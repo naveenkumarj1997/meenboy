@@ -1,0 +1,799 @@
+/* ============================================
+   AnimatedOceanScene — Enhanced Keyframe Animations
+   Serene Boat Ride: Breathing Life into Still Waters
+   ============================================ */
+
+/* --- Sky & Atmosphere --- */
+@keyframes sky-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+  50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+}
+
+@keyframes glow-ring {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+  50% { transform: translate(-50%, -50%) scale(1.4); opacity: 0.1; }
+}
+
+/* --- Stars --- */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes twinkle-alt {
+  0%, 100% { opacity: 0.6; }
+  30% { opacity: 0.1; }
+  70% { opacity: 0.9; }
+}
+
+/* --- Clouds --- */
+@keyframes drift-cloud-1 {
+  0% { transform: translateX(-10%); }
+  100% { transform: translateX(110%); }
+}
+
+@keyframes drift-cloud-2 {
+  0% { transform: translateX(110%) scaleX(-1); }
+  100% { transform: translateX(-10%) scaleX(-1); }
+}
+
+@keyframes drift-cloud-3 {
+  0% { transform: translateX(-5%); }
+  100% { transform: translateX(105%); }
+}
+
+/* --- Birds --- */
+@keyframes fly-bird-1 {
+  0% { transform: translate(0, 0) scaleX(1); opacity: 0; }
+  5% { opacity: 0.7; }
+  90% { opacity: 0.7; }
+  100% { transform: translate(calc(100vw + 50px), -80px) scaleX(1); opacity: 0; }
+}
+
+@keyframes fly-bird-2 {
+  0% { transform: translate(0, 0) scaleX(-1); opacity: 0; }
+  5% { opacity: 0.5; }
+  90% { opacity: 0.5; }
+  100% { transform: translate(calc(-100vw - 50px), -60px) scaleX(-1); opacity: 0; }
+}
+
+/* --- Seagull near boat --- */
+@keyframes seagull-hover {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  15% { transform: translate(12px, -8px) rotate(2deg); }
+  30% { transform: translate(25px, -4px) rotate(-1deg); }
+  45% { transform: translate(15px, -12px) rotate(3deg); }
+  60% { transform: translate(-5px, -6px) rotate(-2deg); }
+  75% { transform: translate(-15px, -10px) rotate(1deg); }
+  90% { transform: translate(-8px, -3px) rotate(-1deg); }
+}
+
+@keyframes seagull-wing {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(-0.7); }
+}
+
+/* --- Boat --- */
+@keyframes bob-boat {
+  0%, 100% { transform: translateY(0px); }
+  25% { transform: translateY(-6px); }
+  50% { transform: translateY(-2px); }
+  75% { transform: translateY(-8px); }
+}
+
+@keyframes rock-boat {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(1.5deg); }
+  50% { transform: rotate(-1deg); }
+  75% { transform: rotate(2deg); }
+}
+
+@keyframes boat-drift {
+  0%, 100% { transform: translateX(0px); }
+  50% { transform: translateX(15px); }
+}
+
+/* --- Fisherman Net Animation --- */
+@keyframes cast-net {
+  0% { transform: rotate(-15deg) translateY(0); }
+  15% { transform: rotate(25deg) translateY(-8px); }
+  30% { transform: rotate(35deg) translateY(-12px); }
+  45% { transform: rotate(20deg) translateY(-5px); }
+  55% { transform: rotate(5deg) translateY(2px); }
+  70% { transform: rotate(-10deg) translateY(5px); }
+  85% { transform: rotate(-20deg) translateY(3px); }
+  100% { transform: rotate(-15deg) translateY(0); }
+}
+
+@keyframes fisherman-arm {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(-20deg); }
+  30% { transform: rotate(-35deg); }
+  50% { transform: rotate(-15deg); }
+  70% { transform: rotate(5deg); }
+}
+
+@keyframes net-spread {
+  0% { transform: scaleX(0.4) scaleY(0.3); opacity: 0.3; }
+  20% { transform: scaleX(0.6) scaleY(0.5); opacity: 0.6; }
+  40% { transform: scaleX(1) scaleY(1); opacity: 0.8; }
+  60% { transform: scaleX(1.1) scaleY(1.1); opacity: 0.7; }
+  80% { transform: scaleX(0.8) scaleY(0.7); opacity: 0.5; }
+  100% { transform: scaleX(0.4) scaleY(0.3); opacity: 0.3; }
+}
+
+@keyframes net-sink {
+  0%, 10% { transform: translateY(0) scaleY(1); opacity: 0; }
+  15% { opacity: 0.6; }
+  50% { transform: translateY(20px) scaleY(1.3); opacity: 0.4; }
+  80% { transform: translateY(35px) scaleY(1.5); opacity: 0.2; }
+  100% { transform: translateY(40px) scaleY(1.6); opacity: 0; }
+}
+
+/* --- Waves --- */
+@keyframes wave-move-1 {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes wave-move-2 {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes wave-move-3 {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+/* --- Fish Swimming --- */
+/* Fish SVGs have heads on the LEFT. scaleX(-1) flips them to face RIGHT. */
+@keyframes swim-right {
+  0% { transform: translateX(-120px) scaleX(-1) translateY(0); opacity: 0; }
+  5% { opacity: 1; }
+  45% { transform: translateX(45vw) scaleX(-1) translateY(-8px); }
+  55% { transform: translateX(55vw) scaleX(-1) translateY(5px); }
+  95% { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 120px)) scaleX(-1) translateY(0); opacity: 0; }
+}
+
+/* Fish heads already face LEFT, matching leftward travel — no flip needed */
+@keyframes swim-left {
+  0% { transform: translateX(calc(100vw + 120px)) translateY(0); opacity: 0; }
+  5% { opacity: 1; }
+  45% { transform: translateX(55vw) translateY(6px); }
+  55% { transform: translateX(45vw) translateY(-5px); }
+  95% { opacity: 1; }
+  100% { transform: translateX(-120px) translateY(0); opacity: 0; }
+}
+
+/* School swimming right — flip so fish face right */
+@keyframes swim-school {
+  0% { transform: translateX(-200px) scaleX(-1); }
+  100% { transform: translateX(calc(100vw + 200px)) scaleX(-1); }
+}
+
+/* School swimming left — fish heads already face left */
+@keyframes swim-school-left {
+  0% { transform: translateX(calc(100vw + 200px)); }
+  100% { transform: translateX(-200px); }
+}
+
+@keyframes fish-wobble {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(2deg); }
+  50% { transform: translateY(2px) rotate(-1deg); }
+  75% { transform: translateY(-2px) rotate(1deg); }
+}
+
+@keyframes tail-flick {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(8deg); }
+  75% { transform: rotate(-8deg); }
+}
+
+/* --- Jellyfish --- */
+@keyframes jellyfish-float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-12px) scale(1.02); }
+  50% { transform: translateY(-18px) scale(0.98); }
+  70% { transform: translateY(-10px) scale(1.01); }
+}
+
+@keyframes jellyfish-pulse {
+  0%, 100% { transform: scaleX(1) scaleY(1); }
+  50% { transform: scaleX(1.08) scaleY(0.92); }
+}
+
+@keyframes tentacle-sway {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  25% { transform: rotate(5deg) scaleY(1.05); }
+  50% { transform: rotate(-3deg) scaleY(0.95); }
+  75% { transform: rotate(4deg) scaleY(1.02); }
+}
+
+/* --- Seaweed --- */
+@keyframes seaweed-sway {
+  0%, 100% { transform: rotate(0deg) scaleY(1); }
+  25% { transform: rotate(6deg) scaleY(1.02); }
+  50% { transform: rotate(-4deg) scaleY(0.98); }
+  75% { transform: rotate(5deg) scaleY(1.01); }
+}
+
+@keyframes seaweed-sway-alt {
+  0%, 100% { transform: rotate(2deg); }
+  33% { transform: rotate(-5deg); }
+  66% { transform: rotate(7deg); }
+}
+
+/* --- Bubbles --- */
+@keyframes bubble-rise {
+  0% { transform: translateY(0) translateX(0) scale(0.5); opacity: 0; }
+  10% { opacity: 0.6; }
+  50% { transform: translateY(-60px) translateX(8px) scale(0.8); opacity: 0.4; }
+  80% { opacity: 0.2; }
+  100% { transform: translateY(-130px) translateX(-5px) scale(1); opacity: 0; }
+}
+
+@keyframes bubble-rise-sm {
+  0% { transform: translateY(0) translateX(0) scale(0.3); opacity: 0; }
+  10% { opacity: 0.5; }
+  100% { transform: translateY(-100px) translateX(5px) scale(0.6); opacity: 0; }
+}
+
+/* --- Dolphin Jump --- */
+@keyframes dolphin-jump {
+  0% { transform: translate(0, 20px) rotate(30deg) scaleX(-1); opacity: 0; }
+  10% { opacity: 1; }
+  30% { transform: translate(30px, -40px) rotate(-10deg) scaleX(-1); }
+  50% { transform: translate(60px, -55px) rotate(-30deg) scaleX(-1); }
+  70% { transform: translate(90px, -30px) rotate(-50deg) scaleX(-1); }
+  85% { opacity: 1; }
+  95% { transform: translate(110px, 15px) rotate(-70deg) scaleX(-1); opacity: 0; }
+  100% { transform: translate(115px, 25px) rotate(-75deg) scaleX(-1); opacity: 0; }
+}
+
+@keyframes dolphin-splash {
+  0%, 40% { opacity: 0; transform: scale(0.3); }
+  50% { opacity: 0.6; transform: scale(1); }
+  70% { opacity: 0.3; transform: scale(1.5); }
+  100% { opacity: 0; transform: scale(2); }
+}
+
+/* --- Crab --- */
+@keyframes crab-walk {
+  0% { transform: translateX(0) scaleX(1); }
+  45% { transform: translateX(40px) scaleX(1); }
+  50% { transform: translateX(40px) scaleX(-1); }
+  95% { transform: translateX(0) scaleX(-1); }
+  100% { transform: translateX(0) scaleX(1); }
+}
+
+@keyframes crab-claw {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-15deg); }
+  60% { transform: rotate(10deg); }
+}
+
+/* --- Starfish --- */
+@keyframes starfish-breathe {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.05) rotate(3deg); }
+}
+
+/* --- Seahorse --- */
+@keyframes seahorse-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-6px) rotate(3deg); }
+  50% { transform: translateY(-2px) rotate(-2deg); }
+  75% { transform: translateY(-8px) rotate(2deg); }
+}
+
+/* --- Sea Turtle --- */
+/* Turtle SVG has head on LEFT — flip so it faces right while swimming right */
+@keyframes turtle-swim {
+  0% { transform: translateX(-150px) scaleX(-1) translateY(0); opacity: 0; }
+  5% { opacity: 0.8; }
+  30% { transform: translateX(20vw) scaleX(-1) translateY(-10px); }
+  50% { transform: translateX(40vw) scaleX(-1) translateY(5px); }
+  70% { transform: translateX(60vw) scaleX(-1) translateY(-8px); }
+  95% { opacity: 0.8; }
+  100% { transform: translateX(calc(100vw + 150px)) scaleX(-1) translateY(0); opacity: 0; }
+}
+
+@keyframes turtle-flipper {
+  0%, 100% { transform: rotate(0deg); }
+  50% { transform: rotate(-20deg); }
+}
+
+/* --- Reflections & Shimmer --- */
+@keyframes shimmer {
+  0%, 100% { opacity: 0.15; transform: scaleY(1) translateY(0); }
+  25% { opacity: 0.25; transform: scaleY(1.02) translateY(1px); }
+  50% { opacity: 0.1; transform: scaleY(0.98) translateY(-1px); }
+  75% { opacity: 0.2; transform: scaleY(1.01) translateY(2px); }
+}
+
+@keyframes ripple-expand {
+  0% { transform: scaleX(1); opacity: 0.4; }
+  100% { transform: scaleX(2.5); opacity: 0; }
+}
+
+@keyframes light-ray {
+  0%, 100% { opacity: 0.03; }
+  50% { opacity: 0.08; }
+}
+
+/* --- Shooting Star --- */
+@keyframes shooting-star {
+  0% { transform: translate(0, 0) rotate(-35deg); opacity: 0; }
+  5% { opacity: 1; }
+  15% { opacity: 0; }
+  100% { transform: translate(200px, 120px) rotate(-35deg); opacity: 0; }
+}
+
+/* --- Fog / Mist --- */
+@keyframes fog-drift {
+  0% { transform: translateX(-10%) scaleX(1.2); opacity: 0.04; }
+  50% { transform: translateX(5%) scaleX(1); opacity: 0.08; }
+  100% { transform: translateX(-10%) scaleX(1.2); opacity: 0.04; }
+}
+
+/* --- Underwater Light Rays --- */
+@keyframes underwater-ray {
+  0%, 100% { opacity: 0.03; transform: skewX(-5deg); }
+  50% { opacity: 0.07; transform: skewX(5deg); }
+}
+
+/* --- Water Surface Caustics --- */
+@keyframes caustic-shift {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 100% 100%; }
+}
+
+/* ============================================
+   Scene Container Styles
+   ============================================ */
+
+.ocean-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+/* Sky */
+.ocean-scene__sky {
+  position: absolute;
+  inset: 0;
+  bottom: 40%;
+  background: linear-gradient(
+    180deg,
+    #0a2a3c 0%,
+    #0d3b4f 15%,
+    #115e6e 30%,
+    #1a7a7a 45%,
+    #2d9e8e 60%,
+    #5cc4a8 75%,
+    #f0c27f 88%,
+    #fc8a4a 95%,
+    #e85d3a 100%
+  );
+  background-size: 200% 200%;
+  animation: sky-shift 30s ease-in-out infinite;
+}
+
+/* Sun */
+.ocean-scene__sun {
+  position: absolute;
+  left: 50%;
+  bottom: 38%;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe4a0 0%, #ffb347 40%, #ff6b35 70%, transparent 100%);
+  animation: glow-pulse 6s ease-in-out infinite;
+  z-index: 1;
+}
+
+.ocean-scene__sun-ring {
+  position: absolute;
+  left: 50%;
+  bottom: 38%;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,179,71,0.25) 0%, transparent 70%);
+  animation: glow-ring 6s ease-in-out infinite;
+  z-index: 0;
+}
+
+/* Stars */
+.ocean-scene__star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #fff;
+  border-radius: 50%;
+  animation: twinkle 3s ease-in-out infinite;
+}
+
+.ocean-scene__star--alt { animation-name: twinkle-alt; }
+
+.ocean-scene__star--lg {
+  width: 3px;
+  height: 3px;
+  box-shadow: 0 0 4px 1px rgba(255, 255, 255, 0.3);
+}
+
+/* Shooting star */
+.ocean-scene__shooting-star {
+  position: absolute;
+  width: 30px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.8), transparent);
+  border-radius: 2px;
+  animation: shooting-star 8s ease-in-out infinite;
+  opacity: 0;
+}
+
+/* Clouds */
+.ocean-scene__cloud {
+  position: absolute;
+  opacity: 0.25;
+  filter: blur(1px);
+}
+
+.ocean-scene__cloud--1 { top: 8%; animation: drift-cloud-1 60s linear infinite; }
+.ocean-scene__cloud--2 { top: 15%; animation: drift-cloud-2 80s linear infinite; opacity: 0.15; }
+.ocean-scene__cloud--3 { top: 5%; animation: drift-cloud-3 100s linear infinite; opacity: 0.12; }
+
+/* Birds */
+.ocean-scene__bird { position: absolute; opacity: 0; }
+.ocean-scene__bird--1 { top: 18%; left: -5%; animation: fly-bird-1 18s ease-in-out infinite; animation-delay: 3s; }
+.ocean-scene__bird--2 { top: 12%; right: -5%; animation: fly-bird-2 22s ease-in-out infinite; animation-delay: 10s; }
+.ocean-scene__bird--3 { top: 22%; left: -8%; animation: fly-bird-1 25s ease-in-out infinite; animation-delay: 7s; }
+
+/* Seagulls near boat */
+.ocean-scene__seagull {
+  position: absolute;
+  z-index: 6;
+  animation: seagull-hover 12s ease-in-out infinite;
+}
+
+.ocean-scene__seagull--1 { left: 42%; bottom: 52%; }
+.ocean-scene__seagull--2 { left: 56%; bottom: 55%; animation-delay: -4s; animation-duration: 15s; }
+
+/* Mountains */
+.ocean-scene__mountains {
+  position: absolute;
+  bottom: 38%;
+  left: 0;
+  width: 100%;
+  z-index: 2;
+}
+
+/* Water */
+.ocean-scene__water {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(
+    180deg,
+    #0a4a5e 0%,
+    #083d4f 15%,
+    #07354a 30%,
+    #062f3d 50%,
+    #041f2a 80%,
+    #021520 100%
+  );
+  z-index: 3;
+}
+
+/* Underwater light rays */
+.ocean-scene__underwater-ray {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* Wave layers */
+.ocean-scene__wave-layer {
+  position: absolute;
+  left: 0;
+  width: 200%;
+  z-index: 4;
+}
+
+.ocean-scene__wave-layer--1 { top: -2px; height: 25px; animation: wave-move-1 8s linear infinite; opacity: 0.6; }
+.ocean-scene__wave-layer--2 { top: 8px; height: 20px; animation: wave-move-2 12s linear infinite; opacity: 0.4; }
+.ocean-scene__wave-layer--3 { top: 16px; height: 18px; animation: wave-move-3 10s linear infinite; opacity: 0.3; }
+
+/* Boat group */
+.ocean-scene__boat-group {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 36%;
+  transform: translateX(-50%);
+  animation: boat-drift 20s ease-in-out infinite;
+}
+
+.ocean-scene__boat-bob { animation: bob-boat 5s ease-in-out infinite; }
+.ocean-scene__boat-rock { transform-origin: center bottom; animation: rock-boat 4s ease-in-out infinite; }
+
+/* Fisherman */
+.ocean-scene__fisherman {
+  transform-origin: bottom center;
+}
+
+.ocean-scene__fisherman-arm {
+  transform-origin: 50% 85%;
+  animation: fisherman-arm 8s ease-in-out infinite;
+}
+
+.ocean-scene__fishing-net {
+  transform-origin: top center;
+  animation: cast-net 8s ease-in-out infinite;
+}
+
+.ocean-scene__net-water {
+  animation: net-sink 8s ease-in-out infinite;
+  opacity: 0;
+}
+
+/* Boat reflection */
+.ocean-scene__boat-reflection {
+  position: absolute;
+  left: 50%;
+  bottom: 28%;
+  transform: translateX(-50%) scaleY(-1);
+  opacity: 0.15;
+  filter: blur(4px);
+  z-index: 4;
+  animation: shimmer 5s ease-in-out infinite;
+}
+
+/* Sun reflection on water */
+.ocean-scene__sun-reflection {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 10%;
+  width: 4px;
+  height: 30%;
+  background: linear-gradient(180deg, rgba(255, 179, 71, 0.3) 0%, rgba(255, 179, 71, 0.15) 30%, rgba(255, 179, 71, 0.05) 60%, transparent 100%);
+  z-index: 4;
+  filter: blur(8px);
+  animation: shimmer 4s ease-in-out infinite;
+}
+
+/* Ripple rings (wider for larger boat) */
+.ocean-scene__ripple {
+  position: absolute;
+  left: 50%;
+  bottom: 34%;
+  transform: translateX(-50%);
+  width: 140px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 5;
+  animation: ripple-expand 4s ease-out infinite;
+}
+
+.ocean-scene__ripple--2 { animation-delay: 2s; width: 110px; }
+.ocean-scene__ripple--3 { animation-delay: 1s; width: 90px; bottom: 33%; }
+
+/* Light rays */
+.ocean-scene__light-ray {
+  position: absolute;
+  left: 50%;
+  bottom: 40%;
+  width: 300px;
+  height: 200px;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(255, 200, 100, 0.1) 0%, transparent 100%);
+  clip-path: polygon(45% 0%, 55% 0%, 70% 100%, 30% 100%);
+  z-index: 1;
+  animation: light-ray 8s ease-in-out infinite;
+}
+
+/* Fog */
+.ocean-scene__fog {
+  position: absolute;
+  bottom: 35%;
+  left: -5%;
+  right: -5%;
+  height: 15%;
+  background: linear-gradient(90deg, transparent 0%, rgba(200,230,230,0.06) 20%, rgba(200,230,230,0.1) 50%, rgba(200,230,230,0.06) 80%, transparent 100%);
+  z-index: 6;
+  animation: fog-drift 25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Fish Styles ── */
+.ocean-scene__fish {
+  position: absolute;
+  z-index: 4;
+}
+
+.ocean-scene__fish--wobble {
+  animation: fish-wobble 2s ease-in-out infinite;
+}
+
+.ocean-scene__fish-swim-right {
+  animation: swim-right var(--swim-duration, 18s) linear infinite;
+  animation-delay: var(--swim-delay, 0s);
+}
+
+.ocean-scene__fish-swim-left {
+  animation: swim-left var(--swim-duration, 20s) linear infinite;
+  animation-delay: var(--swim-delay, 0s);
+}
+
+/* School of small fish */
+.ocean-scene__fish-school {
+  position: absolute;
+  z-index: 4;
+  animation: swim-school var(--school-duration, 25s) linear infinite;
+  animation-delay: var(--school-delay, 0s);
+}
+
+/* Jellyfish */
+.ocean-scene__jellyfish {
+  position: absolute;
+  z-index: 4;
+  animation: jellyfish-float 6s ease-in-out infinite;
+}
+
+.ocean-scene__jellyfish-body {
+  animation: jellyfish-pulse 3s ease-in-out infinite;
+}
+
+.ocean-scene__jellyfish-tentacle {
+  transform-origin: top center;
+  animation: tentacle-sway 4s ease-in-out infinite;
+}
+
+/* Seaweed */
+.ocean-scene__seaweed {
+  position: absolute;
+  bottom: 0;
+  z-index: 3;
+  transform-origin: bottom center;
+  animation: seaweed-sway 5s ease-in-out infinite;
+}
+
+.ocean-scene__seaweed--alt {
+  animation-name: seaweed-sway-alt;
+}
+
+/* Bubbles */
+.ocean-scene__bubble {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(150, 220, 240, 0.3);
+  background: radial-gradient(circle at 30% 30%, rgba(200, 240, 255, 0.2), transparent);
+  z-index: 5;
+  animation: bubble-rise var(--bubble-duration, 4s) ease-out infinite;
+  animation-delay: var(--bubble-delay, 0s);
+  opacity: 0;
+}
+
+.ocean-scene__bubble--sm {
+  animation-name: bubble-rise-sm;
+}
+
+/* Dolphin */
+.ocean-scene__dolphin {
+  position: absolute;
+  z-index: 6;
+  opacity: 0;
+  animation: dolphin-jump 6s ease-in-out infinite;
+  animation-delay: 8s;
+}
+
+.ocean-scene__dolphin-splash {
+  position: absolute;
+  z-index: 5;
+  animation: dolphin-splash 6s ease-in-out infinite;
+  animation-delay: 8s;
+  opacity: 0;
+}
+
+/* Crab */
+.ocean-scene__crab {
+  position: absolute;
+  bottom: 2%;
+  z-index: 4;
+  animation: crab-walk 12s ease-in-out infinite;
+}
+
+.ocean-scene__crab-claw {
+  transform-origin: bottom right;
+  animation: crab-claw 3s ease-in-out infinite;
+}
+
+/* Starfish */
+.ocean-scene__starfish {
+  position: absolute;
+  bottom: 1%;
+  z-index: 3;
+  animation: starfish-breathe 6s ease-in-out infinite;
+}
+
+/* Seahorse */
+.ocean-scene__seahorse {
+  position: absolute;
+  z-index: 4;
+  animation: seahorse-bob 5s ease-in-out infinite;
+}
+
+/* Sea Turtle */
+.ocean-scene__turtle {
+  position: absolute;
+  z-index: 4;
+  animation: turtle-swim 35s linear infinite;
+  animation-delay: 5s;
+  opacity: 0;
+}
+
+.ocean-scene__turtle-flipper {
+  transform-origin: 80% 50%;
+  animation: turtle-flipper 1.5s ease-in-out infinite;
+}
+
+/* Coral */
+.ocean-scene__coral {
+  position: absolute;
+  bottom: 0;
+  z-index: 3;
+}
+
+/* Content overlay */
+.ocean-scene__content-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10,42,60,0.4) 0%, rgba(10,42,60,0.2) 30%, rgba(10,42,60,0.1) 50%, rgba(10,42,60,0.3) 70%, rgba(4,31,42,0.6) 100%);
+  z-index: 7;
+  pointer-events: none;
+}
+
+/* ============================================
+   Accessibility: Reduced Motion
+   ============================================ */
+@media (prefers-reduced-motion: reduce) {
+  .ocean-scene * {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+  .ocean-scene__star { opacity: 0.5; }
+  .ocean-scene__cloud { opacity: 0.2; }
+  .ocean-scene__bird { opacity: 0; }
+  .ocean-scene__fish, .ocean-scene__fish-school,
+  .ocean-scene__jellyfish, .ocean-scene__dolphin,
+  .ocean-scene__turtle, .ocean-scene__bubble { opacity: 0 !important; }
+}
+
+/* ============================================
+   Responsive Adjustments
+   ============================================ */
+@media (max-width: 768px) {
+  .ocean-scene__sun { width: 50px; height: 50px; }
+  .ocean-scene__sun-ring { width: 100px; height: 100px; }
+  .ocean-scene__boat-group { transform: translateX(-50%) scale(0.45); }
+  .ocean-scene__boat-reflection { transform: translateX(-50%) scaleY(-1) scale(0.45); }
+  .ocean-scene__light-ray { width: 150px; height: 120px; }
+  .ocean-scene__seagull { transform: scale(0.7); }
+  .ocean-scene__dolphin { transform: scale(0.6); }
+  .ocean-scene__jellyfish { transform: scale(0.7); }
+  .ocean-scene__seaweed { transform: scale(0.8); }
+}

@@ -1,0 +1,52 @@
+/* CustomCursor.css */
+
+
+/* Ensure the custom cursor stays on top and doesn't interfere with clicks */
+.custom-cursor-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 99999;
+  overflow: hidden;
+}
+
+/* Hide custom cursor on touch devices */
+@media (pointer: coarse) {
+  .custom-cursor-container {
+    display: none !important;
+  }
+}
+
+/* Ripple Animation */
+.cursor-ripple {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid rgba(45, 212, 191, 0.6); /* Teal-400 */
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.3), inset 0 0 10px rgba(45, 212, 191, 0.3);
+  transform: translate(-50%, -50%);
+  animation: cursor-ripple-expand 0.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes cursor-ripple-expand {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 1;
+    border-width: 4px;
+  }
+  100% {
+    width: 80px;
+    height: 80px;
+    opacity: 0;
+    border-width: 0px;
+  }
+}
+
+/* Main fish glow effect */
+.fish-glow {
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.8)) drop-shadow(0 0 16px rgba(34, 211, 238, 0.6));
+}

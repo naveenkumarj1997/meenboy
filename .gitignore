@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Build Outputs
+dist/
+build/
+.tscache/
+
+# Environment Variables
+.env
+.env.local
+.env.development
+.env.production
+
+# Server Uploads
+server/uploads/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/

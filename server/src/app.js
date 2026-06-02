@@ -1,0 +1,65 @@
+const express = require("express");
+const cors = require("cors");
+const helmet = require("helmet");
+const morgan = require("morgan");
+const { getDbState } = require("./config/db");
+const authRoutes = require("./routes/authRoutes");
+const dashboardRoutes = require("./routes/dashboardRoutes");
+const catalogRoutes = require("./routes/catalogRoutes");
+const orderRoutes = require("./routes/orderRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
+const userRoutes = require("./routes/userRoutes");
+const financeRoutes = require("./routes/financeRoutes");
+const availabilityRoutes = require("./routes/availabilityRoutes");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
+
+const app = express();
+
+app.use(
+  cors({
+    origin: [
+      process.env.CLIENT_URL || "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:5174",
+      "http://127.0.0.1:5174"
+    ],
+    credentials: true
+  })
+);
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(morgan("dev"));
+app.use(express.json());
+
+app.get("/api/health", (req, res) => {
+  const dbState = getDbState();
+  res.status(dbState === "connected" ? 200 : 503).json({
+    status: dbState === "connected" ? "ok" : "degraded",
+    service: "MEENBOY API",
+    database: dbState
+  });
+});
+
+const path = require("path");
+const uploadRoutes = require("./routes/uploadRoutes");
+
+// Serve static files from the uploads directory
+app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
+
+app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/catalog", catalogRoutes);
+app.use("/api/orders", orderRoutes);
+app.use("/api/payments", paymentRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/finance", financeRoutes);
+app.use("/api/availability", availabilityRoutes);
+
+app.use(notFound);
+app.use(errorHandler);
+
+module.exports = app;

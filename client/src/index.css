@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slate-100: var(--color-cyan-100);
+  --color-slate-200: var(--color-cyan-200);
+  --color-slate-300: var(--color-cyan-300);
+  --color-slate-400: var(--color-cyan-400);
+  --color-slate-500: var(--color-cyan-500);
+  --color-slate-600: var(--color-cyan-600);
+  --color-slate-700: var(--color-cyan-700);
+  --color-slate-800: var(--color-cyan-800);
+  --color-slate-900: var(--color-cyan-900);
+  --color-slate-950: var(--color-cyan-950);
+  
+  --color-indigo-300: var(--color-teal-300);
+  --color-indigo-400: var(--color-teal-400);
+  --color-indigo-500: var(--color-teal-500);
+  --color-indigo-600: var(--color-teal-600);
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--color-cyan-950);
+  color: #f8fafc;
+}
+
+* {
+  box-sizing: border-box;
+}
