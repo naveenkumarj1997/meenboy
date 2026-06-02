@@ -60,7 +60,7 @@ export default function AdminProfile() {
         updatePayload.password = formData.password;
       }
 
-      await updateUser(token, user.id || user._id, updatePayload);
+      await updateUser(token, user.id || (user as any)._id, updatePayload);
       setSuccess("Profile updated successfully!");
       setFormData(prev => ({ ...prev, password: "" })); // Clear password field
     } catch (err: any) {

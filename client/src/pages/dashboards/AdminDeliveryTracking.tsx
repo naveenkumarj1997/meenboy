@@ -16,7 +16,6 @@ import {
   BarChart,
   Bar,
   XAxis,
-  YAxis,
   Tooltip as RechartsTooltip,
   ResponsiveContainer
 } from "recharts";
@@ -191,7 +190,7 @@ export default function AdminDeliveryTracking() {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie data={pieData} dataKey="value" cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5}>
-                  {pieData.map((entry, index) => (
+                  {pieData.map((_entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>

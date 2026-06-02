@@ -1,5 +1,7 @@
 // ─── Availability API ─────────────────────────────────────────────────────────
 
+import { request } from './api';
+
 export interface AvailabilityPayload {
   date: string;
   isClosed: boolean;

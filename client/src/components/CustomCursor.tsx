@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, useMotionValue, useSpring } from 'framer-motion';
 import './CustomCursor.css';
 
@@ -39,12 +39,6 @@ const CustomCursor = () => {
 
   // Click states for ripples
   const [ripples, setRipples] = useState<{ id: number; x: number; y: number }[]>([]);
-
-  // Springs for the main fish (fast, snappy)
-  const springConfigMain = { damping: 25, stiffness: 400, mass: 0.5 };
-  const mainX = useSpring(mouseX, springConfigMain);
-  const mainY = useSpring(mouseY, springConfigMain);
-  const mainRot = useSpring(rotation, springConfigMain);
 
   // Springs for trailing fish (slow and calm)
   const slowRot = useSpring(rotation, { damping: 50, stiffness: 40, mass: 1.5 });

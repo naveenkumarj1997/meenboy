@@ -21,11 +21,12 @@ This guide explains how to push your code to GitHub and deploy the MERN stack ap
 
 ---
 
-## Step 2: Deploy Backend to Railway
-Railway is perfect for Node.js backends.
+## Step 2: Deploy Backend
+You can deploy your backend to either **Railway** or **Render** (if you hit Railway's free project limits).
 
+### Option A: Railway
 1. Go to [Railway.app](https://railway.app/) and log in with GitHub.
-2. Click **New Project** > **Deploy from GitHub repo**.
+2. Click **New Project** > **Deploy from GitHub repo**. (If it asks you to upgrade, it means you've reached your free project limit. You can either delete an old project or use Option B below).
 3. Select your MEENBOY repository.
 4. **Important**: Since this is a monorepo, Railway will detect multiple folders. When configuring the deployment:
    - Set the **Root Directory** to `/server`.
@@ -35,8 +36,21 @@ Railway is perfect for Node.js backends.
    - `NODE_ENV` = `production`
    - `MONGODB_URI` = `your_mongodb_connection_string`
    - `JWT_SECRET` = `a_long_secure_random_string`
-   - `CLIENT_URL` = (Leave blank for now, we will update this after deploying Vercel)
-6. Go to the **Settings** tab > **Networking** > **Generate Domain**. Copy this public URL (e.g., `https://meenboy-api-production.up.railway.app`).
+   - `CLIENT_URL` = (Leave blank for now)
+6. Go to the **Settings** tab > **Networking** > **Generate Domain**. Copy this public URL.
+
+### Option B: Render.com (Free Alternative)
+1. Go to [Render.com](https://render.com/) and create a free account with GitHub.
+2. Click **New** > **Web Service**.
+3. Connect your GitHub repository.
+4. Fill out the configuration:
+   - **Name**: meenboy-api (or whatever you prefer)
+   - **Root Directory**: `server`
+   - **Environment**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+5. Scroll down to **Environment Variables** and add the same variables as above (`PORT`, `NODE_ENV`, `MONGODB_URI`, `JWT_SECRET`, `CLIENT_URL`).
+6. Click **Create Web Service**. Render will generate a URL like `https://meenboy-api.onrender.com`. Copy this URL.
 
 ---
 

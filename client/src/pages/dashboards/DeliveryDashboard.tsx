@@ -191,7 +191,7 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const [localDocumentUrl, setLocalDocumentUrl] = useState<string | undefined>(user?.documentUrl);
+  const [localDocumentUrl, setLocalDocumentUrl] = useState<string | undefined>((user as any)?.documentUrl);
 
   if (user?.status === "pending") {
     if (!localDocumentUrl) {

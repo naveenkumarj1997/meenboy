@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link, Navigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { createOrder, createPayment, getMyOrders, getAvailabilityByDate, type OrderPayload } from "../lib/api";
@@ -46,7 +45,7 @@ const CheckoutPage = () => {
   const [errors, setErrors] = useState<Partial<CheckoutForm>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessingUPI, setIsProcessingUPI] = useState(false);
-  const [orderPlaced, setOrderPlaced] = useState(false);
+
   const [lockedFields, setLockedFields] = useState({
     name: false,
     phone: false,

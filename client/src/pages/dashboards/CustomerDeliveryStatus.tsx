@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getMyOrders } from "../../lib/api";
 import DashboardShell from "./DashboardShell";
@@ -10,7 +10,7 @@ const CUSTOMER_NAV_LINKS = [
 ];
 
 export default function CustomerDeliveryStatus() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");

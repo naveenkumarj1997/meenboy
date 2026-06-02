@@ -10,7 +10,7 @@ interface AuthPayload {
   role?: "customer" | "admin" | "delivery_partner";
 }
 
-const request = async <T>(url: string, options?: RequestInit): Promise<T> => {
+export const request = async <T>(url: string, options?: RequestInit): Promise<T> => {
   const { headers, ...restOptions } = options || {};
   const response = await fetch(`${API_BASE}${url}`, {
     ...restOptions,

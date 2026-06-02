@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
-import { getAllUsers, updateUser, deleteUser } from "../../lib/api";
+import { getAllUsers, updateUser } from "../../lib/api";
 
 const NAV_LINKS = [
   { label: "Overview", href: "/dashboard/admin" },
@@ -112,17 +112,7 @@ export default function AdminUsers() {
     }
   };
 
-  const handleDelete = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to permanently delete this user?")) return;
-    try {
-      setError("");
-      await deleteUser(token!, userId);
-      setSuccess("User deleted successfully");
-      fetchUsers();
-    } catch (err: any) {
-      setError(err.message || "Failed to delete user");
-    }
-  };
+
 
   const handleToggleBlock = async (user: any) => {
     try {

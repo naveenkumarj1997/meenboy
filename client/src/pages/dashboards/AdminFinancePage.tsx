@@ -27,7 +27,7 @@ const formatCurrency = (amount: number) => {
 };
 
 export default function AdminFinancePage() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [summary, setSummary] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
