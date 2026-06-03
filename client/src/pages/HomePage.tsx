@@ -41,7 +41,7 @@ const HomePage = () => {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2 }}
-            className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white mb-6 drop-shadow-xl whitespace-nowrap"
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight text-white mb-6 drop-shadow-xl"
           >
             Ocean Fresh to Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-cyan-300">Doorstep</span>
           </motion.h1>
@@ -59,13 +59,13 @@ const HomePage = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="mt-12 flex flex-col sm:flex-row justify-center gap-6"
+            className="mt-12 flex flex-col sm:flex-row justify-center items-center gap-6"
           >
             <Link
               to="/products"
               className="group relative rounded-full bg-teal-500 px-8 py-4 font-bold text-white hover:bg-teal-400 transition-all duration-300 shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_30px_rgba(20,184,166,0.6)] overflow-hidden"
             >
-              <span className="relative z-10 flex items-center gap-2">
+              <span className="relative z-10 flex items-center justify-center gap-2">
                 Start Ordering
                 <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
@@ -206,7 +206,7 @@ const HomePage = () => {
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="absolute -bottom-8 -left-8 bg-white text-cyan-950 p-6 rounded-2xl shadow-xl">
+            <div className="absolute -bottom-4 left-4 sm:-bottom-8 sm:-left-8 bg-white text-cyan-950 p-6 rounded-2xl shadow-xl">
               <div className="flex items-center gap-4">
                 <div className="text-4xl font-black text-teal-500">5k+</div>
                 <div className="text-sm font-bold leading-tight">Happy<br/>Customers</div>

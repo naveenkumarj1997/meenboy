@@ -6,6 +6,12 @@ import AdminProductsPage from "./pages/dashboards/AdminProductsPage";
 import AdminDailyPrices from "./pages/dashboards/AdminDailyPrices";
 import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
+import AdminPendingPayments from "./pages/dashboards/AdminPendingPayments";
+import AdminCollectedPayments from "./pages/dashboards/AdminCollectedPayments";
+import AdminPurchases from "./pages/dashboards/AdminPurchases";
+import AdminSettlements from "./pages/dashboards/AdminSettlements";
+import AdminPartnerSalary from "./pages/dashboards/AdminPartnerSalary";
+import AdminEarnings from "./pages/dashboards/AdminEarnings";
 import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
@@ -30,6 +36,7 @@ import CartPage from "./pages/CartPage";
 import CheckoutPage from "./pages/CheckoutPage";
 import PaymentStatusPage from "./pages/PaymentStatusPage";
 import PaymentHistoryPage from "./pages/dashboards/PaymentHistoryPage";
+import PartnerEarnings from "./pages/dashboards/PartnerEarnings";
 import CustomCursor from "./components/CustomCursor";
 
 const DashboardRouter = () => {
@@ -84,6 +91,12 @@ function App() {
           <Route path="/dashboard/admin/daily-prices" element={<AdminDailyPrices />} />
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />
+          <Route path="/dashboard/admin/pending-payments" element={<AdminPendingPayments />} />
+          <Route path="/dashboard/admin/collected-payments" element={<AdminCollectedPayments />} />
+          <Route path="/dashboard/admin/purchases" element={<AdminPurchases />} />
+          <Route path="/dashboard/admin/settlements" element={<AdminSettlements />} />
+          <Route path="/dashboard/admin/partner-salary" element={<AdminPartnerSalary />} />
+          <Route path="/dashboard/admin/earnings" element={<AdminEarnings />} />
           <Route path="/dashboard/admin/users" element={<AdminUsers />} />
           <Route path="/dashboard/admin/finance" element={<AdminFinancePage />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
@@ -95,6 +108,7 @@ function App() {
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["delivery_partner"]} />}>
           <Route path="/dashboard/delivery" element={<DeliveryDashboard />} />
+          <Route path="/dashboard/delivery/earnings" element={<PartnerEarnings />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -41,7 +41,7 @@ const deliveryAssignmentSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["cash", "upi", "none"],
+      enum: ["cash", "upi", "none", "partial_cash", "partial_upi", "pay_later"],
       default: "none"
     }
   },

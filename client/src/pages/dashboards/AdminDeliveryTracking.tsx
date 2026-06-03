@@ -29,6 +29,12 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
+  { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
+  { label: "Purchases", href: "/dashboard/admin/purchases" },
+  { label: "Settlements", href: "/dashboard/admin/settlements" },
+  { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
+  { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
   { label: "Users", href: "/dashboard/admin/users" },
   { label: "Money", href: "/dashboard/admin/finance" },
   { label: "Availability", href: "/dashboard/admin/availability" },
@@ -380,6 +386,7 @@ export default function AdminDeliveryTracking() {
                   <th className="px-6 py-4 font-medium">Customer Details</th>
                   <th className="px-6 py-4 font-medium">Items</th>
                   <th className="px-6 py-4 font-medium">Delivery Slot</th>
+                  <th className="px-6 py-4 font-medium">Financials</th>
                   <th className="px-6 py-4 font-medium">Partner</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium">Updated At</th>
@@ -408,6 +415,16 @@ export default function AdminDeliveryTracking() {
                     <td className="px-6 py-4 text-xs">
                       <div>{a.order?.deliveryDate}</div>
                       <div className="text-slate-400">{a.order?.deliveryTime}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-white/80">Total: ₹{a.order?.total?.toFixed(2) || '0.00'}</div>
+                      <div className="text-teal-400 text-xs">Paid: ₹{(a.paymentCollected || 0).toFixed(2)}</div>
+                      {((a.order?.total || 0) - (a.paymentCollected || 0)) > 0 && (
+                        <div className="text-rose-400 text-xs mt-0.5">Pending: ₹{((a.order?.total || 0) - (a.paymentCollected || 0)).toFixed(2)}</div>
+                      )}
+                      <div className="text-blue-300 text-[10px] uppercase tracking-widest mt-1 border border-blue-500/20 bg-blue-500/10 rounded px-1.5 py-0.5 inline-block">
+                        {(a.paymentMethod || a.order?.paymentStatus || 'pending').replace(/_/g, ' ')}
+                      </div>
                     </td>
                     <td className="px-6 py-4 font-medium">{a.deliveryPartner?.name || 'Unknown'}</td>
                     <td className="px-6 py-4">
@@ -461,3 +478,4 @@ export default function AdminDeliveryTracking() {
     </DashboardShell>
   );
 }
+

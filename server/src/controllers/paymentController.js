@@ -47,7 +47,26 @@ const getMyPayments = async (req, res, next) => {
       .populate("order", "total status deliveryDate deliveryTime")
       .sort({ createdAt: -1 })
       .lean();
-    res.json({ payments });
+
+    const ManualCollection = require("../models/ManualCollection");
+    const manualCollections = await ManualCollection.find({ customer: req.user._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formattedCollections = manualCollections.map(mc => ({
+      _id: mc._id.toString(),
+      amount: mc.amount,
+      provider: "admin_collection",
+      status: "captured",
+      createdAt: mc.createdAt,
+      order: null
+    }));
+
+    const combinedPayments = [...payments, ...formattedCollections].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json({ payments: combinedPayments });
   } catch (error) {
     next(error);
   }

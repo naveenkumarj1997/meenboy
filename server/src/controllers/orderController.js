@@ -233,6 +233,20 @@ const updateDeliveryStatus = async (req, res, next) => {
       await Order.findByIdAndUpdate(assignment.order._id, { status: status === "delivered" ? "delivered" : "out_for_delivery" });
     }
 
+    // If delivered and payment was partial or pay later, update user's pending balance
+    if (status === "delivered") {
+      const orderTotal = assignment.order.total;
+      const collected = Number(paymentCollected) || 0;
+      const unpaidAmount = Math.max(0, orderTotal - collected);
+
+      if (unpaidAmount > 0) {
+        await User.findByIdAndUpdate(
+          assignment.order.customer,
+          { $inc: { pendingBalance: unpaidAmount } }
+        );
+      }
+    }
+
     await createNotification({
       user: assignment.order.customer,
       type: "order_status_updated",

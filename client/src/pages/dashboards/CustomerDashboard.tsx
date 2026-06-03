@@ -11,6 +11,13 @@ const CustomerDashboard = () => {
   const [error, setError] = useState("");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Search, sort, pagination
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"date" | "total" | "status">("date");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
+
   const [productImageMap, setProductImageMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -63,6 +70,45 @@ const CustomerDashboard = () => {
   };
 
   const activeOrders = orders.filter(o => !["delivered", "cancelled"].includes(o.status));
+
+  const filteredAndSorted = [...orders]
+    .filter(o => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      // Search by order ID, status, or date
+      return (
+        o._id.toLowerCase().includes(q) ||
+        o.status.replace(/_/g, " ").toLowerCase().includes(q) ||
+        o.deliveryDate?.toLowerCase().includes(q) ||
+        new Date(o.createdAt).toLocaleDateString().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sortBy === "date") {
+        return sortOrder === "desc"
+          ? new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          : new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortBy === "total") {
+        return sortOrder === "desc"
+          ? (b.total || 0) - (a.total || 0)
+          : (a.total || 0) - (b.total || 0);
+      } else {
+        return sortOrder === "desc"
+          ? b.status.localeCompare(a.status)
+          : a.status.localeCompare(b.status);
+      }
+    });
+
+  const totalPages = Math.ceil(filteredAndSorted.length / itemsPerPage) || 1;
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortBy, sortOrder]);
+
+  const paginatedData = filteredAndSorted.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const handleDownloadInvoice = async (orderId: string) => {
     try {
@@ -127,6 +173,40 @@ const CUSTOMER_NAV_LINKS = [
         </Link>
       </div>
 
+      {orders.length > 0 && (
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-6 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
+          <div className="relative w-full md:w-auto flex-1 max-w-sm">
+            <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-white/50">🔍</span>
+            <input
+              type="text"
+              placeholder="Search by Order ID, Date, or Status..."
+              className="w-full bg-cyan-950/30 border border-white/10 rounded-lg pl-10 pr-4 py-2.5 text-white outline-none focus:border-teal-500 transition-colors text-sm"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          
+          <div className="flex gap-2 w-full md:w-auto items-center">
+            <span className="text-sm text-white/50 hidden md:inline-block">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="flex-1 md:w-auto bg-cyan-950/30 border border-white/10 text-white rounded-lg px-3 py-2.5 outline-none focus:border-teal-500 transition-colors text-sm"
+            >
+              <option value="date">Date Placed</option>
+              <option value="total">Order Total</option>
+              <option value="status">Status</option>
+            </select>
+            <button
+              onClick={() => setSortOrder(prev => prev === "desc" ? "asc" : "desc")}
+              className="bg-white/10 hover:bg-white/20 text-white rounded-lg px-3 py-2.5 transition-colors border border-white/10 text-sm"
+            >
+              {sortOrder === "desc" ? "↓ Desc" : "↑ Asc"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {orders.length === 0 ? (
         <div className="bg-white/5 border border-white/10 rounded-3xl p-12 text-center">
           <div className="text-6xl mb-4 opacity-50">🛒</div>
@@ -139,9 +219,15 @@ const CUSTOMER_NAV_LINKS = [
             Start Shopping
           </Link>
         </div>
+      ) : paginatedData.length === 0 ? (
+        <div className="bg-white/5 border border-white/10 rounded-3xl p-12 text-center">
+          <div className="text-4xl mb-4 opacity-50">🔍</div>
+          <h3 className="text-xl font-bold text-white mb-2">No matches found</h3>
+          <p className="text-white/50">Try adjusting your search query or filters.</p>
+        </div>
       ) : (
         <div className="space-y-6">
-          {orders.map((order) => (
+          {paginatedData.map((order) => (
             <div key={order._id} className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
               {/* Order Header */}
               <div className="bg-cyan-950/50 p-4 md:p-6 border-b border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -212,6 +298,30 @@ const CUSTOMER_NAV_LINKS = [
               </div>
             </div>
           ))}
+          
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between pt-4 gap-4">
+              <div className="text-sm text-white/50">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredAndSorted.length)} of {filteredAndSorted.length} orders
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 rounded-lg bg-white/10 text-white disabled:opacity-30 hover:bg-white/20 transition-colors font-medium text-sm"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 rounded-lg bg-white/10 text-white disabled:opacity-30 hover:bg-white/20 transition-colors font-medium text-sm"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </DashboardShell>

@@ -14,6 +14,12 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
+  { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
+  { label: "Purchases", href: "/dashboard/admin/purchases" },
+  { label: "Settlements", href: "/dashboard/admin/settlements" },
+  { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
+  { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
   { label: "Users", href: "/dashboard/admin/users" },
   { label: "Money", href: "/dashboard/admin/finance" },
   { label: "Availability", href: "/dashboard/admin/availability" },
@@ -298,3 +304,4 @@ const AdminAvailability = () => {
 };
 
 export default AdminAvailability;
+

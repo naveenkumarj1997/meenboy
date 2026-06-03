@@ -58,6 +58,11 @@ const userSchema = new mongoose.Schema(
       state: { type: String, trim: true },
       postalCode: { type: String, trim: true },
       country: { type: String, trim: true, default: "India" }
+    },
+    pendingBalance: {
+      type: Number,
+      default: 0,
+      min: 0
     }
   },
   {

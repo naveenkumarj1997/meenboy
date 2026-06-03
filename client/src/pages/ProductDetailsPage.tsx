@@ -142,7 +142,21 @@ const ProductDetailsPage = () => {
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState("");
   const [cartAdded, setCartAdded] = useState(false);
-  const { addToCart } = useCart();
+  const { cartItems, addToCart, updateQuantity: updateCartQuantity } = useCart();
+
+  useEffect(() => {
+    if (!product) return;
+    const cutToUse = selectedCut || product.cuts?.[0];
+    const itemInCart = cartItems.find(item => item.productId === String(product.id) && item.cutName === cutToUse?.name);
+    
+    if (itemInCart) {
+      setQuantity(itemInCart.quantity);
+      if (itemInCart.notes) setNotes(itemInCart.notes);
+    } else {
+      setQuantity(1);
+      setNotes("");
+    }
+  }, [product, selectedCut]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -215,8 +229,6 @@ const ProductDetailsPage = () => {
     };
 
     loadData();
-    setQuantity(1);
-    setNotes("");
     setCartAdded(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [id]);
@@ -228,17 +240,27 @@ const ProductDetailsPage = () => {
     const cutToUse = selectedCut || product.cuts?.[0];
     const price = cutToUse && cutToUse.price > 0 ? cutToUse.price : product.priceRange.min;
     
-    addToCart({
-      productId: String(product.id),
-      name: product.name,
-      price: price,
-      quantity: quantity,
-      image: product.image,
-      category: product.category,
-      cutName: cutToUse?.name,
-      notes: notes.trim() || undefined,
-      unit: product.unit,
-    });
+    let cartItemId = String(product.id);
+    if (cutToUse) cartItemId += `-${cutToUse.name}`;
+    if (notes.trim()) cartItemId += `-${notes.trim()}`;
+
+    const existingItem = cartItems.find(item => item.id === cartItemId);
+
+    if (existingItem) {
+      updateCartQuantity(cartItemId, quantity);
+    } else {
+      addToCart({
+        productId: String(product.id),
+        name: product.name,
+        price: price,
+        quantity: quantity,
+        image: product.image,
+        category: product.category,
+        cutName: cutToUse?.name,
+        notes: notes.trim() || undefined,
+        unit: product.unit,
+      });
+    }
 
     setCartAdded(true);
     setTimeout(() => setCartAdded(false), 2500);
@@ -593,7 +615,7 @@ const ProductDetailsPage = () => {
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    Add to Cart
+                    {cartItems.some(item => item.id === (String(product.id) + (selectedCut ? `-${selectedCut.name}` : (product.cuts?.[0] ? `-${product.cuts[0].name}` : '')) + (notes.trim() ? `-${notes.trim()}` : ''))) ? "Update Cart" : "Add to Cart"}
                     {selectedCut && (
                       <span className="text-sm opacity-75 font-medium">
                         · {selectedCut.name}

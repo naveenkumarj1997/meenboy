@@ -5,6 +5,7 @@ import { getPartnerAssignments, updateDeliveryStatus, reorderAssignments, upload
 
 const NAV_LINKS = [
   { label: "Deliveries", href: "/dashboard/delivery" },
+  { label: "Earnings", href: "/dashboard/delivery/earnings" }
 ];
 
 function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (url: string, phone: string) => void }) {
@@ -517,13 +518,33 @@ export default function DeliveryDashboard() {
                     <select 
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
                       value={statusForm.paymentMethod}
-                      onChange={(e) => setStatusForm({...statusForm, paymentMethod: e.target.value})}
+                      onChange={(e) => {
+                        const newMethod = e.target.value;
+                        if (newMethod === "pay_later") {
+                          setStatusForm({...statusForm, paymentMethod: newMethod, paymentCollected: 0});
+                        } else {
+                          setStatusForm({...statusForm, paymentMethod: newMethod});
+                        }
+                      }}
                     >
-                      <option value="cash">Cash</option>
-                      <option value="upi">UPI / Online</option>
+                      <option value="cash">Cash (Full)</option>
+                      <option value="upi">UPI / Online (Full)</option>
+                      <option value="partial_cash">Partial Payment (Cash)</option>
+                      <option value="partial_upi">Partial Payment (UPI)</option>
+                      <option value="pay_later">Pay Later (Full Amount Pending)</option>
                       <option value="none">Already Paid / None</option>
                     </select>
                   </div>
+                  {statusForm.paymentMethod !== "pay_later" && statusForm.paymentMethod !== "none" && statusForm.paymentCollected < selectedAssignment.order?.total && (
+                    <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-sm">
+                      Amount of ₹{(selectedAssignment.order?.total - statusForm.paymentCollected).toFixed(2)} will be added to customer's pending payments.
+                    </div>
+                  )}
+                  {statusForm.paymentMethod === "pay_later" && (
+                    <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-sm">
+                      Full amount of ₹{selectedAssignment.order?.total?.toFixed(2)} will be added to customer's pending payments.
+                    </div>
+                  )}
                 </>
               )}
 
