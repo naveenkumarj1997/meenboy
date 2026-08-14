@@ -24,12 +24,23 @@ app.use(
       if (!origin) return callback(null, true);
       
       const allowedOrigins = [
-        process.env.CLIENT_URL,
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
         "http://127.0.0.1:5174"
       ];
+      
+      if (process.env.CLIENT_URL) {
+        allowedOrigins.push(process.env.CLIENT_URL);
+        // If they set https://domain.com, also allow https://www.domain.com
+        if (process.env.CLIENT_URL.startsWith('https://') && !process.env.CLIENT_URL.startsWith('https://www.')) {
+          allowedOrigins.push(process.env.CLIENT_URL.replace('https://', 'https://www.'));
+        }
+        // If they set https://www.domain.com, also allow https://domain.com
+        if (process.env.CLIENT_URL.startsWith('https://www.')) {
+          allowedOrigins.push(process.env.CLIENT_URL.replace('https://www.', 'https://'));
+        }
+      }
       
       // Allow if it's in the exact list OR if it's a Vercel deployment URL
       if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
