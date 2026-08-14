@@ -14,8 +14,7 @@ const Navbar = () => {
         <div className="flex justify-between h-16">
           <div className="flex items-center">
             <Link to="/" className="flex items-center gap-2 text-2xl font-bold tracking-wider text-teal-400">
-              <img src="/logo.png" alt="Fishfriendly Logo" className="h-10 w-auto rounded-full bg-white object-cover" />
-              <span className="hidden sm:block">FISHFRIENDLY</span>
+              <span>FISHFRIENDLY</span>
             </Link>
           </div>
 

@@ -102,7 +102,7 @@ const ContactPage = () => {
             <div>
               <h3 className="text-xl font-semibold text-white mb-2">Email Us</h3>
               <p className="text-slate-400 mb-1">For general inquiries:</p>
-              <a href="mailto:support@fishfriendly.com" className="text-teal-400 hover:text-teal-300">support@fishfriendly.com</a>
+              <a href="mailto:fishfriendlymeats@gmail.com" className="text-teal-400 hover:text-teal-300">fishfriendlymeats@gmail.com</a>
             </div>
           </div>
 
@@ -115,7 +115,7 @@ const ContactPage = () => {
             <div>
               <h3 className="text-xl font-semibold text-white mb-2">Call Us</h3>
               <p className="text-slate-400 mb-1">Mon-Fri from 8am to 5pm.</p>
-              <a href="tel:+15551234567" className="text-teal-400 hover:text-teal-300">+1 (555) 123-4567</a>
+              <a href="tel:+919087894319" className="text-teal-400 hover:text-teal-300">+91 9087894319</a>
             </div>
           </div>
 
@@ -129,8 +129,8 @@ const ContactPage = () => {
             <div>
               <h3 className="text-xl font-semibold text-white mb-2">Headquarters</h3>
               <p className="text-slate-400">
-                123 Ocean Drive<br />
-                Sea View City, SC 12345
+                Bypass Road in Kalavasal,<br />
+                Madurai, Tamil Nadu (PIN code: 625016)
               </p>
             </div>
           </div>
