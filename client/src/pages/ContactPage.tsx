@@ -102,7 +102,7 @@ const ContactPage = () => {
             <div>
               <h3 className="text-xl font-semibold text-white mb-2">Email Us</h3>
               <p className="text-slate-400 mb-1">For general inquiries:</p>
-              <a href="mailto:support@meenboy.com" className="text-teal-400 hover:text-teal-300">support@meenboy.com</a>
+              <a href="mailto:support@fishfriendly.com" className="text-teal-400 hover:text-teal-300">support@fishfriendly.com</a>
             </div>
           </div>
 

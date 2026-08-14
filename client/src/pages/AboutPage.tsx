@@ -8,7 +8,7 @@ const AboutPage = () => {
         animate={{ opacity: 1, y: 0 }}
         className="text-center mb-16"
       >
-        <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">About <span className="text-teal-400">MEENBOY</span></h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">About <span className="text-teal-400">FISHFRIENDLY</span></h1>
         <div className="w-24 h-1 bg-teal-500 mx-auto rounded-full"></div>
       </motion.div>
 
@@ -21,10 +21,10 @@ const AboutPage = () => {
           <div className="bg-cyan-900 rounded-2xl p-8 border border-cyan-800 shadow-xl">
             <h2 className="text-2xl font-semibold text-teal-400 mb-4">Our Story</h2>
             <p className="text-slate-300 mb-4 leading-relaxed">
-              Founded with a passion for the ocean, MEENBOY started with a simple mission: to bridge the gap between local fishermen and seafood lovers. We recognized that the journey from the dock to the dinner table was often too long, compromising the quality and freshness of the catch.
+              Founded with a passion for the ocean, FISHFRIENDLY started with a simple mission: to bridge the gap between local fishermen and seafood lovers. We recognized that the journey from the dock to the dinner table was often too long, compromising the quality and freshness of the catch.
             </p>
             <p className="text-slate-300 leading-relaxed">
-              Today, MEENBOY is proud to offer a platform where customers can order premium, sustainably sourced seafood that is delivered fresh to their doorstep. Our state-of-the-art cold-chain delivery system ensures that every order arrives in pristine condition.
+              Today, FISHFRIENDLY is proud to offer a platform where customers can order premium, sustainably sourced seafood that is delivered fresh to their doorstep. Our state-of-the-art cold-chain delivery system ensures that every order arrives in pristine condition.
             </p>
           </div>
         </motion.div>

@@ -52,7 +52,7 @@ const HomePage = () => {
             transition={{ duration: 0.8, delay: 0.4 }}
             className="mt-6 text-xl md:text-2xl text-cyan-100 max-w-3xl mx-auto font-light drop-shadow-lg"
           >
-            MEENBOY connects you with the freshest catch of the day. Hand-selected, sustainably sourced, and delivered with uncompromising quality.
+            FISHFRIENDLY connects you with the freshest catch of the day. Hand-selected, sustainably sourced, and delivered with uncompromising quality.
           </motion.p>
           
           <motion.div 
@@ -116,7 +116,7 @@ const HomePage = () => {
       <section className="w-full py-24 px-4 sm:px-6 lg:px-8 bg-cyan-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-20">
-            <h2 className="text-3xl md:text-4xl font-bold text-cyan-950">The MEENBOY Difference</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-cyan-950">The FISHFRIENDLY Difference</h2>
             <div className="w-24 h-1.5 bg-gradient-to-r from-teal-400 to-cyan-500 mx-auto mt-6 rounded-full"></div>
           </div>
           
@@ -165,7 +165,7 @@ const HomePage = () => {
         
         <div className="max-w-7xl mx-auto relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">Exclusive Benefits for MEENBOY Members</h2>
+            <h2 className="text-4xl md:text-5xl font-bold mb-6">Exclusive Benefits for FISHFRIENDLY Members</h2>
             <p className="text-cyan-200 text-lg mb-10 leading-relaxed">
               Create an account today and dive into a sea of exclusive perks designed to give you the best seafood experience possible.
             </p>

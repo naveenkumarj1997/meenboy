@@ -9,7 +9,7 @@ const Footer = () => {
           {/* Brand & About */}
           <div className="col-span-1 md:col-span-1">
             <Link to="/" className="text-2xl font-bold tracking-wider text-teal-400 block mb-4">
-              MEENBOY
+              FISHFRIENDLY
             </Link>
             <p className="text-sm">
               Your premier ocean-fresh seafood delivery partner. Quality and freshness guaranteed.
@@ -40,7 +40,7 @@ const Footer = () => {
           <div>
             <h3 className="text-white font-semibold mb-4">Contact Us</h3>
             <ul className="space-y-2 text-sm">
-              <li>Email: support@meenboy.com</li>
+              <li>Email: support@fishfriendly.com</li>
               <li>Phone: +1 (555) 123-4567</li>
               <li>Address: 123 Ocean Drive, Sea View City, SC 12345</li>
             </ul>
@@ -49,7 +49,7 @@ const Footer = () => {
         </div>
         
         <div className="mt-8 pt-8 border-t border-cyan-800 text-sm text-center">
-          <p>&copy; {new Date().getFullYear()} MEENBOY. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} FISHFRIENDLY. All rights reserved.</p>
         </div>
       </div>
     </footer>

@@ -1,7 +1,7 @@
 {
-  "name": "meenboy-server",
+  "name": "fishfriendly-server",
   "version": "1.0.0",
-  "description": "MEENBOY backend API",
+  "description": "FISHFRIENDLY backend API",
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",

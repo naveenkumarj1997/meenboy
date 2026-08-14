@@ -20,7 +20,7 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-const STORAGE_KEY = "meenboy_auth_token";
+const STORAGE_KEY = "fishfriendly_auth_token";
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);

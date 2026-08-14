@@ -25,13 +25,13 @@ const generateInvoice = (order, user) => {
       doc
         .fontSize(24)
         .font("Helvetica-Bold")
-        .text("MEENBOY", 50, 50)
+        .text("FISHFRIENDLY", 50, 50)
         .fontSize(10)
         .font("Helvetica")
         .text("123 Fish Market Road", 50, 80)
         .text("Chennai, Tamil Nadu 600001", 50, 95)
         .text("GSTIN: 33AAAAA0000A1Z5", 50, 110)
-        .text("Email: support@meenboy.com", 50, 125);
+        .text("Email: support@fishfriendly.com", 50, 125);
 
       // --- Invoice Details ---
       doc
@@ -140,7 +140,7 @@ const generateInvoice = (order, user) => {
         .fontSize(10)
         .font("Helvetica")
         .text(
-          "Thank you for your business! For any queries, contact support@meenboy.com.",
+          "Thank you for your business! For any queries, contact support@fishfriendly.com.",
           50,
           700,
           { align: "center", width: 500 }

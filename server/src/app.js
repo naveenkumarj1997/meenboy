@@ -51,7 +51,7 @@ app.get("/api/health", (req, res) => {
   const dbState = getDbState();
   res.status(dbState === "connected" ? 200 : 503).json({
     status: dbState === "connected" ? "ok" : "degraded",
-    service: "MEENBOY API",
+    service: "FISHFRIENDLY API",
     database: dbState
   });
 });

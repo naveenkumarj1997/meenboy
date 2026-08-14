@@ -35,7 +35,7 @@ const LoginPage = () => {
         onSubmit={handleSubmit}
         className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8"
       >
-        <h1 className="text-2xl font-bold text-white">Login to MEENBOY</h1>
+        <h1 className="text-2xl font-bold text-white">Login to FISHFRIENDLY</h1>
         <p className="mt-1 text-sm text-slate-300">Access your role dashboard securely.</p>
         {error && <p className="mt-4 text-sm text-rose-400">{error}</p>}
         <div className="mt-6 space-y-4">

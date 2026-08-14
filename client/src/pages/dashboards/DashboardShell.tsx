@@ -35,7 +35,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     <>
       <div className="p-6 flex flex-col items-start gap-1 border-b border-slate-800">
         <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-500 tracking-wider">
-          MEENBOY
+          FISHFRIENDLY
         </h1>
         <span className="text-xs text-slate-500 font-medium uppercase tracking-widest">Workspace</span>
       </div>
@@ -104,7 +104,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
       
       {/* Mobile Top Header */}
       <div className="md:hidden flex items-center justify-between border-b border-slate-800 bg-slate-900 p-4 sticky top-0 z-50">
-        <h1 className="text-xl font-bold text-teal-400 tracking-wider">MEENBOY</h1>
+        <h1 className="text-xl font-bold text-teal-400 tracking-wider">FISHFRIENDLY</h1>
         <button 
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="text-slate-300 hover:text-white p-2"

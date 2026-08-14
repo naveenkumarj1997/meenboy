@@ -39,7 +39,7 @@ const RegisterPage = () => {
         onSubmit={handleSubmit}
         className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8"
       >
-        <h1 className="text-2xl font-bold text-white">Create MEENBOY Account</h1>
+        <h1 className="text-2xl font-bold text-white">Create FISHFRIENDLY Account</h1>
         {error && <p className="mt-4 text-sm text-rose-400">{error}</p>}
         <div className="mt-6 space-y-4">
           <input
