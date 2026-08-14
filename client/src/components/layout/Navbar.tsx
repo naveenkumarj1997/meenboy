@@ -13,8 +13,9 @@ const Navbar = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link to="/" className="text-2xl font-bold tracking-wider text-teal-400">
-              FISHFRIENDLY
+            <Link to="/" className="flex items-center gap-2 text-2xl font-bold tracking-wider text-teal-400">
+              <img src="/logo.png" alt="Fishfriendly Logo" className="h-10 w-auto rounded-full bg-white object-cover" />
+              <span className="hidden sm:block">FISHFRIENDLY</span>
             </Link>
           </div>
 
