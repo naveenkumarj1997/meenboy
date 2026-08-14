@@ -356,8 +356,8 @@ const AdminProductsPage = () => {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl my-8 overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto pt-10 pb-10">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl">
             <div className="flex justify-between items-center p-6 border-b border-slate-800">
               <h3 className="text-2xl font-bold text-white">
                 {editingId ? "Edit Product" : "Add New Product"}
