@@ -2,10 +2,69 @@ const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
 
+const SHOP = {
+  name: "FISHFRIENDLY",
+  email: "fishfriendlymeats@gmail.com",
+  phone: "+91 9087894319",
+  addressLine1: "Balusamy konnar street, Madakkulam",
+  addressLine2: "Bypass Road in Kalavasal",
+  cityLine: "Madurai, Tamil Nadu - 625003"
+};
+
+const FONT_REGULAR = path.join(__dirname, "../assets/fonts/HindMadurai-Regular.ttf");
+const FONT_BOLD = path.join(__dirname, "../assets/fonts/HindMadurai-Bold.ttf");
+const FALLBACK_REGULAR = "C:\\Windows\\Fonts\\Nirmala.ttf";
+const FALLBACK_BOLD = "C:\\Windows\\Fonts\\NirmalaB.ttf";
+
+const resolveFonts = () => {
+  const regular = fs.existsSync(FONT_REGULAR)
+    ? FONT_REGULAR
+    : fs.existsSync(FALLBACK_REGULAR)
+      ? FALLBACK_REGULAR
+      : null;
+  const bold = fs.existsSync(FONT_BOLD)
+    ? FONT_BOLD
+    : fs.existsSync(FALLBACK_BOLD)
+      ? FALLBACK_BOLD
+      : regular;
+
+  return { regular, bold };
+};
+
+const buildBillToLines = (order, user) => {
+  const lines = [];
+  lines.push(user?.name || "Customer");
+
+  const line1 = (order.address?.line1 || "").trim();
+  const line2 = (order.address?.line2 || "").trim();
+  const city = (order.address?.city || "").trim();
+  const state = (order.address?.state || "").trim();
+  const postalCode = (order.address?.postalCode || "").trim();
+  const phone = (order.address?.phone || "").trim();
+
+  if (line1) lines.push(line1);
+
+  // Avoid repeating area/line2 when it is already part of line1
+  if (line2) {
+    const line1Lower = line1.toLowerCase();
+    const line2Lower = line2.toLowerCase();
+    if (!line1Lower.includes(line2Lower)) {
+      lines.push(line2);
+    }
+  }
+
+  const cityStatePin = [city, state].filter(Boolean).join(", ");
+  const location = postalCode ? `${cityStatePin} ${postalCode}`.trim() : cityStatePin;
+  if (location) lines.push(location);
+
+  if (phone) lines.push(`Phone: ${phone}`);
+
+  return lines;
+};
+
 const generateInvoice = (order, user) => {
   return new Promise((resolve, reject) => {
     try {
-      // Create invoices directory if it doesn't exist
       const invoicesDir = path.join(__dirname, "../../uploads/invoices");
       if (!fs.existsSync(invoicesDir)) {
         fs.mkdirSync(invoicesDir, { recursive: true });
@@ -14,63 +73,61 @@ const generateInvoice = (order, user) => {
       const fileName = `INV-${order._id}.pdf`;
       const filePath = path.join(invoicesDir, fileName);
 
-      // Initialize PDF document
-      const doc = new PDFDocument({ margin: 50, size: "A4" });
+      const fonts = resolveFonts();
+      if (!fonts.regular) {
+        return reject(new Error("No Unicode font found for invoice PDF (Tamil support required)."));
+      }
 
-      // Pipe to file
+      const doc = new PDFDocument({ margin: 50, size: "A4" });
       const writeStream = fs.createWriteStream(filePath);
       doc.pipe(writeStream);
 
-      // --- Header ---
+      doc.registerFont("InvoiceRegular", fonts.regular);
+      doc.registerFont("InvoiceBold", fonts.bold || fonts.regular);
+
+      // --- Shop Header ---
       doc
+        .font("InvoiceBold")
         .fontSize(24)
-        .font("Helvetica-Bold")
-        .text("FISHFRIENDLY", 50, 50)
-        .fontSize(10)
-        .font("Helvetica")
-        .text("123 Fish Market Road", 50, 80)
-        .text("Chennai, Tamil Nadu 600001", 50, 95)
-        .text("GSTIN: 33AAAAA0000A1Z5", 50, 110)
-        .text("Email: support@fishfriendly.com", 50, 125);
+        .text(SHOP.name, 50, 50)
+        .font("InvoiceRegular")
+        .fontSize(9)
+        .text(SHOP.addressLine1, 50, 80)
+        .text(SHOP.addressLine2, 50, 93)
+        .text(SHOP.cityLine, 50, 106)
+        .text(`Phone: ${SHOP.phone}`, 50, 119)
+        .text(`Email: ${SHOP.email}`, 50, 132);
 
       // --- Invoice Details ---
       doc
+        .font("InvoiceBold")
         .fontSize(20)
-        .font("Helvetica-Bold")
         .text("TAX INVOICE", 400, 50, { align: "right" })
         .fontSize(10)
-        .font("Helvetica-Bold")
         .text("Invoice Number:", 400, 80, { align: "right" })
-        .font("Helvetica")
+        .font("InvoiceRegular")
         .text(order._id.toString().slice(-8).toUpperCase(), 400, 95, { align: "right" })
-        .font("Helvetica-Bold")
+        .font("InvoiceBold")
         .text("Invoice Date:", 400, 110, { align: "right" })
-        .font("Helvetica")
+        .font("InvoiceRegular")
         .text(new Date(order.createdAt).toLocaleDateString(), 400, 125, { align: "right" });
 
-      doc.moveDown(3);
-
       // --- Bill To ---
-      doc
-        .fontSize(12)
-        .font("Helvetica-Bold")
-        .text("Bill To:", 50, 170)
-        .fontSize(10)
-        .font("Helvetica")
-        .text(user?.name || "Customer", 50, 190)
-        .text(order.address.line1, 50, 205);
-
-      if (order.address.line2) {
-        doc.text(order.address.line2, 50, 220);
-        doc.text(`${order.address.city}, ${order.address.state} ${order.address.postalCode}`, 50, 235);
-      } else {
-        doc.text(`${order.address.city}, ${order.address.state} ${order.address.postalCode}`, 50, 220);
-      }
+      const billToLines = buildBillToLines(order, user);
+      let billY = 170;
+      doc.font("InvoiceBold").fontSize(12).text("Bill To:", 50, billY);
+      billY += 18;
+      doc.font("InvoiceRegular").fontSize(10);
+      billToLines.forEach((line) => {
+        doc.text(line, 50, billY, { width: 280 });
+        billY += 14;
+      });
 
       // --- Table Header ---
-      const tableTop = 280;
+      const tableTop = Math.max(280, billY + 20);
       doc
-        .font("Helvetica-Bold")
+        .font("InvoiceBold")
+        .fontSize(10)
         .text("Item Description", 50, tableTop)
         .text("Quantity", 280, tableTop, { width: 90, align: "right" })
         .text("Unit Price", 370, tableTop, { width: 90, align: "right" })
@@ -81,21 +138,25 @@ const generateInvoice = (order, user) => {
         .lineTo(550, tableTop + 20)
         .stroke();
 
-      // --- Table Rows ---
       let yPosition = tableTop + 30;
-      doc.font("Helvetica");
+      doc.font("InvoiceRegular").fontSize(10);
 
       order.items.forEach((item) => {
-        let description = item.productName;
+        let description = item.productName || "Item";
         if (item.cutName) description += ` - ${item.cutName}`;
 
-        doc
-          .text(description, 50, yPosition, { width: 230 })
-          .text(item.quantity.toString(), 280, yPosition, { width: 90, align: "right" })
-          .text(`Rs. ${item.unitPrice.toFixed(2)}`, 370, yPosition, { width: 90, align: "right" })
-          .text(`Rs. ${item.totalPrice.toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
+        // Measure wrapped Tamil/English description height
+        const descHeight = doc.heightOfString(description, { width: 230 });
+        const rowHeight = Math.max(30, descHeight + 8);
 
-        yPosition += 30;
+        doc
+          .font("InvoiceRegular")
+          .text(description, 50, yPosition, { width: 230 })
+          .text(String(item.quantity), 280, yPosition, { width: 90, align: "right" })
+          .text(`Rs. ${Number(item.unitPrice).toFixed(2)}`, 370, yPosition, { width: 90, align: "right" })
+          .text(`Rs. ${Number(item.totalPrice).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
+
+        yPosition += rowHeight;
       });
 
       doc
@@ -105,20 +166,19 @@ const generateInvoice = (order, user) => {
 
       yPosition += 15;
 
-      // --- Totals ---
       doc
-        .font("Helvetica-Bold")
+        .font("InvoiceBold")
         .text("Subtotal:", 370, yPosition, { width: 90, align: "right" })
-        .font("Helvetica")
-        .text(`Rs. ${order.subtotal.toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
+        .font("InvoiceRegular")
+        .text(`Rs. ${Number(order.subtotal).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
 
       yPosition += 20;
 
       doc
-        .font("Helvetica-Bold")
+        .font("InvoiceBold")
         .text("Delivery Fee:", 370, yPosition, { width: 90, align: "right" })
-        .font("Helvetica")
-        .text(`Rs. ${order.deliveryFee.toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
+        .font("InvoiceRegular")
+        .text(`Rs. ${Number(order.deliveryFee).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
 
       yPosition += 20;
 
@@ -130,17 +190,16 @@ const generateInvoice = (order, user) => {
       yPosition += 10;
 
       doc
-        .font("Helvetica-Bold")
+        .font("InvoiceBold")
         .fontSize(12)
         .text("Total Amount:", 350, yPosition, { width: 110, align: "right" })
-        .text(`Rs. ${order.total.toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
+        .text(`Rs. ${Number(order.total).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
 
-      // --- Footer ---
       doc
+        .font("InvoiceRegular")
         .fontSize(10)
-        .font("Helvetica")
         .text(
-          "Thank you for your business! For any queries, contact support@fishfriendly.com.",
+          `Thank you for your business! For any queries, contact ${SHOP.email} | ${SHOP.phone}`,
           50,
           700,
           { align: "center", width: 500 }

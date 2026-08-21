@@ -39,7 +39,7 @@ const createCategory = async (req, res, next) => {
 /**
  * GET /api/catalog/products
  * List products — supports ?category=Fish&q=salmon&page=1&limit=20&sort=-createdAt
- * Public route
+ * Public route — only active (visible) products
  */
 const listProducts = async (req, res, next) => {
   try {
@@ -78,6 +78,86 @@ const listProducts = async (req, res, next) => {
     });
   } catch (error) {
     next(error);
+  }
+};
+
+/**
+ * GET /api/catalog/admin/products
+ * Admin only — list ALL products (active + hidden)
+ */
+const listAdminProducts = async (req, res, next) => {
+  try {
+    const {
+      category,
+      q,
+      page    = 1,
+      limit   = 100,
+      sort    = "-createdAt"
+    } = req.query;
+
+    const filter = {};
+    if (category) filter.category = category;
+    if (q)        filter.$text = { $search: q };
+
+    const pageNum  = Math.max(1, Number(page));
+    const limitNum = Math.min(200, Math.max(1, Number(limit)));
+    const skip     = (pageNum - 1) * limitNum;
+
+    const [products, total] = await Promise.all([
+      Product.find(filter).sort(sort).skip(skip).limit(limitNum).lean(),
+      Product.countDocuments(filter)
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        pagination: {
+          page:  pageNum,
+          limit: limitNum,
+          total,
+          pages: Math.ceil(total / limitNum)
+        }
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * PATCH /api/catalog/products/:id/visibility
+ * Admin only — show/hide product for customers (isActive)
+ */
+const setProductVisibility = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    if (typeof isActive !== "boolean") {
+      return res.status(400).json({
+        success: false,
+        message: "isActive must be a boolean"
+      });
+    }
+
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { $set: { isActive } },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!product) {
+      return res.status(404).json({ success: false, message: "Product not found" });
+    }
+
+    return res.json({
+      success: true,
+      message: isActive ? "Product is now visible to customers" : "Product is now hidden from customers",
+      data: { product }
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 
@@ -216,8 +296,10 @@ module.exports = {
   listCategories,
   createCategory,
   listProducts,
+  listAdminProducts,
   getProduct,
   createProduct,
   updateProduct,
+  setProductVisibility,
   deleteProduct
 };

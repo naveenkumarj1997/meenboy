@@ -13,6 +13,8 @@ const {
   getProductsForDailyPrice,
   updateDailyPrices,
   downloadInvoice,
+  downloadPartnerDayReport,
+  downloadVendorCategoryReport,
   listAllAssignments,
   getDeliveryStats,
   reorderAssignments,
@@ -60,6 +62,18 @@ router.get("/admin", protect, authorizeRoles("admin"), listOrdersForAdmin);
 router.get("/assignments", protect, authorizeRoles("delivery_partner"), listAssignmentsForPartner);
 router.get("/assignments/all", protect, authorizeRoles("admin"), listAllAssignments);
 router.get("/delivery-stats", protect, authorizeRoles("admin"), getDeliveryStats);
+router.get(
+  "/reports/partner-day",
+  protect,
+  authorizeRoles("admin"),
+  downloadPartnerDayReport
+);
+router.get(
+  "/reports/vendor-category",
+  protect,
+  authorizeRoles("admin"),
+  downloadVendorCategoryReport
+);
 
 router.get("/daily-prices/products", protect, authorizeRoles("admin"), getProductsForDailyPrice);
 

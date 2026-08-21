@@ -5,6 +5,7 @@ import {
   createAdminProduct,
   updateAdminProduct,
   deleteAdminProduct,
+  setAdminProductVisibility,
   uploadAdminImage,
 } from "../../lib/api";
 import type { ProductPayload, CutPayload } from "../../lib/api";
@@ -19,6 +20,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
@@ -39,6 +41,7 @@ const AdminProductsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   
   const [searchQuery, setSearchQuery] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "name", direction: "asc" });
@@ -60,10 +63,16 @@ const AdminProductsPage = () => {
   });
 
   const fetchProducts = async () => {
+    if (!token) {
+      setError("Not authorized");
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      const res = await getAdminProducts();
+      const res = await getAdminProducts(token);
       setProducts(res.data.products);
+      setError("");
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -73,7 +82,23 @@ const AdminProductsPage = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [token]);
+
+  const handleToggleVisibility = async (product: any) => {
+    if (!token) return;
+    const nextVisible = !product.isActive;
+    try {
+      setTogglingId(product._id);
+      await setAdminProductVisibility(token, product._id, nextVisible);
+      setProducts((prev) =>
+        prev.map((p) => (p._id === product._id ? { ...p, isActive: nextVisible } : p))
+      );
+    } catch (err: any) {
+      alert(`Could not update visibility: ${err.message}`);
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -180,7 +205,7 @@ const AdminProductsPage = () => {
   return (
     <DashboardShell
       title="Manage Products"
-      description="Add, edit, and remove products from the catalog."
+      description="Add, edit, and show/hide products in the customer catalog."
       navLinks={ADMIN_NAV_LINKS}
     >
       {(() => {
@@ -254,7 +279,7 @@ const AdminProductsPage = () => {
               <th className="p-4 text-slate-400 font-medium">Product</th>
               <th className="p-4 text-slate-400 font-medium">Category</th>
               <th className="p-4 text-slate-400 font-medium">Price Range</th>
-              <th className="p-4 text-slate-400 font-medium">Status</th>
+              <th className="p-4 text-slate-400 font-medium">Visibility</th>
               <th className="p-4 text-slate-400 font-medium text-right">Actions</th>
             </tr>
           </thead>
@@ -273,7 +298,12 @@ const AdminProductsPage = () => {
               </tr>
             ) : (
               currentProducts.map((p) => (
-                <tr key={p._id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
+                <tr
+                  key={p._id}
+                  className={`border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors ${
+                    !p.isActive ? "opacity-60" : ""
+                  }`}
+                >
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-800 shrink-0">
@@ -298,15 +328,33 @@ const AdminProductsPage = () => {
                     ₹{p.minPrice} - ₹{p.maxPrice} / {p.unit || 'kg'}
                   </td>
                   <td className="p-4">
-                    {p.isActive ? (
-                      <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full text-xs font-semibold">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="bg-red-500/10 text-red-400 px-2.5 py-1 rounded-full text-xs font-semibold">
-                        Inactive
-                      </span>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={!!p.isActive}
+                        aria-label={p.isActive ? "Hide product from customers" : "Show product to customers"}
+                        disabled={togglingId === p._id}
+                        onClick={() => handleToggleVisibility(p)}
+                        className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                          p.isActive ? "bg-emerald-500" : "bg-slate-600"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                            p.isActive ? "translate-x-6" : "translate-x-1"
+                          }`}
+                        />
+                      </button>
+                      <div className="min-w-0">
+                        <div className={`text-xs font-semibold ${p.isActive ? "text-emerald-400" : "text-slate-400"}`}>
+                          {togglingId === p._id ? "Saving..." : p.isActive ? "Show" : "Hide"}
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          {p.isActive ? "Visible on /products" : "Hidden from customers"}
+                        </div>
+                      </div>
+                    </div>
                   </td>
                   <td className="p-4 text-right">
                     <button

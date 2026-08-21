@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption } from "../lib/weightOptions";
 import {
   BADGE_STYLES,
   CATEGORY_ICONS,
@@ -9,6 +10,7 @@ import {
 } from "../data/products";
 import { useCart } from "../context/CartContext";
 import { getProductById, getCatalog } from "../lib/api";
+import { getProductReviewStats } from "../lib/productReviews";
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 const StarRating = ({ rating, size = "md" }: { rating: number; size?: "sm" | "md" }) => {
@@ -139,7 +141,7 @@ const ProductDetailsPage = () => {
   const [loading, setLoading] = useState(true);
 
   const [selectedCut, setSelectedCut] = useState<Cut | null>(null);
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState(DEFAULT_WEIGHT_KG);
   const [notes, setNotes] = useState("");
   const [cartAdded, setCartAdded] = useState(false);
   const { cartItems, addToCart, updateQuantity: updateCartQuantity } = useCart();
@@ -150,10 +152,12 @@ const ProductDetailsPage = () => {
     const itemInCart = cartItems.find(item => item.productId === String(product.id) && item.cutName === cutToUse?.name);
     
     if (itemInCart) {
-      setQuantity(itemInCart.quantity);
+      setQuantity(
+        product.unit === "kg" ? snapToWeightOption(itemInCart.quantity) : itemInCart.quantity
+      );
       if (itemInCart.notes) setNotes(itemInCart.notes);
     } else {
-      setQuantity(1);
+      setQuantity(product.unit === "kg" ? DEFAULT_WEIGHT_KG : 1);
       setNotes("");
     }
   }, [product, selectedCut]);
@@ -167,6 +171,7 @@ const ProductDetailsPage = () => {
         const prodRes = await getProductById(id);
         const p = prodRes.data.product;
         
+        const { rating, reviews } = getProductReviewStats(p._id);
         const mappedProduct: Product = {
           id: p._id,
           name: p.name,
@@ -174,8 +179,8 @@ const ProductDetailsPage = () => {
           price: p.minPrice,
           priceRange: { min: p.minPrice, max: p.maxPrice },
           unit: p.unit || "kg",
-          rating: 4.8,
-          reviews: Math.floor(Math.random() * 200) + 50,
+          rating,
+          reviews,
           badge: "",
           description: p.description || "Freshly sourced product",
           longDescription: p.description || "Freshly sourced product directly from the markets.",
@@ -202,22 +207,25 @@ const ProductDetailsPage = () => {
         const mappedRelated = catRes.data.products
           .filter((cp: any) => cp.category === mappedProduct.category && cp._id !== mappedProduct.id)
           .slice(0, 3)
-          .map((cp: any) => ({
+          .map((cp: any) => {
+            const { rating, reviews } = getProductReviewStats(cp._id);
+            return {
             id: cp._id,
             name: cp.name,
             category: cp.category,
             price: cp.minPrice,
             priceRange: { min: cp.minPrice, max: cp.maxPrice },
             unit: cp.unit || "kg",
-            rating: 4.5,
-            reviews: 50,
+            rating,
+            reviews,
             description: cp.description || "Fresh product",
             longDescription: cp.description || "",
             image: cp.image?.startsWith('/uploads') ? `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}${cp.image}` : (cp.image || "https://placehold.co/600x400/0e7490/e0f2fe?text=No+Image"),
             cuts: [],
             origin: "Local",
             nutritionHighlights: []
-          }));
+          };
+          });
         
         setRelatedProducts(mappedRelated);
       } catch (err) {
@@ -530,39 +538,52 @@ const ProductDetailsPage = () => {
             <div className="mb-6 space-y-4">
               <div>
                 <label className="block text-xs font-bold text-white/55 uppercase tracking-widest mb-2">
-                  Quantity
+                  {product.unit === "kg" ? "Select Weight" : "Quantity"}
                 </label>
-                <div className="inline-flex items-center bg-cyan-950/50 rounded-xl p-1.5 border border-white/10">
-                  <button
-                    onClick={() => setQuantity((q) => {
-                      if (product.unit === "kg") {
-                        const next = q - 0.1;
-                        return next >= 0.1 ? Number(next.toFixed(1)) : 0.1;
-                      }
-                      return Math.max(1, q - 1);
-                    })}
-                    className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-lg font-medium"
-                  >
-                    -
-                  </button>
-                  <span className="w-16 text-center font-bold text-white text-sm">
-                    {product.unit === "kg" 
-                      ? (quantity < 1 ? `${Math.round(quantity * 1000)}g` : `${quantity}kg`) 
-                      : quantity}
-                  </span>
-                  <button
-                    onClick={() => setQuantity((q) => {
-                      if (product.unit === "kg") {
-                        const next = q + 0.1;
-                        return next <= 5.0 ? Number(next.toFixed(1)) : 5.0;
-                      }
-                      return q + 1;
-                    })}
-                    className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-lg font-medium"
-                  >
-                    +
-                  </button>
-                </div>
+                {product.unit === "kg" ? (
+                  <div className="space-y-2">
+                    <select
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number(e.target.value))}
+                      className="w-full max-w-xs bg-cyan-950/50 border border-white/10 rounded-xl px-4 py-3 text-sm font-semibold text-white focus:outline-none focus:border-teal-500/50 transition-colors"
+                    >
+                      {WEIGHT_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-white/35">
+                      Price for selected weight:{" "}
+                      <span className="text-teal-400 font-bold">
+                        ₹
+                        {(
+                          (selectedCut && selectedCut.price > 0
+                            ? selectedCut.price
+                            : product.priceRange.min) * quantity
+                        ).toFixed(2)}
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center bg-cyan-950/50 rounded-xl p-1.5 border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-lg font-medium"
+                    >
+                      -
+                    </button>
+                    <span className="w-16 text-center font-bold text-white text-sm">{quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setQuantity((q) => q + 1)}
+                      className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-lg font-medium"
+                    >
+                      +
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -616,6 +637,14 @@ const ProductDetailsPage = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     {cartItems.some(item => item.id === (String(product.id) + (selectedCut ? `-${selectedCut.name}` : (product.cuts?.[0] ? `-${product.cuts[0].name}` : '')) + (notes.trim() ? `-${notes.trim()}` : ''))) ? "Update Cart" : "Add to Cart"}
+                    <span className="text-sm opacity-75 font-medium">
+                      · ₹
+                      {(
+                        (selectedCut && selectedCut.price > 0
+                          ? selectedCut.price
+                          : product.priceRange.min) * quantity
+                      ).toFixed(2)}
+                    </span>
                     {selectedCut && (
                       <span className="text-sm opacity-75 font-medium">
                         · {selectedCut.name}

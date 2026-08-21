@@ -6,9 +6,11 @@ const {
   listCategories,
   createCategory,
   listProducts,
+  listAdminProducts,
   getProduct,
   createProduct,
   updateProduct,
+  setProductVisibility,
   deleteProduct
 } = require("../controllers/catalogController");
 
@@ -80,10 +82,46 @@ router.get(
 );
 
 /**
+ * GET /api/catalog/admin/products
+ * Admin only — all products including hidden
+ */
+router.get(
+  "/admin/products",
+  protect,
+  authorizeRoles("admin"),
+  [
+    query("category")
+      .optional()
+      .isIn(VALID_CATEGORIES)
+      .withMessage(`category must be one of: ${VALID_CATEGORIES.join(", ")}`),
+    query("page").optional().isInt({ min: 1 }).withMessage("page must be a positive integer"),
+    query("limit").optional().isInt({ min: 1, max: 200 }).withMessage("limit must be 1–200")
+  ],
+  validateRequest,
+  listAdminProducts
+);
+
+/**
  * GET /api/catalog/products/:id
  * Public — fetch single product by MongoDB ObjectId OR slug
  */
 router.get("/products/:id", getProduct);
+
+/**
+ * PATCH /api/catalog/products/:id/visibility
+ * Admin only — show/hide product for customers
+ */
+router.patch(
+  "/products/:id/visibility",
+  protect,
+  authorizeRoles("admin"),
+  [
+    param("id").isMongoId().withMessage("Invalid product ID"),
+    body("isActive").isBoolean().withMessage("isActive must be true or false")
+  ],
+  validateRequest,
+  setProductVisibility
+);
 
 /**
  * POST /api/catalog/products
@@ -182,7 +220,11 @@ router.put(
     body("availableCuts")
       .optional()
       .isArray()
-      .withMessage("availableCuts must be an array")
+      .withMessage("availableCuts must be an array"),
+    body("isActive")
+      .optional()
+      .isBoolean()
+      .withMessage("isActive must be true or false")
   ],
   validateRequest,
   updateProduct

@@ -8,6 +8,11 @@ const { createNotification } = require("../utils/notifications");
 const path = require("path");
 const fs = require("fs");
 const { generateInvoice } = require("../utils/pdfInvoice");
+const { generatePartnerDayReport } = require("../utils/pdfDeliveryReport");
+const {
+  generateVendorCategoryReport,
+  generateVendorAllCategoriesReport
+} = require("../utils/pdfVendorCategoryReport");
 
 const createOrder = async (req, res, next) => {
   try {
@@ -15,6 +20,21 @@ const createOrder = async (req, res, next) => {
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Order must contain at least one item" });
+    }
+
+    const productIds = items.map((item) => item.product).filter(Boolean);
+    if (productIds.length > 0) {
+      const catalogProducts = await Product.find({ _id: { $in: productIds } }).lean();
+      const inactive = catalogProducts.filter((p) => p.isActive === false);
+      if (inactive.length > 0) {
+        const names = inactive.map((p) => p.name).join(", ");
+        return res.status(400).json({
+          message: `These products are no longer available: ${names}. Please remove them from your cart.`
+        });
+      }
+      if (catalogProducts.length !== new Set(productIds.map(String)).size) {
+        return res.status(400).json({ message: "One or more products in your cart are invalid." });
+      }
     }
 
     if (deliveryDate) {
@@ -116,7 +136,7 @@ const listOrdersForAdmin = async (req, res, next) => {
   try {
     const orders = await Order.find()
       .sort({ createdAt: -1 })
-      .populate("customer", "name email")
+      .populate("customer", "name email phone mapUrl")
       .lean();
     res.json({ orders });
   } catch (error) {
@@ -366,21 +386,264 @@ const downloadInvoice = async (req, res, next) => {
 
     let filePath;
 
+    // Always regenerate invoice so shop details / address formatting stay up to date
     if (order.invoicePath) {
-      filePath = path.join(__dirname, "../../", order.invoicePath);
-      if (!fs.existsSync(filePath)) {
-        order.invoicePath = null;
+      const oldPath = path.join(__dirname, "../../", order.invoicePath);
+      if (fs.existsSync(oldPath)) {
+        try {
+          fs.unlinkSync(oldPath);
+        } catch (_) {
+          // ignore unlink errors and continue regenerating
+        }
       }
     }
 
-    if (!order.invoicePath) {
-      const relativePath = await generateInvoice(order, order.customer);
-      order.invoicePath = relativePath;
-      await order.save();
-      filePath = path.join(__dirname, "../../", relativePath);
-    }
+    const relativePath = await generateInvoice(order, order.customer);
+    order.invoicePath = relativePath;
+    await order.save();
+    filePath = path.join(__dirname, "../../", relativePath);
 
     res.download(filePath, `Invoice-${order._id.toString().slice(-8).toUpperCase()}.pdf`);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const downloadPartnerDayReport = async (req, res, next) => {
+  try {
+    const { date, partnerId } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "date query param is required" });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const isAll = !partnerId || String(partnerId).toLowerCase() === "all";
+
+    if (isAll) {
+      const orders = await Order.find({ deliveryDate: date })
+        .populate("customer", "name email phone mapUrl")
+        .sort({ deliveryTime: 1, createdAt: 1 })
+        .lean();
+
+      const orderIds = orders.map((o) => o._id);
+      const assignments = await DeliveryAssignment.find({
+        order: { $in: orderIds }
+      })
+        .populate("deliveryPartner", "name phone")
+        .lean();
+
+      const partnerByOrder = {};
+      assignments.forEach((a) => {
+        partnerByOrder[String(a.order)] = a.deliveryPartner || null;
+      });
+
+      const dayRows = orders.map((order) => ({
+        order,
+        deliveryPartner: partnerByOrder[String(order._id)] || null,
+        status: partnerByOrder[String(order._id)] ? "assigned" : "unassigned"
+      }));
+
+      const { filePath, fileName } = await generatePartnerDayReport({
+        partner: null,
+        date,
+        assignments: dayRows,
+        allPartners: true
+      });
+
+      return res.download(filePath, fileName);
+    }
+
+    const partner = await User.findOne({
+      _id: partnerId,
+      role: "delivery_partner"
+    }).select("name phone email");
+
+    if (!partner) {
+      return res.status(404).json({ message: "Delivery partner not found" });
+    }
+
+    const assignments = await DeliveryAssignment.find({
+      deliveryPartner: partnerId
+    })
+      .populate({
+        path: "order",
+        populate: { path: "customer", select: "name email phone mapUrl" }
+      })
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const dayAssignments = assignments
+      .filter((a) => a.order && a.order.deliveryDate === date)
+      .sort((a, b) => {
+        const tA = a.order?.deliveryTime || "";
+        const tB = b.order?.deliveryTime || "";
+        return String(tA).localeCompare(String(tB));
+      });
+
+    const { filePath, fileName } = await generatePartnerDayReport({
+      partner,
+      date,
+      assignments: dayAssignments,
+      allPartners: false
+    });
+
+    res.download(filePath, fileName);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const buildVendorRowsForDate = async (date, categoryFilter) => {
+  const PRODUCT_CATEGORIES = Product.PRODUCT_CATEGORIES || [
+    "Seafood",
+    "Fish",
+    "Chicken",
+    "Mutton",
+    "Country Chicken"
+  ];
+
+  const orders = await Order.find({
+    deliveryDate: date,
+    status: { $ne: "cancelled" }
+  })
+    .populate("customer", "name")
+    .sort({ deliveryTime: 1, createdAt: 1 })
+    .lean();
+
+  const productIds = [
+    ...new Set(
+      orders.flatMap((o) => (o.items || []).map((item) => String(item.product)).filter(Boolean))
+    )
+  ];
+
+  const products = await Product.find({ _id: { $in: productIds } })
+    .select("name category unit")
+    .lean();
+
+  const categoryByProduct = {};
+  const unitByProduct = {};
+  products.forEach((p) => {
+    categoryByProduct[String(p._id)] = p.category;
+    unitByProduct[String(p._id)] = p.unit || "kg";
+  });
+
+  const rowsByCategory = {};
+  PRODUCT_CATEGORIES.forEach((cat) => {
+    rowsByCategory[cat] = [];
+  });
+  rowsByCategory.Other = [];
+
+  orders.forEach((order) => {
+    (order.items || []).forEach((item) => {
+      const cat = categoryByProduct[String(item.product)] || "Other";
+      if (categoryFilter && categoryFilter !== "all" && cat !== categoryFilter) {
+        return;
+      }
+      if (!rowsByCategory[cat]) rowsByCategory[cat] = [];
+      rowsByCategory[cat].push({
+        productName: item.productName,
+        cutName: item.cutName || "",
+        quantity: item.quantity,
+        unit: item.unit || unitByProduct[String(item.product)] || "kg",
+        notes: item.notes || "",
+        orderId: order._id,
+        customerName: order.customer?.name || "Guest"
+      });
+    });
+  });
+
+  const buildTotals = (rows) => {
+    const map = {};
+    rows.forEach((r) => {
+      const key = `${r.productName}||${r.cutName || "-"}||${r.unit || "kg"}`;
+      if (!map[key]) {
+        map[key] = {
+          label: r.cutName ? `${r.productName} (${r.cutName})` : r.productName,
+          quantity: 0,
+          unit: r.unit || "kg"
+        };
+      }
+      map[key].quantity += Number(r.quantity) || 0;
+    });
+    return Object.values(map)
+      .map((t) => ({
+        ...t,
+        quantity: Math.round(t.quantity * 1000) / 1000
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  };
+
+  return { rowsByCategory, buildTotals, PRODUCT_CATEGORIES };
+};
+
+const downloadVendorCategoryReport = async (req, res, next) => {
+  try {
+    const { date, category } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "date query param is required" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const categoryFilter =
+      !category || String(category).toLowerCase() === "all" ? "all" : String(category);
+
+    const { rowsByCategory, buildTotals, PRODUCT_CATEGORIES } = await buildVendorRowsForDate(
+      date,
+      categoryFilter
+    );
+
+    if (categoryFilter !== "all" && !PRODUCT_CATEGORIES.includes(categoryFilter)) {
+      return res.status(400).json({
+        message: `category must be one of: all, ${PRODUCT_CATEGORIES.join(", ")}`
+      });
+    }
+
+    if (categoryFilter === "all") {
+      const sections = PRODUCT_CATEGORIES.map((cat) => ({
+        categoryLabel: cat,
+        rows: rowsByCategory[cat] || [],
+        totals: buildTotals(rowsByCategory[cat] || [])
+      })).filter((s) => s.rows.length > 0);
+
+      if ((rowsByCategory.Other || []).length) {
+        sections.push({
+          categoryLabel: "Other",
+          rows: rowsByCategory.Other,
+          totals: buildTotals(rowsByCategory.Other)
+        });
+      }
+
+      const { filePath, fileName } = await generateVendorAllCategoriesReport({
+        date,
+        sections:
+          sections.length > 0
+            ? sections
+            : PRODUCT_CATEGORIES.map((cat) => ({
+                categoryLabel: cat,
+                rows: [],
+                totals: []
+              }))
+      });
+
+      return res.download(filePath, fileName);
+    }
+
+    const rows = rowsByCategory[categoryFilter] || [];
+    const { filePath, fileName } = await generateVendorCategoryReport({
+      date,
+      categoryLabel: categoryFilter,
+      rows,
+      totals: buildTotals(rows)
+    });
+
+    res.download(filePath, fileName);
   } catch (error) {
     next(error);
   }
@@ -391,7 +654,7 @@ const listAllAssignments = async (req, res, next) => {
     const assignments = await DeliveryAssignment.find()
       .populate({
         path: "order",
-        populate: { path: "customer", select: "name email phone" }
+        populate: { path: "customer", select: "name email phone mapUrl" }
       })
       .populate("deliveryPartner", "name email")
       .sort({ createdAt: -1 })
@@ -567,6 +830,8 @@ module.exports = {
   getProductsForDailyPrice,
   updateDailyPrices,
   downloadInvoice,
+  downloadPartnerDayReport,
+  downloadVendorCategoryReport,
   listAllAssignments,
   getDeliveryStats,
   reorderAssignments,

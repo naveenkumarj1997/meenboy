@@ -12,6 +12,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },

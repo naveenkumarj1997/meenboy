@@ -6,6 +6,7 @@ import AdminProductsPage from "./pages/dashboards/AdminProductsPage";
 import AdminDailyPrices from "./pages/dashboards/AdminDailyPrices";
 import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
+import AdminOverallReports from "./pages/dashboards/AdminOverallReports";
 import AdminPendingPayments from "./pages/dashboards/AdminPendingPayments";
 import AdminCollectedPayments from "./pages/dashboards/AdminCollectedPayments";
 import AdminPurchases from "./pages/dashboards/AdminPurchases";
@@ -30,6 +31,7 @@ import UnauthorizedPage from "./pages/UnauthorizedPage";
 import CustomerLayout from "./components/layout/CustomerLayout";
 import AboutPage from "./pages/AboutPage";
 import ContactPage from "./pages/ContactPage";
+import WhatsAppPage from "./pages/WhatsAppPage";
 import ProductsPage from "./pages/ProductsPage";
 import ProductDetailsPage from "./pages/ProductDetailsPage";
 import CartPage from "./pages/CartPage";
@@ -65,6 +67,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
+          <Route path="/whatsapp" element={<WhatsAppPage />} />
           <Route path="/products" element={<ProductsPage />} />
           <Route path="/products/:id" element={<ProductDetailsPage />} />
           <Route path="/cart" element={<CartPage />} />
@@ -91,6 +94,7 @@ function App() {
           <Route path="/dashboard/admin/daily-prices" element={<AdminDailyPrices />} />
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />
+          <Route path="/dashboard/admin/overall-reports" element={<AdminOverallReports />} />
           <Route path="/dashboard/admin/pending-payments" element={<AdminPendingPayments />} />
           <Route path="/dashboard/admin/collected-payments" element={<AdminCollectedPayments />} />
           <Route path="/dashboard/admin/purchases" element={<AdminPurchases />} />

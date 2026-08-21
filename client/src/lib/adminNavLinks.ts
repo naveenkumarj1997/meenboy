@@ -1,0 +1,21 @@
+export const ADMIN_NAV_LINKS = [
+  { label: "Overview", href: "/dashboard/admin" },
+  { label: "Profile", href: "/dashboard/admin/profile" },
+  { label: "New Customers", href: "/dashboard/admin/new-customers" },
+  { label: "New Delivery Partners", href: "/dashboard/admin/partner-approvals" },
+  { label: "Products", href: "/dashboard/admin/products" },
+  { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
+  { label: "Order Management", href: "/dashboard/admin/deliveries" },
+  { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
+  { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
+  { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
+  { label: "Purchases", href: "/dashboard/admin/purchases" },
+  { label: "Settlements", href: "/dashboard/admin/settlements" },
+  { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
+  { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
+  { label: "Users", href: "/dashboard/admin/users" },
+  { label: "Money", href: "/dashboard/admin/finance" },
+  { label: "Availability", href: "/dashboard/admin/availability" },
+  { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
+];

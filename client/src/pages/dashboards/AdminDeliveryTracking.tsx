@@ -29,6 +29,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
@@ -227,7 +228,8 @@ export default function AdminDeliveryTracking() {
           </div>
         ) : (
           <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-sm text-slate-300">
+            <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300 min-w-[720px]">
               <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="px-4 py-4 font-medium">Order ID</th>
@@ -286,6 +288,7 @@ export default function AdminDeliveryTracking() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         )}
       </div>
@@ -379,7 +382,8 @@ export default function AdminDeliveryTracking() {
               ) : (
                 <>
                   <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-            <table className="w-full text-left text-sm text-slate-300">
+            <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-300 min-w-[900px]">
               <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
                 <tr>
                   <th className="px-6 py-4 font-medium">Order ID</th>
@@ -445,6 +449,7 @@ export default function AdminDeliveryTracking() {
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
           
           <div className="flex items-center justify-between mt-4">

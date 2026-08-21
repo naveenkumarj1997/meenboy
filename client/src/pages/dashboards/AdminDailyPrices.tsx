@@ -12,6 +12,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
@@ -129,7 +130,8 @@ export default function AdminDailyPrices() {
         <div className="text-slate-400">No pending or confirmed orders found for this delivery date.</div>
       ) : (
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-          <table className="w-full text-left text-sm text-slate-300">
+          <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-slate-300 min-w-[640px]">
             <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4 font-medium">Product</th>
@@ -172,6 +174,7 @@ export default function AdminDailyPrices() {
               })}
             </tbody>
           </table>
+          </div>
           <div className="p-4 border-t border-slate-800 flex justify-end">
             <button
               onClick={handleSave}

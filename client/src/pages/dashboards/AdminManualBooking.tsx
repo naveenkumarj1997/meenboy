@@ -12,6 +12,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
@@ -65,7 +66,7 @@ export default function AdminManualBooking() {
         setLoading(true);
         const [usersRes, productsRes] = await Promise.all([
           getAllUsers(token),
-          getAdminProducts()
+          getAdminProducts(token)
         ]);
         setUsers(usersRes.users.filter((u: any) => u.role === "customer"));
         setProducts(productsRes.data.products.filter((p: any) => p.isActive));

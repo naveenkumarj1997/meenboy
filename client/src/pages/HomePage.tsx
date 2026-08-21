@@ -208,7 +208,7 @@ const HomePage = () => {
             </div>
             <div className="absolute -bottom-4 left-4 sm:-bottom-8 sm:-left-8 bg-white text-cyan-950 p-6 rounded-2xl shadow-xl">
               <div className="flex items-center gap-4">
-                <div className="text-4xl font-black text-teal-500">5k+</div>
+                <div className="text-4xl font-black text-teal-500">500+</div>
                 <div className="text-sm font-bold leading-tight">Happy<br/>Customers</div>
               </div>
             </div>

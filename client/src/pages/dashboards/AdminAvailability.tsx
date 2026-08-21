@@ -14,6 +14,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
+  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
@@ -56,17 +57,38 @@ const AdminAvailability = () => {
       
       const [availRes, productsRes] = await Promise.all([
         getAvailabilityByDate(date),
-        getAdminProducts()
+        getAdminProducts(token)
       ]);
       
       const data = availRes.availability;
       setIsClosed(data.isClosed);
       setUnavailableCategories(data.unavailableCategories || []);
-      setUnavailableProducts(data.unavailableProducts || []);
       setNotes(data.notes || "");
-      
-      if (productsRes.success) {
-        setAllProducts(productsRes.data.products);
+
+      const products = productsRes.success ? productsRes.data.products || [] : [];
+      setAllProducts(products);
+
+      const savedUnavailable = (data.unavailableProducts || []).map((id: string) => String(id));
+      // Hidden catalog products (isActive: false) default to unavailable for every date
+      const hiddenIds = products
+        .filter((p: any) => p.isActive === false)
+        .map((p: any) => String(p._id));
+      const mergedUnavailable = Array.from(new Set([...savedUnavailable, ...hiddenIds]));
+      setUnavailableProducts(mergedUnavailable);
+
+      // Persist hidden products as unavailable for this date so customer cart/checkout can detect them
+      const needsPersist = hiddenIds.some((id) => !savedUnavailable.includes(id));
+      if (needsPersist) {
+        try {
+          await updateAvailability(token, date, {
+            isClosed: data.isClosed,
+            unavailableCategories: data.unavailableCategories || [],
+            unavailableProducts: mergedUnavailable,
+            notes: data.notes || ""
+          });
+        } catch (persistErr) {
+          console.error("Failed to persist hidden products for date", persistErr);
+        }
       }
     } catch (err: any) {
       console.error(err);
@@ -85,12 +107,19 @@ const AdminAvailability = () => {
     try {
       setSaving(true);
       setMessage(null);
+      // Always keep hidden products marked unavailable for this date
+      const hiddenIds = allProducts
+        .filter((p) => p.isActive === false)
+        .map((p) => String(p._id));
+      const mergedUnavailable = Array.from(new Set([...unavailableProducts, ...hiddenIds]));
+
       await updateAvailability(token, selectedDate, {
         isClosed,
         unavailableCategories,
-        unavailableProducts,
+        unavailableProducts: mergedUnavailable,
         notes
       });
+      setUnavailableProducts(mergedUnavailable);
       setMessage({ type: "success", text: "Availability successfully updated." });
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
@@ -107,9 +136,11 @@ const AdminAvailability = () => {
     );
   };
 
-  const toggleProduct = (productId: string) => {
-    setUnavailableProducts(prev => 
-      prev.includes(productId) ? prev.filter(id => id !== productId) : [...prev, productId]
+  const toggleProduct = (productId: string, isHidden: boolean) => {
+    if (isHidden) return; // permanently unavailable while product is hidden
+    const id = String(productId);
+    setUnavailableProducts((prev) =>
+      prev.includes(id) ? prev.filter((pid) => pid !== id) : [...prev, id]
     );
   };
 
@@ -179,6 +210,9 @@ const AdminAvailability = () => {
                   <h3 className="text-sm font-bold text-white/60 uppercase tracking-wide mb-2">
                     Disable Specific Categories or Items
                   </h3>
+                  <p className="text-xs text-amber-300/80 mb-3">
+                    Hidden products from Products page appear in amber and stay unavailable by default for every date.
+                  </p>
                   <div className="space-y-4">
                     {validCategories.map(cat => {
                       const isCatDisabled = unavailableCategories.includes(cat);
@@ -229,20 +263,43 @@ const AdminAvailability = () => {
                                 className="border-t border-white/10"
                               >
                                 {catProducts.map(product => {
-                                  const isProductDisabled = unavailableProducts.includes(product._id);
+                                  const productId = String(product._id);
+                                  const isHidden = product.isActive === false;
+                                  const isProductDisabled = unavailableProducts.includes(productId) || isHidden;
                                   return (
                                     <div 
-                                      key={product._id}
-                                      onClick={() => toggleProduct(product._id)}
-                                      className={`flex items-center justify-between px-6 py-3 border-b border-white/5 last:border-0 cursor-pointer transition-colors ${
-                                        isProductDisabled ? "bg-rose-500/10" : "hover:bg-white/5"
+                                      key={productId}
+                                      onClick={() => toggleProduct(productId, isHidden)}
+                                      className={`flex items-center justify-between px-6 py-3 border-b border-white/5 last:border-0 transition-colors ${
+                                        isHidden
+                                          ? "bg-amber-500/15 cursor-not-allowed"
+                                          : isProductDisabled
+                                            ? "bg-rose-500/10 cursor-pointer"
+                                            : "hover:bg-white/5 cursor-pointer"
                                       }`}
                                     >
-                                      <span className={`text-sm ${isProductDisabled ? 'text-rose-300 font-medium' : 'text-white/80'}`}>
-                                        {product.name}
-                                      </span>
+                                      <div className="min-w-0 flex flex-col">
+                                        <span className={`text-sm ${
+                                          isHidden
+                                            ? "text-amber-200 font-medium"
+                                            : isProductDisabled
+                                              ? "text-rose-300 font-medium"
+                                              : "text-white/80"
+                                        }`}>
+                                          {product.name}
+                                        </span>
+                                        {isHidden && (
+                                          <span className="text-[10px] text-amber-300/80 font-semibold uppercase tracking-wide mt-0.5">
+                                            Hidden in catalog · default unavailable
+                                          </span>
+                                        )}
+                                      </div>
                                       <div className={`w-4 h-4 rounded-sm flex items-center justify-center border transition-colors ${
-                                        isProductDisabled ? 'bg-rose-500 border-rose-500' : 'border-white/30'
+                                        isHidden
+                                          ? "bg-amber-500 border-amber-400"
+                                          : isProductDisabled
+                                            ? "bg-rose-500 border-rose-500"
+                                            : "border-white/30"
                                       }`}>
                                         {isProductDisabled && (
                                           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">

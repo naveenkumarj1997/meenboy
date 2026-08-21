@@ -9,6 +9,7 @@ import {
 } from "../data/products";
 import { useCart } from "../context/CartContext";
 import { getCatalog } from "../lib/api";
+import { getProductReviewStats } from "../lib/productReviews";
 
 // ─── Sort Options ─────────────────────────────────────────────────────────────
 const SORT_OPTIONS = [
@@ -71,7 +72,7 @@ const ProductCard = ({
     });
 
     setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
+    setTimeout(() => setAdded(false), 4500);
   };
 
   return (
@@ -144,15 +145,21 @@ const ProductCard = ({
           </span>
         </div>
 
-        {/* Price + CTA */}
-        <div className="flex items-center justify-between mt-auto">
-          <div className="leading-tight">
-            <span className="text-[10px] text-white/35 uppercase tracking-wide block">
-              from / {product.unit}
+        {/* Price Range + CTA */}
+        <div className="flex items-end justify-between gap-3 mt-auto">
+          <div className="leading-tight min-w-0">
+            <span className="text-[10px] text-white/35 uppercase tracking-wide block mb-0.5">
+              Expected Price Range / {product.unit}
             </span>
-            <span className="text-xl font-black text-teal-400">
-              ₹{product.priceRange.min.toFixed(2)}
-            </span>
+            <div className="flex items-baseline gap-1.5 flex-wrap">
+              <span className="text-lg font-black text-teal-400">
+                ₹{product.priceRange.min.toFixed(2)}
+              </span>
+              <span className="text-white/30 font-medium text-sm">—</span>
+              <span className="text-base font-black text-teal-300">
+                ₹{product.priceRange.max.toFixed(2)}
+              </span>
+            </div>
           </div>
 
           <motion.button
@@ -198,6 +205,24 @@ const ProductCard = ({
           </motion.button>
         </div>
 
+        <AnimatePresence>
+          {added && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -4 }}
+              className="mt-3 rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-3 py-2 text-center"
+            >
+              <p className="text-[11px] text-emerald-300/90 leading-snug">
+                Added!{" "}
+                <Link to="/cart" className="font-semibold text-emerald-200 underline underline-offset-2 hover:text-white">
+                  Go to cart to place order
+                </Link>
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* View Details link */}
         <Link
           to={`/products/${product.id}`}
@@ -227,15 +252,17 @@ const ProductsPage = () => {
       try {
         setLoading(true);
         const res = await getCatalog();
-        const mappedProducts: Product[] = res.data.products.map(p => ({
+        const mappedProducts: Product[] = res.data.products.map(p => {
+          const { rating, reviews } = getProductReviewStats(p._id);
+          return {
           id: p._id,
           name: p.name,
           category: p.category,
           price: p.minPrice,
           priceRange: { min: p.minPrice, max: p.maxPrice },
           unit: p.unit || "kg",
-          rating: 4.5, // Fallback mock value
-          reviews: Math.floor(Math.random() * 200) + 50, // Fallback mock value
+          rating,
+          reviews,
           badge: "", // No badge by default
           description: p.description || "Freshly sourced product",
           longDescription: p.description || "Freshly sourced product directly from the markets.",
@@ -248,7 +275,8 @@ const ProductsPage = () => {
           })) || [],
           origin: "Local Market",
           nutritionHighlights: ["High Quality", "Freshly Packed"],
-        }));
+        };
+        });
         setProducts(mappedProducts);
       } catch (err) {
         console.error("Failed to load catalog", err);

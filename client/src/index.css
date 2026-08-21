@@ -28,3 +28,9 @@ body {
 * {
   box-sizing: border-box;
 }
+
+/* Improve touch scrolling for admin sidebars/menus on mobile */
+.overscroll-contain {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}

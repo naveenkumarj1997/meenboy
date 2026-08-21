@@ -72,8 +72,10 @@ export const getAdminOverview = async (token: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
-export const getAdminProducts = async () =>
-  request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/products?limit=100");
+export const getAdminProducts = async (token: string) =>
+  request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/admin/products?limit=200", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
 export const getCatalog = async () =>
   request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/products?limit=100");
@@ -93,6 +95,13 @@ export const updateAdminProduct = async (token: string, id: string, payload: Par
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
+  });
+
+export const setAdminProductVisibility = async (token: string, id: string, isActive: boolean) =>
+  request<{ success: boolean; message: string; data: { product: any } }>(`/catalog/products/${id}/visibility`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ isActive })
   });
 
 export const deleteAdminProduct = async (token: string, id: string) =>
@@ -156,6 +165,7 @@ export interface OrderPayload {
   }[];
   address: {
     line1: string;
+    line2?: string;
     city: string;
     state: string;
     postalCode: string;
@@ -232,6 +242,42 @@ export const downloadInvoice = async (token: string, orderId: string) => {
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.message || "Failed to download invoice");
+  }
+  return response.blob();
+};
+
+export const downloadPartnerDayReport = async (
+  token: string,
+  params: { date: string; partnerId?: string }
+) => {
+  const qs = new URLSearchParams({ date: params.date });
+  if (params.partnerId && params.partnerId !== "all") {
+    qs.set("partnerId", params.partnerId);
+  } else {
+    qs.set("partnerId", "all");
+  }
+  const response = await fetch(`${API_BASE}/orders/reports/partner-day?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to generate delivery report PDF");
+  }
+  return response.blob();
+};
+
+export const downloadVendorCategoryReport = async (
+  token: string,
+  params: { date: string; category?: string }
+) => {
+  const qs = new URLSearchParams({ date: params.date });
+  qs.set("category", params.category && params.category !== "all" ? params.category : "all");
+  const response = await fetch(`${API_BASE}/orders/reports/vendor-category?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to generate vendor prep PDF");
   }
   return response.blob();
 };

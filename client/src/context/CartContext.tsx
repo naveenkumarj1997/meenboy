@@ -65,10 +65,13 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       removeFromCart(id);
       return;
     }
-    
+
+    // Use 2 decimal places so 0.25 kg (250g) is not rounded to 0.3
+    const nextQty = Math.round(quantity * 100) / 100;
+
     setCartItems((prevItems) =>
       prevItems.map((item) =>
-        item.id === id ? { ...item, quantity: Number(quantity.toFixed(1)) } : item
+        item.id === id ? { ...item, quantity: nextQty } : item
       )
     );
   };

@@ -23,6 +23,12 @@ const Navbar = () => {
             <Link to="/" className="hover:text-teal-400 transition-colors">Home</Link>
             <Link to="/about" className="hover:text-teal-400 transition-colors">About Us</Link>
             <Link to="/products" className="hover:text-teal-400 transition-colors">Products</Link>
+            <Link to="/whatsapp" className="hover:text-teal-400 transition-colors inline-flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-[#25D366]" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                <path d="M20.52 3.48A11.86 11.86 0 0012.01 0C5.4 0 .04 5.36.04 11.97c0 2.11.55 4.17 1.6 5.99L0 24l6.2-1.62a11.94 11.94 0 005.8 1.48h.01c6.61 0 11.97-5.36 11.97-11.97 0-3.2-1.25-6.21-3.46-8.41zM12 21.48h-.01a9.5 9.5 0 01-4.84-1.33l-.35-.2-3.68.96.98-3.58-.23-.37a9.48 9.48 0 01-1.45-5.05C2.42 6.68 6.7 2.4 12 2.4c2.54 0 4.93.99 6.73 2.79a9.45 9.45 0 012.78 6.72c0 5.3-4.28 9.57-9.51 9.57zm5.22-7.14c-.29-.14-1.7-.84-1.96-.93-.26-.1-.45-.14-.64.14-.19.29-.74.93-.9 1.12-.17.19-.33.21-.62.07-.29-.14-1.21-.45-2.31-1.42-.85-.76-1.43-1.7-1.6-1.98-.17-.29-.02-.44.12-.58.13-.13.29-.33.43-.5.14-.17.19-.29.29-.48.1-.19.05-.36-.02-.5-.08-.14-.64-1.55-.88-2.12-.23-.56-.47-.48-.64-.49h-.55c-.19 0-.5.07-.76.36-.26.29-1 1-1 2.43s1.02 2.82 1.17 3.01c.14.19 2.01 3.07 4.87 4.31.68.29 1.21.47 1.62.6.68.22 1.3.19 1.79.11.55-.08 1.7-.69 1.94-1.36.24-.67.24-1.24.17-1.36-.07-.11-.26-.18-.55-.32z" />
+              </svg>
+              WhatsApp
+            </Link>
             <Link to="/contact" className="hover:text-teal-400 transition-colors">Contact</Link>
             
             <Link to="/cart" className="relative text-white hover:text-teal-400 transition-colors p-2">
@@ -86,6 +92,7 @@ const Navbar = () => {
             <Link to="/" className="block px-3 py-2 rounded-md hover:bg-cyan-800 hover:text-teal-400" onClick={() => setIsOpen(false)}>Home</Link>
             <Link to="/about" className="block px-3 py-2 rounded-md hover:bg-cyan-800 hover:text-teal-400" onClick={() => setIsOpen(false)}>About Us</Link>
             <Link to="/products" className="block px-3 py-2 rounded-md hover:bg-cyan-800 hover:text-teal-400" onClick={() => setIsOpen(false)}>Products</Link>
+            <Link to="/whatsapp" className="block px-3 py-2 rounded-md hover:bg-cyan-800 hover:text-teal-400" onClick={() => setIsOpen(false)}>WhatsApp</Link>
             <Link to="/contact" className="block px-3 py-2 rounded-md hover:bg-cyan-800 hover:text-teal-400" onClick={() => setIsOpen(false)}>Contact</Link>
             <Link to="/cart" className="block px-3 py-2 rounded-md hover:bg-cyan-800 hover:text-teal-400 flex items-center justify-between" onClick={() => setIsOpen(false)}>
               Cart
