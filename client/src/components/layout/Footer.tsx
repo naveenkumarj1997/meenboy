@@ -42,7 +42,7 @@ const Footer = () => {
             <ul className="space-y-2 text-sm">
               <li>Email: fishfriendlymeats@gmail.com</li>
               <li>Phone: +91 9087894319</li>
-              <li>Address: Bypass Road in Kalavasal, Madurai, Tamil Nadu (PIN code: 625016)</li>
+              <li>Address: Balusamy konnar street, Madakkulam, Bypass Road in Kalavasal, Madurai, Tamil Nadu - 625003</li>
             </ul>
           </div>
           

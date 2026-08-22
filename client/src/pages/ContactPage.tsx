@@ -127,10 +127,11 @@ const ContactPage = () => {
               </svg>
             </div>
             <div>
-              <h3 className="text-xl font-semibold text-white mb-2">Headquarters</h3>
+              <h3 className="text-xl font-semibold text-white mb-2">Visit Us</h3>
               <p className="text-slate-400">
-                Bypass Road in Kalavasal,<br />
-                Madurai, Tamil Nadu (PIN code: 625016)
+                Balusamy konnar street, Madakkulam<br />
+                Bypass Road in Kalavasal<br />
+                Madurai, Tamil Nadu - 625003
               </p>
             </div>
           </div>
