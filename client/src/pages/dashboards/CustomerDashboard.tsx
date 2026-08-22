@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getMyOrders, downloadInvoice, getCatalog } from "../../lib/api";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 import DashboardShell from "./DashboardShell";
 
 const CustomerDashboard = () => {
@@ -114,14 +115,7 @@ const CustomerDashboard = () => {
     try {
       setDownloadingId(orderId);
       const blob = await downloadInvoice(token!, orderId);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Invoice-${orderId.slice(-8).toUpperCase()}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
+      triggerPdfDownload(blob, `Invoice-${orderId.slice(-8).toUpperCase()}.pdf`);
     } catch (err: any) {
       setError(err.message || "Failed to download invoice");
     } finally {

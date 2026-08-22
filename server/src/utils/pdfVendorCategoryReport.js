@@ -11,24 +11,7 @@ const SHOP = {
   cityLine: "Madurai, Tamil Nadu - 625003"
 };
 
-const FONT_REGULAR = path.join(__dirname, "../assets/fonts/HindMadurai-Regular.ttf");
-const FONT_BOLD = path.join(__dirname, "../assets/fonts/HindMadurai-Bold.ttf");
-const FALLBACK_REGULAR = "C:\\Windows\\Fonts\\Nirmala.ttf";
-const FALLBACK_BOLD = "C:\\Windows\\Fonts\\NirmalaB.ttf";
-
-const resolveFonts = () => {
-  const regular = fs.existsSync(FONT_REGULAR)
-    ? FONT_REGULAR
-    : fs.existsSync(FALLBACK_REGULAR)
-      ? FALLBACK_REGULAR
-      : null;
-  const bold = fs.existsSync(FONT_BOLD)
-    ? FONT_BOLD
-    : fs.existsSync(FALLBACK_BOLD)
-      ? FALLBACK_BOLD
-      : regular;
-  return { regular, bold };
-};
+const { resolvePdfFonts } = require("./pdfFonts");
 
 /** Distinct theme per category so vendors can spot the right PDF quickly */
 const CATEGORY_THEMES = {
@@ -100,7 +83,7 @@ const generateVendorCategoryReport = ({ date, categoryLabel, rows, totals = [] }
       const fileName = `VendorPrep-${date}-${slug}.pdf`;
       const filePath = path.join(reportsDir, fileName);
 
-      const fonts = resolveFonts();
+      const fonts = resolvePdfFonts();
       if (!fonts.regular) {
         return reject(new Error("No Unicode font found for report PDF."));
       }
@@ -388,7 +371,7 @@ const generateVendorAllCategoriesReport = async ({ date, sections }) => {
       const fileName = `VendorPrep-${date}-ALL.pdf`;
       const filePath = path.join(reportsDir, fileName);
 
-      const fonts = resolveFonts();
+      const fonts = resolvePdfFonts();
       if (!fonts.regular) {
         return reject(new Error("No Unicode font found for report PDF."));
       }

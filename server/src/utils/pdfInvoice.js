@@ -11,25 +11,7 @@ const SHOP = {
   cityLine: "Madurai, Tamil Nadu - 625003"
 };
 
-const FONT_REGULAR = path.join(__dirname, "../assets/fonts/HindMadurai-Regular.ttf");
-const FONT_BOLD = path.join(__dirname, "../assets/fonts/HindMadurai-Bold.ttf");
-const FALLBACK_REGULAR = "C:\\Windows\\Fonts\\Nirmala.ttf";
-const FALLBACK_BOLD = "C:\\Windows\\Fonts\\NirmalaB.ttf";
-
-const resolveFonts = () => {
-  const regular = fs.existsSync(FONT_REGULAR)
-    ? FONT_REGULAR
-    : fs.existsSync(FALLBACK_REGULAR)
-      ? FALLBACK_REGULAR
-      : null;
-  const bold = fs.existsSync(FONT_BOLD)
-    ? FONT_BOLD
-    : fs.existsSync(FALLBACK_BOLD)
-      ? FALLBACK_BOLD
-      : regular;
-
-  return { regular, bold };
-};
+const { resolvePdfFonts } = require("./pdfFonts");
 
 const buildBillToLines = (order, user) => {
   const lines = [];
@@ -73,7 +55,7 @@ const generateInvoice = (order, user) => {
       const fileName = `INV-${order._id}.pdf`;
       const filePath = path.join(invoicesDir, fileName);
 
-      const fonts = resolveFonts();
+      const fonts = resolvePdfFonts();
       if (!fonts.regular) {
         return reject(new Error("No Unicode font found for invoice PDF (Tamil support required)."));
       }

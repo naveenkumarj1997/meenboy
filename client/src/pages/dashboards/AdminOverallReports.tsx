@@ -10,6 +10,7 @@ import {
   getAllAssignments,
   getDeliveryPartners
 } from "../../lib/api";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 
 const VENDOR_CATEGORIES = [
   "Seafood",
@@ -167,17 +168,10 @@ export default function AdminOverallReports() {
         date,
         partnerId: isAll ? "all" : partnerId
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const partnerName = isAll
         ? "ALL"
         : (selectedPartner?.name || "partner").replace(/\s+/g, "_");
-      a.download = `Delivery-${date}-${partnerName}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      triggerPdfDownload(blob, `Delivery-${date}-${partnerName}.pdf`);
       setSuccess(
         isAll
           ? `PDF generated for ALL orders on ${date}.`
@@ -203,15 +197,8 @@ export default function AdminOverallReports() {
         date: vendorDate,
         category: vendorCategory
       });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
       const catSlug = vendorCategory === "all" ? "ALL" : vendorCategory.replace(/\s+/g, "_");
-      a.download = `VendorPrep-${vendorDate}-${catSlug}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      triggerPdfDownload(blob, `VendorPrep-${vendorDate}-${catSlug}.pdf`);
       setSuccess(
         vendorCategory === "all"
           ? `Vendor prep PDF generated for ALL categories on ${vendorDate}.`
