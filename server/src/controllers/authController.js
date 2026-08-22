@@ -91,6 +91,7 @@ const login = async (req, res, next) => {
 };
 
 const me = async (req, res) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
   res.status(200).json({ user: req.user });
 };
 

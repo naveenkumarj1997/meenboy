@@ -42,7 +42,14 @@ import PartnerEarnings from "./pages/dashboards/PartnerEarnings";
 import CustomCursor from "./components/CustomCursor";
 
 const DashboardRouter = () => {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-100">
+        Loading...
+      </div>
+    );
+  }
   if (!user) return <Navigate to="/login" replace />;
 
   if (user.role === "admin") return <AdminDashboard />;

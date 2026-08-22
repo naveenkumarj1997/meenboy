@@ -94,7 +94,7 @@ const parseSavedAddress = (addr: {
 
 const CheckoutPage = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
-  const { token, user } = useAuth();
+  const { token, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -373,7 +373,15 @@ const CheckoutPage = () => {
     }
   };
 
-  // Enforce login for checkout
+  // Enforce login for checkout — wait until session restore finishes
+  if (isLoading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center text-slate-300">
+        Loading...
+      </div>
+    );
+  }
+
   if (!user) {
     return <Navigate to="/login" replace state={{ from: "/checkout" }} />;
   }

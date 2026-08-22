@@ -2,6 +2,15 @@ import type { AuthResponse } from "../types/auth";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 interface AuthPayload {
   name?: string;
   email: string;
@@ -13,6 +22,7 @@ interface AuthPayload {
 export const request = async <T>(url: string, options?: RequestInit): Promise<T> => {
   const { headers, ...restOptions } = options || {};
   const response = await fetch(`${API_BASE}${url}`, {
+    cache: "no-store",
     ...restOptions,
     headers: {
       "Content-Type": "application/json",
@@ -20,10 +30,19 @@ export const request = async <T>(url: string, options?: RequestInit): Promise<T>
     }
   });
 
-  const data = await response.json();
+  const raw = await response.text();
+  let data: any = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = {};
+    }
+  }
+
   if (!response.ok) {
     const errorMsg = data?.message || data?.errors?.[0]?.msg || "Request failed";
-    throw new Error(errorMsg);
+    throw new ApiError(errorMsg, response.status);
   }
 
   return data as T;
