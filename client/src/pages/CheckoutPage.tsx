@@ -50,6 +50,48 @@ interface CheckoutForm {
   deliveryTime: string;
 }
 
+/** Restore Door / Street / Area from last order (new structured line1 or old single-line address). */
+const parseSavedAddress = (addr: {
+  line1?: string;
+  line2?: string;
+  city?: string;
+  postalCode?: string;
+}) => {
+  const line1 = (addr.line1 || "").trim();
+  const line2 = (addr.line2 || "").trim();
+  const parts = line1
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  let doorNo = "";
+  let streetName = "";
+  let area = "";
+
+  if (parts.length >= 3) {
+    doorNo = parts[0];
+    streetName = parts.slice(1, -1).join(", ");
+    area = parts[parts.length - 1];
+  } else if (parts.length === 2) {
+    doorNo = parts[0];
+    streetName = parts[1];
+    area = line2;
+  } else if (parts.length === 1) {
+    streetName = parts[0];
+    area = line2;
+  }
+
+  if (!area && line2) area = line2;
+
+  const city = addr.city && isMaduraiCity(addr.city) ? MADURAI_CITY : "";
+  const pincode =
+    addr.postalCode && isMaduraiPincode(String(addr.postalCode))
+      ? String(addr.postalCode)
+      : "";
+
+  return { doorNo, streetName, area, city, pincode };
+};
+
 const CheckoutPage = () => {
   const { cartItems, cartTotal, clearCart } = useCart();
   const { token, user } = useAuth();
@@ -87,7 +129,12 @@ const CheckoutPage = () => {
   const [lockedFields, setLockedFields] = useState({
     name: false,
     phone: false,
-    mapUrl: false
+    mapUrl: false,
+    doorNo: false,
+    streetName: false,
+    area: false,
+    city: false,
+    pincode: false
   });
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [unavailableByCartId, setUnavailableByCartId] = useState<Record<string, ItemAvailability>>({});
@@ -118,26 +165,29 @@ const CheckoutPage = () => {
             const hasPhone = !!lastOrder.address?.phone;
             const hasMapUrl = !!lastOrder.mapUrl;
             const addr = lastOrder.address || {};
+            const parsed = parseSavedAddress(addr);
+            const hasSavedAddress = !!(addr.line1 || addr.line2 || addr.postalCode);
 
-            setForm(prev => ({
+            setForm((prev) => ({
               ...prev,
               phone: hasPhone ? lastOrder.address.phone : prev.phone,
               mapUrl: hasMapUrl ? lastOrder.mapUrl : prev.mapUrl,
-              city: addr.city && isMaduraiCity(addr.city) ? MADURAI_CITY : prev.city,
-              pincode:
-                addr.postalCode && isMaduraiPincode(String(addr.postalCode))
-                  ? String(addr.postalCode)
-                  : prev.pincode,
-              // Best-effort restore from previous line1 if it looks structured
-              doorNo: prev.doorNo,
-              streetName: prev.streetName,
-              area: prev.area
+              doorNo: parsed.doorNo || prev.doorNo,
+              streetName: parsed.streetName || prev.streetName,
+              area: parsed.area || prev.area,
+              city: parsed.city || prev.city || MADURAI_CITY,
+              pincode: parsed.pincode || prev.pincode
             }));
 
-            setLockedFields(prev => ({
+            setLockedFields((prev) => ({
               ...prev,
               phone: hasPhone,
-              mapUrl: hasMapUrl
+              mapUrl: hasMapUrl,
+              doorNo: hasSavedAddress && !!parsed.doorNo,
+              streetName: hasSavedAddress && !!parsed.streetName,
+              area: hasSavedAddress && !!parsed.area,
+              city: hasSavedAddress && !!parsed.city,
+              pincode: hasSavedAddress && !!parsed.pincode
             }));
           }
         })
@@ -284,6 +334,7 @@ const CheckoutPage = () => {
         })),
         address: {
           line1,
+          line2: form.area.trim(),
           city: MADURAI_CITY,
           state: MADURAI_STATE,
           postalCode: form.pincode.trim(),
@@ -415,8 +466,9 @@ const CheckoutPage = () => {
                   <input
                     type="text"
                     value={form.doorNo}
+                    readOnly={lockedFields.doorNo}
                     onChange={(e) => setForm({ ...form, doorNo: e.target.value })}
-                    className={`w-full bg-cyan-950/50 border ${errors.doorNo ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors`}
+                    className={`w-full bg-cyan-950/50 border ${errors.doorNo ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors ${lockedFields.doorNo ? "opacity-60 cursor-not-allowed" : ""}`}
                     placeholder="e.g. 12A"
                   />
                   {errors.doorNo && <p className="text-red-400 text-xs mt-1.5">{errors.doorNo}</p>}
@@ -426,8 +478,9 @@ const CheckoutPage = () => {
                   <input
                     type="text"
                     value={form.streetName}
+                    readOnly={lockedFields.streetName}
                     onChange={(e) => setForm({ ...form, streetName: e.target.value })}
-                    className={`w-full bg-cyan-950/50 border ${errors.streetName ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors`}
+                    className={`w-full bg-cyan-950/50 border ${errors.streetName ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors ${lockedFields.streetName ? "opacity-60 cursor-not-allowed" : ""}`}
                     placeholder="e.g. West Masi Street"
                   />
                   {errors.streetName && <p className="text-red-400 text-xs mt-1.5">{errors.streetName}</p>}
@@ -437,8 +490,9 @@ const CheckoutPage = () => {
                   <input
                     type="text"
                     value={form.area}
+                    readOnly={lockedFields.area}
                     onChange={(e) => setForm({ ...form, area: e.target.value })}
-                    className={`w-full bg-cyan-950/50 border ${errors.area ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors`}
+                    className={`w-full bg-cyan-950/50 border ${errors.area ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors ${lockedFields.area ? "opacity-60 cursor-not-allowed" : ""}`}
                     placeholder="e.g. Tallakulam"
                   />
                   {errors.area && <p className="text-red-400 text-xs mt-1.5">{errors.area}</p>}
@@ -448,8 +502,9 @@ const CheckoutPage = () => {
                   <input
                     type="text"
                     value={form.city}
+                    readOnly={lockedFields.city}
                     onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className={`w-full bg-cyan-950/50 border ${errors.city || (form.city && !isMaduraiCity(form.city)) ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors`}
+                    className={`w-full bg-cyan-950/50 border ${errors.city || (form.city && !isMaduraiCity(form.city)) ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors ${lockedFields.city ? "opacity-60 cursor-not-allowed" : ""}`}
                     placeholder="Madurai"
                   />
                   {errors.city && <p className="text-red-400 text-xs mt-1.5">{errors.city}</p>}
@@ -461,11 +516,12 @@ const CheckoutPage = () => {
                     inputMode="numeric"
                     maxLength={6}
                     value={form.pincode}
+                    readOnly={lockedFields.pincode}
                     onChange={(e) =>
                       setForm({ ...form, pincode: e.target.value.replace(/\D/g, "").slice(0, 6) })
                     }
                     list="madurai-pincodes"
-                    className={`w-full bg-cyan-950/50 border ${errors.pincode || (form.pincode.length === 6 && !isMaduraiPincode(form.pincode)) ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors`}
+                    className={`w-full bg-cyan-950/50 border ${errors.pincode || (form.pincode.length === 6 && !isMaduraiPincode(form.pincode)) ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors ${lockedFields.pincode ? "opacity-60 cursor-not-allowed" : ""}`}
                     placeholder="e.g. 625001"
                   />
                   <datalist id="madurai-pincodes">
