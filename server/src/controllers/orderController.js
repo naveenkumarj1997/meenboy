@@ -5,6 +5,7 @@ const DateAvailability = require("../models/DateAvailability");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const { createNotification } = require("../utils/notifications");
+const DailyPriceUpdate = require("../models/DailyPriceUpdate");
 const path = require("path");
 const fs = require("fs");
 const { generateInvoice } = require("../utils/pdfInvoice");
@@ -13,6 +14,25 @@ const {
   generateVendorCategoryReport,
   generateVendorAllCategoriesReport
 } = require("../utils/pdfVendorCategoryReport");
+
+const applyDailyPriceFlags = async (orders) => {
+  if (!orders.length) return orders;
+  const dates = [...new Set(orders.map((o) => o.deliveryDate).filter(Boolean))];
+  const updates = await DailyPriceUpdate.find({ deliveryDate: { $in: dates } }).lean();
+  const updatedDates = new Set(updates.map((u) => u.deliveryDate));
+  return orders.map((o) => ({
+    ...o,
+    dailyPriceUpdated: Boolean(o.dailyPriceUpdated || updatedDates.has(o.deliveryDate)),
+    estimatedTotal: o.estimatedTotal != null ? o.estimatedTotal : o.total
+  }));
+};
+
+const snapshotOrderItems = (items = []) =>
+  items.map((item) => ({
+    ...item,
+    estimatedUnitPrice: item.estimatedUnitPrice ?? item.unitPrice,
+    estimatedTotalPrice: item.estimatedTotalPrice ?? item.totalPrice
+  }));
 
 const createOrder = async (req, res, next) => {
   try {
@@ -78,13 +98,19 @@ const createOrder = async (req, res, next) => {
 
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
     const total = subtotal + deliveryFee;
+    const dailyUpdate = deliveryDate
+      ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
+      : null;
 
     const order = await Order.create({
       customer: req.user._id,
-      items,
+      items: snapshotOrderItems(items),
       subtotal,
       deliveryFee,
       total,
+      estimatedTotal: total,
+      dailyPriceUpdated: Boolean(dailyUpdate),
+      dailyPriceUpdatedAt: dailyUpdate ? dailyUpdate.updatedAt : undefined,
       address,
       deliveryDate,
       deliveryTime,
@@ -126,7 +152,7 @@ const getMyOrders = async (req, res, next) => {
       deliveryPartner: assignmentMap[o._id.toString()] || null
     }));
 
-    res.json({ orders: populatedOrders });
+    res.json({ orders: await applyDailyPriceFlags(populatedOrders) });
   } catch (error) {
     next(error);
   }
@@ -169,6 +195,18 @@ const updateOrderStatus = async (req, res, next) => {
     const { orderId } = req.params;
     const { status } = req.body;
 
+    const existing = await Order.findById(orderId);
+    if (!existing) return res.status(404).json({ message: "Order not found" });
+
+    if (status === "cancelled") {
+      if (existing.status === "delivered") {
+        return res.status(400).json({ message: "Delivered orders cannot be cancelled." });
+      }
+      if (existing.status === "cancelled") {
+        return res.status(400).json({ message: "This order is already cancelled." });
+      }
+    }
+
     const order = await Order.findByIdAndUpdate(
       orderId,
       { status },
@@ -176,12 +214,77 @@ const updateOrderStatus = async (req, res, next) => {
     );
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    if (status === "cancelled") {
+      await DeliveryAssignment.updateMany({ order: orderId }, { status: "cancelled" });
+    }
+
     await createNotification({
       user: order.customer,
       type: "order_status_updated",
       title: "Order status updated",
       message: `Your order status is now: ${order.status}`,
       metadata: { orderId: order._id, status: order.status }
+    });
+
+    res.json({ order });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateAdminOrder = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const { items, address, deliveryDate, deliveryTime, mapUrl, deliveryFee } = req.body;
+
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.status === "cancelled") {
+      return res.status(400).json({ message: "Cancelled orders cannot be edited." });
+    }
+
+    if (Array.isArray(items) && items.length > 0) {
+      order.items = items.map((item) => ({
+        product: item.product,
+        productName: item.productName,
+        productImage: item.productImage,
+        quantity: item.quantity,
+        unit: item.unit || "kg",
+        cutName: item.cutName,
+        notes: item.notes,
+        unitPrice: item.unitPrice,
+        totalPrice: Number(item.quantity) * Number(item.unitPrice)
+      }));
+      order.subtotal = order.items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+    }
+
+    if (deliveryFee != null && deliveryFee !== "") {
+      order.deliveryFee = Number(deliveryFee) || 0;
+    }
+    order.total = Number(order.subtotal || 0) + Number(order.deliveryFee || 0);
+
+    if (address) {
+      order.address = order.address || {};
+      if (address.line1) order.address.line1 = address.line1;
+      if (address.line2 !== undefined) order.address.line2 = address.line2;
+      if (address.city) order.address.city = address.city;
+      if (address.state) order.address.state = address.state;
+      if (address.postalCode) order.address.postalCode = address.postalCode;
+      if (address.phone !== undefined) order.address.phone = address.phone;
+    }
+
+    if (deliveryDate) order.deliveryDate = deliveryDate;
+    if (deliveryTime) order.deliveryTime = deliveryTime;
+    if (mapUrl !== undefined) order.mapUrl = mapUrl;
+
+    await order.save();
+
+    await createNotification({
+      user: order.customer,
+      type: "order_status_updated",
+      title: "Order updated",
+      message: "Your order has been updated by Fish Friendly admin.",
+      metadata: { orderId: order._id }
     });
 
     res.json({ order });
@@ -281,6 +384,54 @@ const updateDeliveryStatus = async (req, res, next) => {
   }
 };
 
+const buildDailyPriceSummary = (orders) => {
+  const productMap = new Map();
+
+  orders.forEach((order) => {
+    (order.items || []).forEach((item) => {
+      const key = `${item.product}-${item.cutName || "default"}`;
+      if (!productMap.has(key)) {
+        const booked = item.estimatedUnitPrice != null ? Number(item.estimatedUnitPrice) : Number(item.unitPrice);
+        productMap.set(key, {
+          productId: item.product,
+          productName: item.productName,
+          cutName: item.cutName,
+          unit: item.unit || "kg",
+          currentUnitPrice: Number(item.unitPrice),
+          estimatedUnitPrice: booked,
+          totalQuantity: 0
+        });
+      }
+      productMap.get(key).totalQuantity += Number(item.quantity) || 0;
+    });
+  });
+
+  const products = Array.from(productMap.values()).map((p) => {
+    const qty = Math.round(Number(p.totalQuantity) * 1000) / 1000;
+    const booked = Number(p.estimatedUnitPrice);
+    const daily = Number(p.currentUnitPrice);
+    return {
+      ...p,
+      totalQuantity: qty,
+      amountDifference: Math.round((daily - booked) * qty * 100) / 100
+    };
+  });
+
+  const changes = products
+    .filter((p) => Math.abs(Number(p.amountDifference)) > 0.01)
+    .map((p) => ({
+      productName: p.productName,
+      cutName: p.cutName,
+      unit: p.unit,
+      quantity: p.totalQuantity,
+      bookedUnitPrice: p.estimatedUnitPrice,
+      dailyUnitPrice: p.currentUnitPrice,
+      amountDifference: p.amountDifference
+    }));
+
+  return { products, changes };
+};
+
 const getProductsForDailyPrice = async (req, res, next) => {
   try {
     const { deliveryDate } = req.query;
@@ -290,28 +441,19 @@ const getProductsForDailyPrice = async (req, res, next) => {
 
     const orders = await Order.find({
       deliveryDate,
-      status: { $in: ["pending", "confirmed"] }
+      status: { $nin: ["cancelled"] }
     }).lean();
 
-    const productMap = new Map();
+    const { products, changes } = buildDailyPriceSummary(orders);
+    const lock = await DailyPriceUpdate.findOne({ deliveryDate }).populate("updatedBy", "name").lean();
 
-    orders.forEach(order => {
-      order.items.forEach(item => {
-        const key = `${item.product}-${item.cutName || 'default'}`;
-        if (!productMap.has(key)) {
-          productMap.set(key, {
-            productId: item.product,
-            productName: item.productName,
-            cutName: item.cutName,
-            currentUnitPrice: item.unitPrice,
-            totalQuantity: 0
-          });
-        }
-        productMap.get(key).totalQuantity += item.quantity;
-      });
+    res.json({
+      products,
+      dailyPriceUpdated: Boolean(lock),
+      updatedAt: lock?.updatedAt || null,
+      updatedByName: lock?.updatedBy?.name || null,
+      changes: lock?.items?.length ? lock.items : changes
     });
-
-    res.json({ products: Array.from(productMap.values()) });
   } catch (error) {
     next(error);
   }
@@ -323,20 +465,35 @@ const updateDailyPrices = async (req, res, next) => {
 
     const orders = await Order.find({
       deliveryDate,
-      status: { $in: ["pending", "confirmed"] }
+      status: { $in: ["pending", "confirmed", "preparing"] }
     });
 
     let updatedCount = 0;
+    const now = new Date();
+
+    await DailyPriceUpdate.findOneAndUpdate(
+      { deliveryDate },
+      { deliveryDate, updatedBy: req.user._id },
+      { upsert: true, new: true }
+    );
 
     for (const order of orders) {
+      const alreadyConfirmed = Boolean(order.dailyPriceUpdated);
+      if (order.estimatedTotal == null) {
+        order.estimatedTotal = order.total;
+      }
+
       let orderChanged = false;
 
       for (const item of order.items) {
+        if (item.estimatedUnitPrice == null) item.estimatedUnitPrice = item.unitPrice;
+        if (item.estimatedTotalPrice == null) item.estimatedTotalPrice = item.totalPrice;
+
         const update = priceUpdates.find(
           (pu) => String(pu.productId) === String(item.product) && (pu.cutName ? pu.cutName === item.cutName : !item.cutName)
         );
 
-        if (update) {
+        if (update && update.newPrice != null && update.newPrice !== "") {
           item.unitPrice = update.newPrice;
           item.totalPrice = update.newPrice * item.quantity;
           orderChanged = true;
@@ -346,26 +503,81 @@ const updateDailyPrices = async (req, res, next) => {
       if (orderChanged) {
         order.subtotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0);
         order.total = order.subtotal + order.deliveryFee;
-        await order.save();
         updatedCount++;
-        
-        // Update pending or authorized payments
+      }
+
+      order.dailyPriceUpdated = true;
+      order.dailyPriceUpdatedAt = now;
+      await order.save();
+
+      if (orderChanged) {
         await Payment.updateMany(
           { order: order._id, status: { $in: ["pending", "authorized", "failed"] } },
           { amount: order.total }
         );
-        
+      }
+
+      if (!alreadyConfirmed || orderChanged) {
         await createNotification({
           user: order.customer,
           type: "price_updated",
-          title: "Order price updated",
-          message: `The price for your order on ${deliveryDate} has been updated based on today's market rate. New total: $${order.total.toFixed(2)}`,
+          title: "Daily price updated",
+          message: orderChanged
+            ? `Actual price for your ${deliveryDate} delivery has been confirmed. New total: ₹${Number(order.total).toFixed(2)}`
+            : `Daily price for your ${deliveryDate} delivery has been confirmed.`,
           metadata: { orderId: order._id, total: order.total }
         });
       }
     }
 
-    res.json({ message: `Updated prices for ${updatedCount} orders`, updatedCount });
+    const refreshed = await Order.find({
+      deliveryDate,
+      status: { $nin: ["cancelled"] }
+    }).lean();
+    const { changes } = buildDailyPriceSummary(refreshed);
+    await DailyPriceUpdate.findOneAndUpdate(
+      { deliveryDate },
+      { items: changes, updatedBy: req.user._id },
+      { upsert: true, new: true }
+    );
+
+    res.json({
+      message: `Daily prices saved for ${deliveryDate}. ${updatedCount} order(s) recalculated.`,
+      updatedCount,
+      dailyPriceUpdated: true,
+      changes
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const listInvoicesForAdmin = async (req, res, next) => {
+  try {
+    const { deliveryDate } = req.query;
+    if (!deliveryDate) {
+      return res.status(400).json({ message: "deliveryDate query parameter is required" });
+    }
+
+    const orders = await Order.find({
+      deliveryDate,
+      status: { $ne: "cancelled" }
+    })
+      .populate("customer", "name phone")
+      .sort({ createdAt: 1 })
+      .lean();
+
+    const invoices = orders.map((order) => ({
+      orderId: order._id,
+      customerName: order.customer?.name || "Customer",
+      customerPhone: order.customer?.phone || order.address?.phone || "",
+      total: order.total,
+      status: order.status,
+      deliveryTime: order.deliveryTime,
+      dailyPriceUpdated: Boolean(order.dailyPriceUpdated)
+    }));
+
+    res.json({ invoices });
   } catch (error) {
     next(error);
   }
@@ -382,6 +594,15 @@ const downloadInvoice = async (req, res, next) => {
 
     if (req.user.role === "customer" && order.customer._id.toString() !== req.user._id.toString()) {
       return res.status(403).json({ message: "Not authorized to view this invoice" });
+    }
+
+    const dateLock = await DailyPriceUpdate.findOne({ deliveryDate: order.deliveryDate }).lean();
+    if (dateLock && !order.dailyPriceUpdated) {
+      order.dailyPriceUpdated = true;
+      order.dailyPriceUpdatedAt = dateLock.updatedAt;
+    }
+    if (order.estimatedTotal == null) {
+      order.estimatedTotal = order.total;
     }
 
     let filePath;
@@ -789,13 +1010,19 @@ const createAdminOrder = async (req, res, next) => {
 
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
     const total = subtotal + deliveryFee;
+    const dailyUpdate = deliveryDate
+      ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
+      : null;
 
     const order = await Order.create({
       customer: finalCustomerId,
-      items,
+      items: snapshotOrderItems(items),
       subtotal,
       deliveryFee,
       total,
+      estimatedTotal: total,
+      dailyPriceUpdated: Boolean(dailyUpdate),
+      dailyPriceUpdatedAt: dailyUpdate ? dailyUpdate.updatedAt : undefined,
       address,
       deliveryDate,
       deliveryTime,
@@ -825,10 +1052,12 @@ module.exports = {
   listOrdersForAdmin,
   listAssignmentsForPartner,
   updateOrderStatus,
+  updateAdminOrder,
   assignDeliveryPartner,
   updateDeliveryStatus,
   getProductsForDailyPrice,
   updateDailyPrices,
+  listInvoicesForAdmin,
   downloadInvoice,
   downloadPartnerDayReport,
   downloadVendorCategoryReport,

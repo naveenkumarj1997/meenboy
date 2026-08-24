@@ -8,6 +8,20 @@ export const WEIGHT_OPTIONS = [
 
 export const DEFAULT_WEIGHT_KG = 1;
 
+/** Display quantity as "250 gram", "1 kg", or "2 pieces". */
+export const formatQuantityLabel = (quantity: number, unit?: string) => {
+  const qty = Number(quantity);
+  const u = String(unit || "kg").toLowerCase();
+  if (u !== "kg") {
+    const label = u === "piece" ? (qty === 1 ? "piece" : "pieces") : u;
+    return `${qty} ${label}`;
+  }
+  const known = WEIGHT_OPTIONS.find((opt) => Math.abs(opt.value - qty) < 0.001);
+  if (known) return known.label;
+  if (qty > 0 && qty < 1) return `${Math.round(qty * 1000)} gram`;
+  return `${Math.round(qty * 100) / 100} kg`;
+};
+
 /** Snap any kg quantity to the closest allowed weight option. */
 export const snapToWeightOption = (kg: number): number => {
   let best = DEFAULT_WEIGHT_KG;

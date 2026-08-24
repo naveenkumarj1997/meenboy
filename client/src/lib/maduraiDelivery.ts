@@ -24,7 +24,8 @@ export const MADURAI_PINCODES = [
   "625020",
   "625021",
   "625022",
-  "625023"
+  "625023",
+  "625402"
 ] as const;
 
 export const MADURAI_DELIVERY_MESSAGE =

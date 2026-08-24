@@ -4,7 +4,6 @@ const path = require("path");
 
 const SHOP = {
   name: "FISHFRIENDLY",
-  email: "fishfriendlymeats@gmail.com",
   phone: "+91 9087894319",
   addressLine1: "Balusamy konnar street, Madakkulam",
   addressLine2: "Bypass Road in Kalavasal",
@@ -12,6 +11,55 @@ const SHOP = {
 };
 
 const { resolvePdfFonts } = require("./pdfFonts");
+
+const WEIGHT_QTY_LABELS = {
+  0.25: "250 gram",
+  0.5: "500 gram",
+  1: "1 kg",
+  1.5: "1.5 kg",
+  2: "2 kg"
+};
+
+const formatInvoiceQuantity = (item) => {
+  const qty = Number(item.quantity);
+  const unit = String(item.unit || "kg").toLowerCase();
+  if (unit !== "kg") {
+    const label = unit === "piece" ? (qty === 1 ? "piece" : "pieces") : unit;
+    return `${qty} ${label}`;
+  }
+  const knownKey = Object.keys(WEIGHT_QTY_LABELS).find((k) => Math.abs(Number(k) - qty) < 0.001);
+  if (knownKey) return WEIGHT_QTY_LABELS[knownKey];
+  if (qty > 0 && qty < 1) {
+    return `${Math.round(qty * 1000)} gram`;
+  }
+  const kg = Math.round(qty * 100) / 100;
+  return `${kg} kg`;
+};
+
+const getInvoicePriceChanges = (items = []) =>
+  items
+    .map((item) => {
+      const oldRate = Number(item.estimatedUnitPrice);
+      const newRate = Number(item.unitPrice);
+      if (!Number.isFinite(oldRate) || !Number.isFinite(newRate)) return null;
+      const diffPerUnit = newRate - oldRate;
+      if (Math.abs(diffPerUnit) < 0.01) return null;
+      const qty = Number(item.quantity) || 0;
+      const lineDiff =
+        item.estimatedTotalPrice != null
+          ? Number(item.totalPrice) - Number(item.estimatedTotalPrice)
+          : diffPerUnit * qty;
+      return {
+        name: item.productName || "Item",
+        cutName: item.cutName || "",
+        qtyLabel: formatInvoiceQuantity(item),
+        unit: item.unit || "kg",
+        oldRate,
+        newRate,
+        lineDiff
+      };
+    })
+    .filter(Boolean);
 
 const buildBillToLines = (order, user) => {
   const lines = [];
@@ -77,8 +125,7 @@ const generateInvoice = (order, user) => {
         .text(SHOP.addressLine1, 50, 80)
         .text(SHOP.addressLine2, 50, 93)
         .text(SHOP.cityLine, 50, 106)
-        .text(`Phone: ${SHOP.phone}`, 50, 119)
-        .text(`Email: ${SHOP.email}`, 50, 132);
+        .text(`Phone: ${SHOP.phone}`, 50, 119);
 
       // --- Invoice Details ---
       doc
@@ -105,8 +152,50 @@ const generateInvoice = (order, user) => {
         billY += 14;
       });
 
+      // --- Price status ---
+      const priceConfirmed = Boolean(order.dailyPriceUpdated);
+      let noticeY = billY + 18;
+      if (priceConfirmed) {
+        doc
+          .font("InvoiceBold")
+          .fontSize(11)
+          .fillColor("#047857")
+          .text("DAILY PRICE UPDATED", 50, noticeY, { width: 500 });
+        noticeY += 16;
+        doc
+          .font("InvoiceRegular")
+          .fontSize(9)
+          .fillColor("#065f46")
+          .text(
+            "Actual market price for this delivery date has been applied. Amounts below are confirmed.",
+            50,
+            noticeY,
+            { width: 500 }
+          );
+        noticeY += 22;
+      } else {
+        doc
+          .font("InvoiceBold")
+          .fontSize(11)
+          .fillColor("#b45309")
+          .text("APPROXIMATE PRICE — DAILY PRICE NOT UPDATED", 50, noticeY, { width: 500 });
+        noticeY += 16;
+        doc
+          .font("InvoiceRegular")
+          .fontSize(9)
+          .fillColor("#92400e")
+          .text(
+            "Item prices and this total are approximate. The actual price is confirmed 1 day before delivery after Daily Prices are updated.",
+            50,
+            noticeY,
+            { width: 500 }
+          );
+        noticeY += 22;
+      }
+      doc.fillColor("#000000");
+
       // --- Table Header ---
-      const tableTop = Math.max(280, billY + 20);
+      const tableTop = Math.max(280, noticeY + 12);
       doc
         .font("InvoiceBold")
         .fontSize(10)
@@ -134,7 +223,7 @@ const generateInvoice = (order, user) => {
         doc
           .font("InvoiceRegular")
           .text(description, 50, yPosition, { width: 230 })
-          .text(String(item.quantity), 280, yPosition, { width: 90, align: "right" })
+          .text(formatInvoiceQuantity(item), 280, yPosition, { width: 90, align: "right" })
           .text(`Rs. ${Number(item.unitPrice).toFixed(2)}`, 370, yPosition, { width: 90, align: "right" })
           .text(`Rs. ${Number(item.totalPrice).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
 
@@ -174,16 +263,63 @@ const generateInvoice = (order, user) => {
       doc
         .font("InvoiceBold")
         .fontSize(12)
-        .text("Total Amount:", 350, yPosition, { width: 110, align: "right" })
+        .text(priceConfirmed ? "Total Amount:" : "Approximate Total:", 350, yPosition, { width: 110, align: "right" })
         .text(`Rs. ${Number(order.total).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
 
+      if (!priceConfirmed) {
+        yPosition += 22;
+        doc
+          .font("InvoiceRegular")
+          .fontSize(8)
+          .fillColor("#92400e")
+          .text(
+            "This invoice shows an estimated total. Final amount will appear here after daily price update (1 day before delivery).",
+            50,
+            yPosition,
+            { width: 500 }
+          )
+          .fillColor("#000000");
+      } else {
+        const priceChanges = getInvoicePriceChanges(order.items || []);
+        if (priceChanges.length > 0) {
+          yPosition += 24;
+          doc
+            .font("InvoiceBold")
+            .fontSize(10)
+            .fillColor("#047857")
+            .text("How the daily price changed", 50, yPosition, { width: 500 });
+          yPosition += 16;
+          doc.font("InvoiceRegular").fontSize(9).fillColor("#111827");
+          priceChanges.forEach((change) => {
+            const direction = change.lineDiff >= 0 ? "increased" : "decreased";
+            const cut = change.cutName ? ` (${change.cutName})` : "";
+            const line = `${change.name}${cut} — ${change.qtyLabel}: Rs. ${change.oldRate.toFixed(2)} to Rs. ${change.newRate.toFixed(2)} per ${change.unit}. Amount ${direction} by Rs. ${Math.abs(change.lineDiff).toFixed(2)}.`;
+            const h = doc.heightOfString(line, { width: 500 });
+            doc.text(line, 50, yPosition, { width: 500 });
+            yPosition += h + 6;
+          });
+          if (order.estimatedTotal != null && Math.abs(Number(order.estimatedTotal) - Number(order.total)) > 0.01) {
+            doc
+              .font("InvoiceBold")
+              .text(
+                `Booking estimate Rs. ${Number(order.estimatedTotal).toFixed(2)}  ->  Confirmed total Rs. ${Number(order.total).toFixed(2)}`,
+                50,
+                yPosition,
+                { width: 500 }
+              );
+          }
+          doc.fillColor("#000000");
+        }
+      }
+
+      const footerY = Math.max(700, yPosition + 28);
       doc
         .font("InvoiceRegular")
         .fontSize(10)
         .text(
-          `Thank you for your business! For any queries, contact ${SHOP.email} | ${SHOP.phone}`,
+          `Thank you for your business! For any queries, contact ${SHOP.phone}`,
           50,
-          700,
+          footerY,
           { align: "center", width: 500 }
         );
 

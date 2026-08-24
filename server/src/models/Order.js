@@ -53,6 +53,14 @@ const orderSchema = new mongoose.Schema(
           type: Number,
           required: true,
           min: 0
+        },
+        estimatedUnitPrice: {
+          type: Number,
+          min: 0
+        },
+        estimatedTotalPrice: {
+          type: Number,
+          min: 0
         }
       }
     ],
@@ -71,6 +79,18 @@ const orderSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0
+    },
+    estimatedTotal: {
+      type: Number,
+      min: 0
+    },
+    dailyPriceUpdated: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    dailyPriceUpdatedAt: {
+      type: Date
     },
     paymentStatus: {
       type: String,

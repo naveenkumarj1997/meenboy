@@ -243,7 +243,13 @@ export const getMyPayments = async (token: string) =>
   });
 
 export const getDailyPriceProducts = async (token: string, deliveryDate: string) =>
-  request<{ products: any[] }>(`/orders/daily-prices/products?deliveryDate=${deliveryDate}`, {
+  request<{
+    products: any[];
+    dailyPriceUpdated?: boolean;
+    updatedAt?: string | null;
+    updatedByName?: string | null;
+    changes?: any[];
+  }>(`/orders/daily-prices/products?deliveryDate=${deliveryDate}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 
@@ -252,6 +258,11 @@ export const updateDailyPrices = async (token: string, payload: { deliveryDate: 
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
+  });
+
+export const getAdminInvoices = async (token: string, deliveryDate: string) =>
+  request<{ invoices: any[] }>(`/orders/admin/invoices?deliveryDate=${deliveryDate}`, {
+    headers: { Authorization: `Bearer ${token}` }
   });
 
 export const downloadInvoice = async (token: string, orderId: string) => {
@@ -324,6 +335,20 @@ export const getDeliveryStats = async (token: string) =>
 export const assignDeliveryPartner = async (token: string, orderId: string, payload: { deliveryPartnerId: string, estimatedArrival?: string }) =>
   request<{ assignment: any }>(`/orders/${orderId}/assign-delivery`, {
     method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const updateOrderStatus = async (token: string, orderId: string, status: string) =>
+  request<{ order: any }>(`/orders/${orderId}/status`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status })
+  });
+
+export const updateAdminOrder = async (token: string, orderId: string, payload: any) =>
+  request<{ order: any }>(`/orders/${orderId}/admin-edit`, {
+    method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
   });

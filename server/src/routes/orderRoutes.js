@@ -8,10 +8,12 @@ const {
   listOrdersForAdmin,
   listAssignmentsForPartner,
   updateOrderStatus,
+  updateAdminOrder,
   assignDeliveryPartner,
   updateDeliveryStatus,
   getProductsForDailyPrice,
   updateDailyPrices,
+  listInvoicesForAdmin,
   downloadInvoice,
   downloadPartnerDayReport,
   downloadVendorCategoryReport,
@@ -76,6 +78,7 @@ router.get(
 );
 
 router.get("/daily-prices/products", protect, authorizeRoles("admin"), getProductsForDailyPrice);
+router.get("/admin/invoices", protect, authorizeRoles("admin"), listInvoicesForAdmin);
 
 router.get("/:orderId/invoice", protect, downloadInvoice);
 
@@ -98,6 +101,13 @@ router.patch(
   [body("status").notEmpty().withMessage("Status is required")],
   validateRequest,
   updateOrderStatus
+);
+
+router.patch(
+  "/:orderId/admin-edit",
+  protect,
+  authorizeRoles("admin"),
+  updateAdminOrder
 );
 
 router.post(

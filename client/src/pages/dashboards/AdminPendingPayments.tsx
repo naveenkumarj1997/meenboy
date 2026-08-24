@@ -9,6 +9,7 @@ const ADMIN_NAV_LINKS = [
   { label: "New Delivery Partners", href: "/dashboard/admin/partner-approvals" },
   { label: "Products", href: "/dashboard/admin/products" },
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
+  { label: "Invoices", href: "/dashboard/admin/invoices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
   { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },

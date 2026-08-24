@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getMyOrders } from "../../lib/api";
 import DashboardShell from "./DashboardShell";
+import OrderChangeHelp from "../../components/OrderChangeHelp";
+import OrderPriceNotice from "../../components/OrderPriceNotice";
 
 const CUSTOMER_NAV_LINKS = [
   { label: "Orders", href: "/dashboard" },
@@ -73,6 +75,10 @@ export default function CustomerDeliveryStatus() {
     >
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
 
+      <div className="mb-6">
+        <OrderChangeHelp />
+      </div>
+
       <div className="mb-8">
         <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
            <div className="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between border-b border-slate-800 pb-6">
@@ -131,6 +137,16 @@ export default function CustomerDeliveryStatus() {
                          </div>
                        </div>
                        
+                       <div className="mb-4">
+                         <OrderPriceNotice
+                           compact
+                           dailyPriceUpdated={order.dailyPriceUpdated}
+                           estimatedTotal={order.estimatedTotal}
+                           total={order.total}
+                           items={order.items}
+                         />
+                       </div>
+                       
                        {order.deliveryPartner && (
                          <div className="text-sm bg-teal-500/10 p-3 rounded-lg border border-teal-500/20 mb-4">
                            <div className="font-medium text-teal-400 mb-1 text-xs uppercase tracking-wider">Delivery Partner</div>
@@ -154,7 +170,9 @@ export default function CustomerDeliveryStatus() {
                          </span>
                        </div>
                        <div className="text-right">
-                         <div className="text-xs text-slate-500 mb-1">Total</div>
+                         <div className="text-xs text-slate-500 mb-1">
+                           {order.dailyPriceUpdated ? "Confirmed total" : "Approximate total"}
+                         </div>
                          <div className="text-lg font-black text-white">₹{order.total?.toFixed(2)}</div>
                        </div>
                      </div>

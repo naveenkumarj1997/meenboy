@@ -13,6 +13,7 @@ import {
   isMaduraiPincode,
   isMaduraiDeliveryAllowed
 } from "../lib/maduraiDelivery";
+import OrderPriceNotice from "../components/OrderPriceNotice";
 
 const CART_CHECK_DATE_KEY = "meenboy_cart_check_date";
 
@@ -539,7 +540,7 @@ const CheckoutPage = () => {
                   </datalist>
                   {errors.pincode && <p className="text-red-400 text-xs mt-1.5">{errors.pincode}</p>}
                   <p className="text-white/40 text-xs mt-1.5">
-                    Allowed Madurai pincodes only (e.g. 625001–625023).
+                    Allowed Madurai pincodes only (e.g. 625001–625023, 625402).
                   </p>
                 </div>
                 <div className="md:col-span-2">
@@ -723,10 +724,13 @@ const CheckoutPage = () => {
               <span className="text-teal-400 font-medium">Free</span>
             </div>
             <div className="flex justify-between items-center pt-3 mt-3 border-t border-white/10">
-              <span className="font-bold text-white text-base">Total</span>
+              <span className="font-bold text-white text-base">Approximate total</span>
               <span className="text-2xl font-black text-teal-400">
                 ₹{formatPrice(cartTotal)}
               </span>
+            </div>
+            <div className="pt-3">
+              <OrderPriceNotice dailyPriceUpdated={false} total={cartTotal} estimatedTotal={cartTotal} compact />
             </div>
           </div>
 

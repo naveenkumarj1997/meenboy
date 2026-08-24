@@ -3,7 +3,10 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getMyOrders, downloadInvoice, getCatalog } from "../../lib/api";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
+import { formatQuantityLabel } from "../../lib/weightOptions";
 import DashboardShell from "./DashboardShell";
+import OrderChangeHelp from "../../components/OrderChangeHelp";
+import OrderPriceNotice from "../../components/OrderPriceNotice";
 
 const CustomerDashboard = () => {
   const { token, user } = useAuth();
@@ -160,6 +163,10 @@ const CUSTOMER_NAV_LINKS = [
         </div>
       </div>
 
+      <div className="mb-10">
+        <OrderChangeHelp />
+      </div>
+
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-white">Order History</h2>
         <Link to="/products" className="text-teal-400 hover:text-teal-300 transition-colors text-sm font-medium bg-teal-400/10 px-4 py-2 rounded-lg">
@@ -238,7 +245,16 @@ const CUSTOMER_NAV_LINKS = [
                 </div>
                 <div className="text-left md:text-right flex flex-col md:items-end gap-2">
                   <div>
-                    <div className="text-white font-bold text-xl">₹{order.total.toFixed(2)}</div>
+                    <div className="text-white font-bold text-xl">
+                      ₹{order.total.toFixed(2)}
+                    </div>
+                    <div
+                      className={`text-[11px] font-black uppercase tracking-wide mt-0.5 ${
+                        order.dailyPriceUpdated ? "text-emerald-400" : "text-amber-400"
+                      }`}
+                    >
+                      {order.dailyPriceUpdated ? "Confirmed daily price" : "Approximate total"}
+                    </div>
                     <div className="text-teal-400/80 text-sm font-medium">
                       Delivery: {order.deliveryDate} ({order.deliveryTime})
                     </div>
@@ -260,6 +276,15 @@ const CUSTOMER_NAV_LINKS = [
                 </div>
               </div>
 
+              <div className="px-4 md:px-6 pt-4">
+                <OrderPriceNotice
+                  dailyPriceUpdated={order.dailyPriceUpdated}
+                  estimatedTotal={order.estimatedTotal}
+                  total={order.total}
+                  items={order.items}
+                />
+              </div>
+
               {/* Order Items */}
               <div className="p-4 md:p-6 space-y-4">
                 {order.items.map((item: any, idx: number) => (
@@ -276,8 +301,29 @@ const CUSTOMER_NAV_LINKS = [
                         {item.productName || 'Seafood Item'}
                       </div>
                       <div className="text-sm text-white/50">
-                        Qty: {item.quantity} {item.cutName && `• Cut: ${item.cutName}`}
+                        Qty: {formatQuantityLabel(item.quantity, item.unit)} {item.cutName && `• Cut: ${item.cutName}`}
                       </div>
+                      {order.dailyPriceUpdated &&
+                        item.estimatedUnitPrice != null &&
+                        Math.abs(Number(item.unitPrice) - Number(item.estimatedUnitPrice)) > 0.01 && (
+                          <div className="text-xs mt-1">
+                            <span className="text-white/45">Booked ₹{Number(item.estimatedUnitPrice).toFixed(2)}</span>
+                            <span className="text-white/40"> → </span>
+                            <span className="text-white font-semibold">₹{Number(item.unitPrice).toFixed(2)}</span>
+                            <span className="text-white/45"> / {item.unit || "kg"}</span>
+                            {Number(item.unitPrice) > Number(item.estimatedUnitPrice) ? (
+                              <span className="text-amber-300 font-bold">
+                                {" "}
+                                · +₹{(Number(item.totalPrice) - Number(item.estimatedTotalPrice ?? item.estimatedUnitPrice * item.quantity)).toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-teal-300 font-bold">
+                                {" "}
+                                · −₹{Math.abs(Number(item.totalPrice) - Number(item.estimatedTotalPrice ?? item.estimatedUnitPrice * item.quantity)).toFixed(2)}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       {item.notes && (
                         <div className="text-xs text-teal-400/70 italic mt-0.5 truncate">
                           Note: {item.notes}

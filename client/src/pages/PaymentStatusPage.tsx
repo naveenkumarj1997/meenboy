@@ -1,5 +1,7 @@
 import { useLocation, Navigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import OrderChangeHelp from "../components/OrderChangeHelp";
+import OrderPriceNotice from "../components/OrderPriceNotice";
 
 const PaymentStatusPage = () => {
   const location = useLocation();
@@ -55,7 +57,7 @@ const PaymentStatusPage = () => {
             <span className="text-white font-mono">{state.orderId.slice(-8).toUpperCase()}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
-            <span className="text-white/50 font-medium">Amount</span>
+            <span className="text-white/50 font-medium">Approximate amount</span>
             <span className="text-white font-bold">₹{state.amount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between items-center text-sm">
@@ -69,6 +71,13 @@ const PaymentStatusPage = () => {
             </span>
           </div>
         </div>
+
+        {isSuccess && (
+          <div className="text-left mb-8 space-y-4">
+            <OrderPriceNotice dailyPriceUpdated={false} total={state.amount} estimatedTotal={state.amount} />
+            <OrderChangeHelp orderId={state.orderId} />
+          </div>
+        )}
 
         <Link
           to="/dashboard"
