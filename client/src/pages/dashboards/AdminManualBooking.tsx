@@ -149,7 +149,7 @@ export default function AdminManualBooking() {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-  const deliveryFee = 50;
+  const deliveryFee = 0;
 
   const handleDownloadInvoice = async (orderId: string) => {
     if (!token) return;
@@ -598,7 +598,7 @@ export default function AdminManualBooking() {
 
                 <div className="flex justify-between text-sm text-slate-400 mb-3">
                   <span>Delivery fee</span>
-                  <span className="text-white">₹{formatPrice(deliveryFee)}</span>
+                  <span className="text-teal-400 font-medium">Free</span>
                 </div>
                 <div className="flex justify-between text-base font-bold text-white mb-4">
                   <span>Approx. total</span>
