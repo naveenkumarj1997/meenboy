@@ -327,6 +327,30 @@ export const getAllAssignments = async (token: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
+export const getTodayDeliveryStatus = async (
+  token: string,
+  params?: { date?: string; partnerId?: string }
+) => {
+  const qs = new URLSearchParams();
+  if (params?.date) qs.set("date", params.date);
+  if (params?.partnerId) qs.set("partnerId", params.partnerId);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return request<{
+    date: string;
+    assignments: any[];
+    partnerSummaries: any[];
+    counts: {
+      total: number;
+      assigned: number;
+      ongoing: number;
+      delivered: number;
+      failed: number;
+      cancelled: number;
+    };
+  }>(`/orders/admin/today-delivery-status${query}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
 export const getDeliveryStats = async (token: string) =>
   request<{ stats: any }>("/orders/delivery-stats", {
     headers: { Authorization: `Bearer ${token}` }
@@ -457,3 +481,58 @@ export const updateAvailability = async (token: string, date: string, payload: P
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
   });
+
+// ─── Walk-in shop sales ───────────────────────────────────────────────────────
+
+export const getWalkInStats = async (token: string) =>
+  request<{
+    today: { date: string; count: number; amount: number };
+    total: { count: number; amount: number };
+  }>("/walk-in/stats", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const listWalkInSales = async (
+  token: string,
+  params?: { date?: string; phone?: string; page?: number; limit?: number }
+) => {
+  const qs = new URLSearchParams();
+  if (params?.date) qs.set("date", params.date);
+  if (params?.phone) qs.set("phone", params.phone);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.limit) qs.set("limit", String(params.limit));
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return request<{
+    sales: any[];
+    pagination: { page: number; limit: number; total: number; pages: number };
+  }>(`/walk-in${query}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const createWalkInSale = async (
+  token: string,
+  payload: {
+    customerName: string;
+    customerPhone: string;
+    items: any[];
+    paymentMethod?: string;
+    notes?: string;
+  }
+) =>
+  request<{ message: string; sale: any }>("/walk-in", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const downloadWalkInBill = async (token: string, saleId: string) => {
+  const response = await fetch(`${API_BASE}/walk-in/${saleId}/bill`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to download bill");
+  }
+  return response.blob();
+};

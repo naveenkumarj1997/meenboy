@@ -338,30 +338,68 @@ const updateDeliveryStatus = async (req, res, next) => {
     const { assignmentId } = req.params;
     const { status, notes, actualArrival, paymentCollected, paymentMethod } = req.body;
 
+    const existing = await DeliveryAssignment.findOne({
+      _id: assignmentId,
+      deliveryPartner: req.user._id
+    }).populate("order");
+
+    if (!existing) return res.status(404).json({ message: "Assignment not found" });
+    if (!existing.order) return res.status(404).json({ message: "Order not found for this assignment" });
+
+    let collected = Number(paymentCollected) || 0;
+    const orderTotal = Number(existing.order.total) || 0;
+
+    if (status === "delivered") {
+      if (paymentMethod === "cash" || paymentMethod === "upi") {
+        collected = orderTotal;
+      } else if (paymentMethod === "pay_later" || paymentMethod === "none") {
+        collected = 0;
+      } else if (paymentMethod === "partial_cash" || paymentMethod === "partial_upi") {
+        if (collected <= 0) {
+          return res.status(400).json({ message: "Enter the partial amount collected." });
+        }
+        if (collected >= orderTotal) {
+          return res.status(400).json({
+            message: "Partial amount must be less than the order total."
+          });
+        }
+      } else if (!paymentMethod) {
+        return res.status(400).json({ message: "Payment method is required when marking delivered." });
+      }
+    }
+
+    if (status === "failed" && !String(notes || "").trim()) {
+      return res.status(400).json({ message: "Reason is required for failed delivery." });
+    }
+
     const assignment = await DeliveryAssignment.findOneAndUpdate(
       { _id: assignmentId, deliveryPartner: req.user._id },
       {
         status,
         ...(notes !== undefined ? { notes } : {}),
         ...(actualArrival ? { actualArrival } : {}),
-        ...(paymentCollected !== undefined ? { paymentCollected } : {}),
-        ...(paymentMethod !== undefined ? { paymentMethod } : {})
+        ...(status === "delivered"
+          ? { paymentCollected: collected, paymentMethod }
+          : {})
       },
       { new: true, runValidators: true }
     ).populate("order");
 
     if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
-    if (status === "delivered" || status === "failed") {
-      await Order.findByIdAndUpdate(assignment.order._id, { status: status === "delivered" ? "delivered" : "out_for_delivery" });
+    if (status === "en_route") {
+      await Order.findByIdAndUpdate(assignment.order._id, { status: "out_for_delivery" });
     }
 
-    // If delivered and payment was partial or pay later, update user's pending balance
-    if (status === "delivered") {
-      const orderTotal = assignment.order.total;
-      const collected = Number(paymentCollected) || 0;
-      const unpaidAmount = Math.max(0, orderTotal - collected);
+    if (status === "delivered" || status === "failed") {
+      await Order.findByIdAndUpdate(
+        assignment.order._id,
+        { status: status === "delivered" ? "delivered" : "out_for_delivery" }
+      );
+    }
 
+    if (status === "delivered") {
+      const unpaidAmount = Math.max(0, orderTotal - collected);
       if (unpaidAmount > 0) {
         await User.findByIdAndUpdate(
           assignment.order.customer,
@@ -1046,6 +1084,144 @@ const createAdminOrder = async (req, res, next) => {
   }
 };
 
+const getTodayDeliveryStatus = async (req, res, next) => {
+  try {
+    const dateParam = req.query.date;
+    const partnerId = req.query.partnerId;
+
+    let date = typeof dateParam === "string" ? dateParam.trim() : "";
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, "0");
+      const d = String(now.getDate()).padStart(2, "0");
+      date = `${y}-${m}-${d}`;
+    }
+
+    const orders = await Order.find({ deliveryDate: date }).select("_id").lean();
+    const orderIds = orders.map((o) => o._id);
+
+    if (orderIds.length === 0) {
+      return res.json({
+        date,
+        assignments: [],
+        partnerSummaries: [],
+        counts: {
+          total: 0,
+          assigned: 0,
+          ongoing: 0,
+          delivered: 0,
+          failed: 0,
+          cancelled: 0
+        }
+      });
+    }
+
+    const filter = { order: { $in: orderIds } };
+    if (partnerId && String(partnerId).toLowerCase() !== "all") {
+      filter.deliveryPartner = partnerId;
+    }
+
+    const assignments = await DeliveryAssignment.find(filter)
+      .populate({
+        path: "order",
+        populate: { path: "customer", select: "name email phone mapUrl" }
+      })
+      .populate("deliveryPartner", "name phone email")
+      .lean();
+
+    assignments.sort((a, b) => {
+      const partnerA = String(a.deliveryPartner?._id || a.deliveryPartner || "");
+      const partnerB = String(b.deliveryPartner?._id || b.deliveryPartner || "");
+      if (partnerA !== partnerB) return partnerA.localeCompare(partnerB);
+      const seqDiff = (a.sequence || 0) - (b.sequence || 0);
+      if (seqDiff !== 0) return seqDiff;
+      return String(a.order?.deliveryTime || "").localeCompare(String(b.order?.deliveryTime || ""));
+    });
+
+    const counts = {
+      total: assignments.length,
+      assigned: 0,
+      ongoing: 0,
+      delivered: 0,
+      failed: 0,
+      cancelled: 0
+    };
+
+    const byPartner = {};
+
+    assignments.forEach((a) => {
+      if (a.status === "delivered") counts.delivered += 1;
+      else if (a.status === "failed") counts.failed += 1;
+      else if (a.status === "cancelled") counts.cancelled += 1;
+      else if (a.status === "en_route" || a.status === "picked_up") counts.ongoing += 1;
+      else counts.assigned += 1;
+
+      const pId = String(a.deliveryPartner?._id || a.deliveryPartner || "unknown");
+      if (!byPartner[pId]) {
+        byPartner[pId] = {
+          partner: a.deliveryPartner || null,
+          deliveries: []
+        };
+      }
+      byPartner[pId].deliveries.push(a);
+    });
+
+    const partnerSummaries = Object.values(byPartner).map((group) => {
+      const list = group.deliveries;
+      const ongoing = list.filter((a) => a.status === "en_route" || a.status === "picked_up");
+      const pending = list.filter(
+        (a) => !["delivered", "failed", "cancelled"].includes(a.status)
+      );
+      const current = ongoing[0] || null;
+      // Next = first pending that isn't the current ongoing stop
+      const next =
+        pending.find((a) => !current || String(a._id) !== String(current._id)) || null;
+      const deliveredCount = list.filter((a) => a.status === "delivered").length;
+
+      return {
+        partner: group.partner,
+        total: list.length,
+        delivered: deliveredCount,
+        remaining: pending.length,
+        currentStop: current
+          ? {
+              assignmentId: current._id,
+              orderId: current.order?._id,
+              status: current.status,
+              customerName: current.order?.customer?.name,
+              address: current.order?.address,
+              deliveryTime: current.order?.deliveryTime,
+              mapUrl: current.order?.mapUrl || current.order?.customer?.mapUrl,
+              updatedAt: current.updatedAt
+            }
+          : null,
+        nextStop: next
+          ? {
+              assignmentId: next._id,
+              orderId: next.order?._id,
+              status: next.status,
+              customerName: next.order?.customer?.name,
+              address: next.order?.address,
+              deliveryTime: next.order?.deliveryTime,
+              mapUrl: next.order?.mapUrl || next.order?.customer?.mapUrl,
+              sequence: next.sequence
+            }
+          : null
+      };
+    });
+
+    res.json({
+      date,
+      assignments,
+      partnerSummaries,
+      counts
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
@@ -1063,6 +1239,7 @@ module.exports = {
   downloadVendorCategoryReport,
   listAllAssignments,
   getDeliveryStats,
+  getTodayDeliveryStatus,
   reorderAssignments,
   createAdminOrder
 };

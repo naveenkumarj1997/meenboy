@@ -19,6 +19,7 @@ const {
   downloadVendorCategoryReport,
   listAllAssignments,
   getDeliveryStats,
+  getTodayDeliveryStatus,
   reorderAssignments,
   createAdminOrder
 } = require("../controllers/orderController");
@@ -64,6 +65,12 @@ router.get("/admin", protect, authorizeRoles("admin"), listOrdersForAdmin);
 router.get("/assignments", protect, authorizeRoles("delivery_partner"), listAssignmentsForPartner);
 router.get("/assignments/all", protect, authorizeRoles("admin"), listAllAssignments);
 router.get("/delivery-stats", protect, authorizeRoles("admin"), getDeliveryStats);
+router.get(
+  "/admin/today-delivery-status",
+  protect,
+  authorizeRoles("admin"),
+  getTodayDeliveryStatus
+);
 router.get(
   "/reports/partner-day",
   protect,

@@ -84,6 +84,15 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (u
   );
 }
 
+function getLocalDateStr(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function DeliveryDashboard() {
   const { token, user } = useAuth();
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -133,25 +142,43 @@ export default function DeliveryDashboard() {
   };
 
   const handleMove = async (index: number, direction: "up" | "down") => {
+    // Must reorder within the visible day queue — not the full assignments array
+    const dateStr = queueFilter === "today" ? getLocalDateStr(0) : getLocalDateStr(1);
+    const dayList = assignments
+      .filter((a) => {
+        if (["delivered", "failed", "cancelled"].includes(a.status)) return false;
+        return a.order?.deliveryDate === dateStr;
+      })
+      .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
     if (direction === "up" && index === 0) return;
-    if (direction === "down" && index === assignments.length - 1) return;
+    if (direction === "down" && index === dayList.length - 1) return;
 
-    const newAssignments = [...assignments];
     const targetIndex = direction === "up" ? index - 1 : index + 1;
-    
-    // Swap
-    [newAssignments[index], newAssignments[targetIndex]] = [newAssignments[targetIndex], newAssignments[index]];
-    
-    // Reassign sequence numbers
-    const updatedSequences = newAssignments.map((a, i) => ({ ...a, sequence: i }));
-    setAssignments(updatedSequences);
+    const reorderedDay = [...dayList];
+    [reorderedDay[index], reorderedDay[targetIndex]] = [
+      reorderedDay[targetIndex],
+      reorderedDay[index]
+    ];
 
-    // Save to backend
+    // Sequence only needs to be correct within this day's queue
+    const sequenceById = new Map(reorderedDay.map((a, i) => [a._id, i]));
+
+    const updatedAssignments = assignments
+      .map((a) =>
+        sequenceById.has(a._id) ? { ...a, sequence: sequenceById.get(a._id) } : a
+      )
+      .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+    setAssignments(updatedAssignments);
+
     try {
-      const payload = updatedSequences.map(a => ({ id: a._id, sequence: a.sequence }));
+      const payload = reorderedDay.map((a, i) => ({ id: a._id, sequence: i }));
       await reorderAssignments(token!, payload);
     } catch (err) {
       console.error("Failed to sync reorder", err);
+      setError("Could not save new route order. Try again.");
+      fetchAssignments();
     }
   };
 
@@ -165,8 +192,60 @@ export default function DeliveryDashboard() {
     });
   };
 
+  const applyPaymentMethod = (method: string) => {
+    if (method === "cash" || method === "upi") {
+      setStatusForm((prev) => ({
+        ...prev,
+        paymentMethod: method,
+        paymentCollected: Number(selectedAssignment?.order?.total || 0)
+      }));
+      return;
+    }
+    if (method === "partial_cash" || method === "partial_upi") {
+      setStatusForm((prev) => ({
+        ...prev,
+        paymentMethod: method,
+        paymentCollected: 0
+      }));
+      return;
+    }
+    // pay_later / none
+    setStatusForm((prev) => ({
+      ...prev,
+      paymentMethod: method,
+      paymentCollected: 0
+    }));
+  };
+
   const submitStatus = async () => {
     if (!selectedAssignment) return;
+
+    if (statusForm.status === "failed" && !statusForm.notes.trim()) {
+      setError("Please enter a reason for failed delivery.");
+      return;
+    }
+
+    let collected = Number(statusForm.paymentCollected) || 0;
+    const total = Number(selectedAssignment.order?.total || 0);
+    const method = statusForm.paymentMethod;
+
+    if (statusForm.status === "delivered") {
+      if (method === "cash" || method === "upi") {
+        collected = total;
+      } else if (method === "pay_later" || method === "none") {
+        collected = 0;
+      } else if (method === "partial_cash" || method === "partial_upi") {
+        if (collected <= 0) {
+          setError("Enter how much cash/UPI you collected for this partial payment.");
+          return;
+        }
+        if (collected >= total) {
+          setError("Partial amount must be less than the full order total. Use Full Cash/UPI if fully paid.");
+          return;
+        }
+      }
+    }
+
     try {
       setUpdatingId(selectedAssignment._id);
       setError("");
@@ -177,12 +256,15 @@ export default function DeliveryDashboard() {
         payload.notes = statusForm.notes;
       }
       if (statusForm.status === "delivered") {
-        payload.paymentCollected = Number(statusForm.paymentCollected);
-        payload.paymentMethod = statusForm.paymentMethod;
+        payload.paymentCollected = collected;
+        payload.paymentMethod = method;
+      }
+      if (statusForm.status === "delivered" || statusForm.status === "en_route") {
+        payload.actualArrival = statusForm.status === "delivered" ? new Date().toISOString() : undefined;
       }
 
       await updateDeliveryStatus(token!, selectedAssignment._id, payload);
-      setSuccess(`Assignment marked as ${statusForm.status}`);
+      setSuccess(`Assignment marked as ${statusForm.status.replace(/_/g, " ")}`);
       setSelectedAssignment(null);
       fetchAssignments();
     } catch (err: any) {
@@ -231,36 +313,26 @@ export default function DeliveryDashboard() {
     );
   }
 
-  const getTodayDateStr = () => {
-    const d = new Date();
-    // Use local time for date string
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  const getTodayDateStr = () => getLocalDateStr(0);
 
-  const getTomorrowDateStr = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  const getTomorrowDateStr = () => getLocalDateStr(1);
 
   const todayStr = getTodayDateStr();
   const tomorrowStr = getTomorrowDateStr();
 
-  const todayAssignments = assignments.filter(a => {
-    if (["delivered", "failed", "cancelled"].includes(a.status)) return false;
-    return a.order?.deliveryDate === todayStr;
-  });
+  const todayAssignments = assignments
+    .filter(a => {
+      if (["delivered", "failed", "cancelled"].includes(a.status)) return false;
+      return a.order?.deliveryDate === todayStr;
+    })
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
-  const tomorrowAssignments = assignments.filter(a => {
-    if (["delivered", "failed", "cancelled"].includes(a.status)) return false;
-    return a.order?.deliveryDate === tomorrowStr;
-  });
+  const tomorrowAssignments = assignments
+    .filter(a => {
+      if (["delivered", "failed", "cancelled"].includes(a.status)) return false;
+      return a.order?.deliveryDate === tomorrowStr;
+    })
+    .sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
   const activeAssignments = queueFilter === "today" ? todayAssignments : tomorrowAssignments;
   
@@ -269,11 +341,27 @@ export default function DeliveryDashboard() {
     a.order?.deliveryDate === pastDate
   );
 
-  // Compute collections
+  // Compute collections (include partial cash/UPI)
   const today = new Date().toLocaleDateString();
   const todayDelivered = assignments.filter(a => a.status === "delivered" && new Date(a.updatedAt).toLocaleDateString() === today);
-  const totalCash = todayDelivered.filter(a => a.paymentMethod === "cash").reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
-  const totalUPI = todayDelivered.filter(a => a.paymentMethod === "upi").reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
+  const totalCash = todayDelivered
+    .filter((a) => a.paymentMethod === "cash" || a.paymentMethod === "partial_cash")
+    .reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
+  const totalUPI = todayDelivered
+    .filter((a) => a.paymentMethod === "upi" || a.paymentMethod === "partial_upi")
+    .reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
+
+  const formatPaymentMethod = (method?: string) => {
+    switch (method) {
+      case "cash": return "Cash (Full)";
+      case "upi": return "UPI (Full)";
+      case "partial_cash": return "Partial Cash";
+      case "partial_upi": return "Partial UPI";
+      case "pay_later": return "Pay Later";
+      case "none": return "Already Paid / None";
+      default: return method || "-";
+    }
+  };
 
   return (
     <DashboardShell
@@ -335,19 +423,25 @@ export default function DeliveryDashboard() {
                   <div key={a._id} className={`bg-slate-900/50 border ${isNext ? 'border-teal-500 shadow-[0_0_15px_rgba(20,184,166,0.2)]' : 'border-slate-800'} rounded-xl p-5 flex flex-col md:flex-row gap-4 items-center`}>
                     
                     {/* Reorder controls */}
-                    <div className="flex flex-col gap-2 mr-2">
-                      <button 
+                    <div className="flex flex-row md:flex-col gap-2 mr-0 md:mr-2 shrink-0">
+                      <button
+                        type="button"
                         onClick={() => handleMove(index, "up")}
                         disabled={index === 0}
-                        className="text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400"
+                        aria-label="Move up in route"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 disabled:hover:text-slate-200"
                       >
                         ▲
                       </button>
-                      <span className="text-center font-bold text-slate-500 text-sm">{index + 1}</span>
-                      <button 
+                      <span className="min-w-[44px] min-h-[44px] flex items-center justify-center font-bold text-slate-400 text-sm">
+                        {index + 1}
+                      </span>
+                      <button
+                        type="button"
                         onClick={() => handleMove(index, "down")}
                         disabled={index === activeAssignments.length - 1}
-                        className="text-slate-400 hover:text-white disabled:opacity-30 disabled:hover:text-slate-400"
+                        aria-label="Move down in route"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-slate-800 border border-slate-700 text-slate-200 hover:text-white hover:bg-slate-700 disabled:opacity-30 disabled:hover:bg-slate-800 disabled:hover:text-slate-200"
                       >
                         ▼
                       </button>
@@ -467,8 +561,13 @@ export default function DeliveryDashboard() {
                          <div className="text-xs text-slate-500 mb-1">Collected Amount</div>
                          <div className="text-white font-black text-xl mb-1">₹{a.paymentCollected?.toFixed(2)}</div>
                          <div className="text-xs uppercase font-bold text-slate-400 bg-slate-800 inline-block px-2 py-0.5 rounded">
-                           {a.paymentMethod}
+                           {formatPaymentMethod(a.paymentMethod)}
                          </div>
+                         {Number(a.order?.total || 0) > Number(a.paymentCollected || 0) && a.status === "delivered" && (
+                           <div className="text-[11px] text-amber-400 mt-2">
+                             Pending: ₹{(Number(a.order?.total || 0) - Number(a.paymentCollected || 0)).toFixed(2)}
+                           </div>
+                         )}
                        </>
                     ) : (
                        <div className="text-rose-400 text-sm">Failed / Cancelled</div>
@@ -483,10 +582,15 @@ export default function DeliveryDashboard() {
 
       {/* Status Update Modal */}
       {selectedAssignment && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-4">Update Delivery</h3>
-            <div className="text-slate-400 text-sm mb-6">Order #{String(selectedAssignment.order?._id).slice(-6).toUpperCase()}</div>
+        <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+          <div className="bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-white mb-1">Update Delivery</h3>
+            <div className="text-slate-400 text-sm mb-2">
+              Order #{String(selectedAssignment.order?._id).slice(-6).toUpperCase()}
+            </div>
+            <div className="text-teal-300 text-sm font-semibold mb-6">
+              Order total: ₹{Number(selectedAssignment.order?.total || 0).toFixed(2)}
+            </div>
             
             <div className="space-y-4">
               <div>
@@ -505,27 +609,11 @@ export default function DeliveryDashboard() {
               {statusForm.status === "delivered" && (
                 <>
                   <div>
-                    <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Amount Collected ($)</label>
-                    <input 
-                      type="number"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
-                      value={statusForm.paymentCollected}
-                      onChange={(e) => setStatusForm({...statusForm, paymentCollected: Number(e.target.value)})}
-                    />
-                  </div>
-                  <div>
                     <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Payment Method</label>
                     <select 
                       className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
                       value={statusForm.paymentMethod}
-                      onChange={(e) => {
-                        const newMethod = e.target.value;
-                        if (newMethod === "pay_later") {
-                          setStatusForm({...statusForm, paymentMethod: newMethod, paymentCollected: 0});
-                        } else {
-                          setStatusForm({...statusForm, paymentMethod: newMethod});
-                        }
-                      }}
+                      onChange={(e) => applyPaymentMethod(e.target.value)}
                     >
                       <option value="cash">Cash (Full)</option>
                       <option value="upi">UPI / Online (Full)</option>
@@ -535,14 +623,51 @@ export default function DeliveryDashboard() {
                       <option value="none">Already Paid / None</option>
                     </select>
                   </div>
-                  {statusForm.paymentMethod !== "pay_later" && statusForm.paymentMethod !== "none" && statusForm.paymentCollected < selectedAssignment.order?.total && (
-                    <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-sm">
-                      Amount of ₹{(selectedAssignment.order?.total - statusForm.paymentCollected).toFixed(2)} will be added to customer's pending payments.
+
+                  {(statusForm.paymentMethod === "cash" || statusForm.paymentMethod === "upi") && (
+                    <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-sm">
+                      Full amount collected: <span className="font-black text-white">₹{Number(selectedAssignment.order?.total || 0).toFixed(2)}</span>
                     </div>
                   )}
+
+                  {(statusForm.paymentMethod === "partial_cash" || statusForm.paymentMethod === "partial_upi") && (
+                    <div className="space-y-2">
+                      <label className="block text-amber-300 text-xs mb-1 uppercase tracking-wider font-bold">
+                        Amount collected now (₹)
+                      </label>
+                      <input 
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.01"
+                        placeholder="Enter collected amount"
+                        className="w-full bg-slate-950 border-2 border-amber-500/50 rounded-lg p-3 text-white outline-none focus:border-amber-400 text-lg font-bold"
+                        value={statusForm.paymentCollected || ""}
+                        onChange={(e) => setStatusForm({
+                          ...statusForm,
+                          paymentCollected: e.target.value === "" ? 0 : Number(e.target.value)
+                        })}
+                      />
+                      <p className="text-xs text-slate-400">
+                        Enter only the amount you collected now. Remaining goes to pending payments.
+                      </p>
+                      {statusForm.paymentCollected > 0 && statusForm.paymentCollected < Number(selectedAssignment.order?.total || 0) && (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-sm">
+                          Pending for customer: ₹{(Number(selectedAssignment.order?.total || 0) - Number(statusForm.paymentCollected || 0)).toFixed(2)}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {statusForm.paymentMethod === "pay_later" && (
-                    <div className="mt-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-400 text-sm">
-                      Full amount of ₹{selectedAssignment.order?.total?.toFixed(2)} will be added to customer's pending payments.
+                    <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg text-amber-300 text-sm">
+                      Nothing collected now. Full amount ₹{Number(selectedAssignment.order?.total || 0).toFixed(2)} will be added to customer pending payments.
+                    </div>
+                  )}
+
+                  {statusForm.paymentMethod === "none" && (
+                    <div className="p-3 bg-slate-800/60 border border-slate-700 rounded-lg text-slate-300 text-sm">
+                      Marked as already paid / no collection needed.
                     </div>
                   )}
                 </>
@@ -561,7 +686,7 @@ export default function DeliveryDashboard() {
               )}
             </div>
 
-            <div className="flex gap-4 mt-8">
+            <div className="flex gap-3 mt-8 sticky bottom-0 bg-slate-900 pt-2">
               <button 
                 onClick={() => setSelectedAssignment(null)}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-medium transition-colors"

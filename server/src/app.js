@@ -84,6 +84,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/finance", financeRoutes);
 app.use("/api/availability", availabilityRoutes);
 app.use("/api/purchases", purchaseRoutes);
+app.use("/api/walk-in", require("./routes/walkInRoutes"));
 
 app.use(notFound);
 app.use(errorHandler);

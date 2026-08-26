@@ -7,6 +7,7 @@ import AdminDailyPrices from "./pages/dashboards/AdminDailyPrices";
 import AdminInvoices from "./pages/dashboards/AdminInvoices";
 import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
+import AdminTodayDeliveryStatus from "./pages/dashboards/AdminTodayDeliveryStatus";
 import AdminOverallReports from "./pages/dashboards/AdminOverallReports";
 import AdminPendingPayments from "./pages/dashboards/AdminPendingPayments";
 import AdminCollectedPayments from "./pages/dashboards/AdminCollectedPayments";
@@ -18,6 +19,7 @@ import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
+import AdminWalkIn from "./pages/dashboards/AdminWalkIn";
 import AdminProfile from "./pages/dashboards/AdminProfile";
 import AdminPartnerApprovals from "./pages/dashboards/AdminPartnerApprovals";
 import AdminNewCustomers from "./pages/dashboards/AdminNewCustomers";
@@ -102,6 +104,7 @@ function App() {
           <Route path="/dashboard/admin/daily-prices" element={<AdminDailyPrices />} />
           <Route path="/dashboard/admin/invoices" element={<AdminInvoices />} />
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
+          <Route path="/dashboard/admin/today-delivery-status" element={<AdminTodayDeliveryStatus />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />
           <Route path="/dashboard/admin/overall-reports" element={<AdminOverallReports />} />
           <Route path="/dashboard/admin/pending-payments" element={<AdminPendingPayments />} />
@@ -113,6 +116,7 @@ function App() {
           <Route path="/dashboard/admin/users" element={<AdminUsers />} />
           <Route path="/dashboard/admin/finance" element={<AdminFinancePage />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
+          <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />
           <Route path="/dashboard/admin/manual-booking" element={<AdminManualBooking />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>

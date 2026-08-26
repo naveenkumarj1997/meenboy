@@ -11,6 +11,7 @@ const NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Invoices", href: "/dashboard/admin/invoices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
+  { label: "Today Delivery Status", href: "/dashboard/admin/today-delivery-status" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
   { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
@@ -22,6 +23,7 @@ const NAV_LINKS = [
   { label: "Users", href: "/dashboard/admin/users" },
   { label: "Money", href: "/dashboard/admin/finance" },
   { label: "Availability", href: "/dashboard/admin/availability" },
+  { label: "Walk-in", href: "/dashboard/admin/walk-in" },
   { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
 ];
 

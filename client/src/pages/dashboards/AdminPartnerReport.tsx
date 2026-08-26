@@ -12,6 +12,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Invoices", href: "/dashboard/admin/invoices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
+  { label: "Today Delivery Status", href: "/dashboard/admin/today-delivery-status" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
   { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
@@ -23,6 +24,7 @@ const ADMIN_NAV_LINKS = [
   { label: "Users", href: "/dashboard/admin/users" },
   { label: "Money", href: "/dashboard/admin/finance" },
   { label: "Availability", href: "/dashboard/admin/availability" },
+  { label: "Walk-in", href: "/dashboard/admin/walk-in" },
   { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
 ];
 
@@ -98,8 +100,12 @@ export default function AdminPartnerReport() {
   const notDelivered = partnerAssignments.filter(a => ['pending', 'assigned'].includes(a.status));
   const failed = partnerAssignments.filter(a => a.status === 'failed');
 
-  const totalCod = completed.filter(a => a.paymentMethod === 'cash').reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
-  const totalUpi = completed.filter(a => a.paymentMethod === 'upi').reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
+  const totalCod = completed
+    .filter((a) => a.paymentMethod === "cash" || a.paymentMethod === "partial_cash")
+    .reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
+  const totalUpi = completed
+    .filter((a) => a.paymentMethod === "upi" || a.paymentMethod === "partial_upi")
+    .reduce((sum, a) => sum + (a.paymentCollected || 0), 0);
   const totalNotPaid = partnerAssignments.filter(a => a.status !== 'delivered').reduce((sum, a) => sum + (a.order?.total || 0), 0);
 
   return (

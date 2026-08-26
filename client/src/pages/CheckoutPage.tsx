@@ -14,6 +14,7 @@ import {
   isMaduraiDeliveryAllowed
 } from "../lib/maduraiDelivery";
 import OrderPriceNotice from "../components/OrderPriceNotice";
+import { SHOP_PHONE_DISPLAY, SHOP_PHONE_TEL, shopWhatsAppUrl } from "../lib/shopContact";
 
 const CART_CHECK_DATE_KEY = "meenboy_cart_check_date";
 
@@ -753,6 +754,31 @@ const CheckoutPage = () => {
               </>
             )}
           </button>
+
+          <div className="mt-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-sm text-slate-300 leading-relaxed">
+            <p>
+              Need <span className="text-amber-300 font-semibold">more than 2 kg</span> of a particular fish?
+              Contact us directly to discuss availability and pricing.
+            </p>
+            <div className="mt-3 flex flex-col sm:flex-row gap-2">
+              <a
+                href={shopWhatsAppUrl(
+                  "Hi Fish Friendly, I want to enquire about ordering more than 2 kg of a particular fish."
+                )}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 font-medium transition-colors"
+              >
+                WhatsApp
+              </a>
+              <a
+                href={SHOP_PHONE_TEL}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-300 hover:bg-teal-500/25 font-medium transition-colors"
+              >
+                Call {SHOP_PHONE_DISPLAY}
+              </a>
+            </div>
+          </div>
 
           {deliveryZoneError && (
             <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl font-medium flex items-start gap-3">

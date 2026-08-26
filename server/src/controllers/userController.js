@@ -333,7 +333,7 @@ const getMyOrderPaymentStatus = async (req, res, next) => {
 };
 
 
-// @desc    Get date-wise breakdown of a specific user's pending payments
+// @desc    Get order-wise breakdown of a specific user's pending payments
 // @route   GET /api/users/:id/pending-breakdown
 // @access  Private/Admin
 const getUserPendingBreakdown = async (req, res, next) => {
@@ -342,14 +342,11 @@ const getUserPendingBreakdown = async (req, res, next) => {
     if (!user) return res.status(404).json({ message: "User not found" });
 
     const totalPending = user.pendingBalance || 0;
-    
-    if (totalPending <= 0) {
-      return res.json({ totalPending: 0, breakdown: [] });
-    }
 
     const Order = require("../models/Order");
+    const ManualCollection = require("../models/ManualCollection");
     const userOrders = await Order.find({ customer: user._id }).select("_id deliveryDate total");
-    const orderIds = userOrders.map(o => o._id);
+    const orderIds = userOrders.map((o) => o._id);
 
     const DeliveryAssignment = require("../models/DeliveryAssignment");
     const assignments = await DeliveryAssignment.find({
@@ -360,48 +357,83 @@ const getUserPendingBreakdown = async (req, res, next) => {
     const allDebts = [];
     let totalGeneratedDebt = 0;
 
-    assignments.forEach(assignment => {
-      const orderTotal = assignment.order.total;
-      const collected = assignment.paymentCollected || 0;
-      const debt = orderTotal - collected;
+    assignments.forEach((assignment) => {
+      if (!assignment.order) return;
+      const orderTotal = Number(assignment.order.total) || 0;
+      const collectedAtDelivery = Number(assignment.paymentCollected) || 0;
+      const originalDebt = Math.max(0, orderTotal - collectedAtDelivery);
 
-      if (debt > 0) {
+      if (originalDebt > 0) {
         allDebts.push({
+          orderId: assignment.order._id,
           date: assignment.order.deliveryDate,
-          amount: debt,
+          orderTotal,
+          collectedAtDelivery,
+          originalDebt,
+          paymentMethod: assignment.paymentMethod,
           createdAt: assignment.updatedAt
         });
-        totalGeneratedDebt += debt;
+        totalGeneratedDebt += originalDebt;
       }
     });
 
     allDebts.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
+    // Amount admin collected later (manual collections), allocated oldest debt first
     const repaidAmount = Math.max(0, totalGeneratedDebt - totalPending);
-    
     let currentRepaid = repaidAmount;
     const breakdown = [];
 
     for (const debt of allDebts) {
-      if (currentRepaid >= debt.amount) {
-        currentRepaid -= debt.amount;
-      } else {
-        const remainingDue = debt.amount - currentRepaid;
+      let adminCollected = 0;
+      if (currentRepaid >= debt.originalDebt) {
+        adminCollected = debt.originalDebt;
+        currentRepaid -= debt.originalDebt;
+      } else if (currentRepaid > 0) {
+        adminCollected = currentRepaid;
         currentRepaid = 0;
-        
-        const existing = breakdown.find(b => b.date === debt.date);
-        if (existing) {
-          existing.amount += remainingDue;
-        } else {
-          breakdown.push({
-            date: debt.date,
-            amount: remainingDue
-          });
-        }
+      }
+
+      const remainingDue = Math.max(0, debt.originalDebt - adminCollected);
+
+      // Show all debts that still have remaining OR had admin collection applied,
+      // so admin can understand the calculation even after partial repayment.
+      if (remainingDue > 0 || adminCollected > 0) {
+        breakdown.push({
+          orderId: debt.orderId,
+          date: debt.date,
+          orderTotal: debt.orderTotal,
+          collectedAtDelivery: debt.collectedAtDelivery,
+          originalDebt: debt.originalDebt,
+          adminCollected,
+          amount: remainingDue,
+          paymentMethod: debt.paymentMethod
+        });
       }
     }
 
-    res.json({ totalPending, breakdown });
+    const adminCollections = await ManualCollection.find({ customer: user._id })
+      .populate("admin", "name")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const totalAdminCollected = adminCollections.reduce(
+      (sum, c) => sum + (Number(c.amount) || 0),
+      0
+    );
+
+    res.json({
+      totalPending,
+      totalGeneratedDebt,
+      totalAdminCollected,
+      breakdown,
+      adminCollections: adminCollections.map((c) => ({
+        amount: c.amount,
+        collectedAt: c.createdAt,
+        adminName: c.admin?.name || "Admin",
+        notes: c.notes || ""
+      }))
+    });
   } catch (error) {
     next(error);
   }
