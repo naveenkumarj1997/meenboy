@@ -1,32 +1,23 @@
 import { useState, useEffect, useMemo } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
-import { getAllUsers, getAdminProducts, createAdminOrder } from "../../lib/api";
-
-const ADMIN_NAV_LINKS = [
-  { label: "Overview", href: "/dashboard/admin" },
-  { label: "Profile", href: "/dashboard/admin/profile" },
-  { label: "New Customers", href: "/dashboard/admin/new-customers" },
-  { label: "New Delivery Partners", href: "/dashboard/admin/partner-approvals" },
-  { label: "Products", href: "/dashboard/admin/products" },
-  { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
-  { label: "Invoices", href: "/dashboard/admin/invoices" },
-  { label: "Order Management", href: "/dashboard/admin/deliveries" },
-  { label: "Today Delivery Status", href: "/dashboard/admin/today-delivery-status" },
-  { label: "Partner Report", href: "/dashboard/admin/partner-report" },
-  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
-  { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
-  { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
-  { label: "Purchases", href: "/dashboard/admin/purchases" },
-  { label: "Settlements", href: "/dashboard/admin/settlements" },
-  { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
-  { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
-  { label: "Users", href: "/dashboard/admin/users" },
-  { label: "Money", href: "/dashboard/admin/finance" },
-  { label: "Availability", href: "/dashboard/admin/availability" },
-  { label: "Walk-in", href: "/dashboard/admin/walk-in" },
-  { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
-];
+import {
+  getAllUsers,
+  getAdminProducts,
+  createAdminOrder,
+  downloadInvoice
+} from "../../lib/api";
+import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
+import {
+  MADURAI_CITY,
+  MADURAI_STATE,
+  MADURAI_PINCODES,
+  MADURAI_DELIVERY_MESSAGE,
+  isMaduraiCity,
+  isMaduraiPincode,
+  isMaduraiDeliveryAllowed
+} from "../../lib/maduraiDelivery";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 
 const DELIVERY_TIMES = [
   "06:00 AM - 07:00 AM",
@@ -42,25 +33,53 @@ const formatPrice = (price: number) => {
   return num % 1 === 0 ? num.toString() : num.toFixed(2);
 };
 
+const emptyAddressForm = () => ({
+  doorNo: "",
+  streetName: "",
+  area: "",
+  city: MADURAI_CITY,
+  state: MADURAI_STATE,
+  postalCode: "",
+  phone: "",
+  mapUrl: ""
+});
+
+/** Split saved line1 into door / street / area when possible. */
+const splitLine1 = (line1 = "") => {
+  const parts = String(line1)
+    .split(",")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (parts.length >= 3) {
+    return { doorNo: parts[0], streetName: parts[1], area: parts.slice(2).join(", ") };
+  }
+  if (parts.length === 2) {
+    return { doorNo: parts[0], streetName: parts[1], area: "" };
+  }
+  return { doorNo: line1 || "", streetName: "", area: "" };
+};
+
 export default function AdminManualBooking() {
   const { token } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  
-  const [customerType, setCustomerType] = useState<"existing" | "new">("existing");
+
+  const [customerType, setCustomerType] = useState<"existing" | "new">("new");
   const [selectedUserId, setSelectedUserId] = useState("");
   const [newCustomer, setNewCustomer] = useState({ name: "", email: "", phone: "" });
-  
+
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<any[]>([]);
-  
-  // Delivery details
+
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState(DELIVERY_TIMES[0]);
-  const [address, setAddress] = useState({ line1: "", city: "Chennai", state: "Tamil Nadu", postalCode: "" });
+  const [addressForm, setAddressForm] = useState(emptyAddressForm());
+  const [customerNotes, setCustomerNotes] = useState("");
+  const [lastOrderId, setLastOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,7 +93,7 @@ export default function AdminManualBooking() {
         setUsers(usersRes.users.filter((u: any) => u.role === "customer"));
         setProducts(productsRes.data.products.filter((p: any) => p.isActive));
       } catch (err: any) {
-        setError(err.response?.data?.message || "Failed to load data");
+        setError(err.message || "Failed to load data");
       } finally {
         setLoading(false);
       }
@@ -84,29 +103,37 @@ export default function AdminManualBooking() {
 
   useEffect(() => {
     if (customerType === "existing" && selectedUserId) {
-      const user = users.find(u => u._id === selectedUserId);
+      const user = users.find((u) => u._id === selectedUserId);
       if (user) {
-        setAddress({
-          line1: user.address?.line1 || "No address provided",
-          city: user.address?.city || "Chennai",
-          state: user.address?.state || "Tamil Nadu",
-          postalCode: user.address?.postalCode || "000000"
+        const split = splitLine1(user.address?.line1 || "");
+        setAddressForm({
+          doorNo: split.doorNo,
+          streetName: split.streetName,
+          area: split.area || user.address?.line2 || "",
+          city: user.address?.city || MADURAI_CITY,
+          state: user.address?.state || MADURAI_STATE,
+          postalCode: user.address?.postalCode || "",
+          phone: user.address?.phone || user.phone || "",
+          mapUrl: user.mapUrl || ""
         });
       }
     } else if (customerType === "new") {
-      setAddress({ line1: "", city: "Chennai", state: "Tamil Nadu", postalCode: "" });
+      setAddressForm((prev) => ({
+        ...emptyAddressForm(),
+        phone: newCustomer.phone || prev.phone
+      }));
     }
   }, [customerType, selectedUserId, users]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    return products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [products, searchQuery]);
 
   const handleAddToCart = (product: any, selectedCut: any, qty: number) => {
     const cutName = selectedCut?.name;
     const price = selectedCut && selectedCut.price > 0 ? selectedCut.price : product.minPrice;
-    
-    setCart(prev => [
+
+    setCart((prev) => [
       ...prev,
       {
         product: product._id,
@@ -122,56 +149,132 @@ export default function AdminManualBooking() {
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
-  const isAddressReadOnly = customerType === "existing";
+  const deliveryFee = 50;
+
+  const handleDownloadInvoice = async (orderId: string) => {
+    if (!token) return;
+    try {
+      const blob = await downloadInvoice(token, orderId);
+      triggerPdfDownload(blob, `Invoice-${String(orderId).slice(-8).toUpperCase()}.pdf`);
+    } catch (err: any) {
+      setError(err.message || "Failed to download invoice");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+    setLastOrderId(null);
 
-    if (cart.length === 0) {
-      return setError("Cart is empty");
-    }
+    if (cart.length === 0) return setError("Cart is empty");
 
     if (customerType === "existing" && !selectedUserId) {
       return setError("Please select an existing customer");
     }
 
-    if (customerType === "new" && (!newCustomer.name || !newCustomer.email || !newCustomer.phone)) {
-      return setError("Please fill all new customer details");
+    if (
+      customerType === "new" &&
+      (!newCustomer.name.trim() || !newCustomer.email.trim() || !newCustomer.phone.trim())
+    ) {
+      return setError("Please fill new customer name, email and phone");
     }
 
     if (!deliveryDate) return setError("Please select a delivery date");
-    if (!address.line1 || !address.postalCode) return setError("Please fill required address fields");
+
+    const doorNo = addressForm.doorNo.trim();
+    const streetName = addressForm.streetName.trim();
+    const area = addressForm.area.trim();
+    const city = addressForm.city.trim();
+    const postalCode = addressForm.postalCode.trim();
+    const phone =
+      addressForm.phone.trim() ||
+      (customerType === "new" ? newCustomer.phone.trim() : "");
+
+    if (!doorNo || !streetName || !area) {
+      return setError("Please fill Door No, Street and Area");
+    }
+    if (!city || !postalCode) {
+      return setError("Please fill City and Pincode");
+    }
+    if (!phone) {
+      return setError("Please enter customer phone for delivery");
+    }
+    if (!isMaduraiDeliveryAllowed(city, postalCode)) {
+      return setError(MADURAI_DELIVERY_MESSAGE);
+    }
+    if (addressForm.mapUrl.trim()) {
+      try {
+        new URL(addressForm.mapUrl.trim());
+      } catch {
+        return setError("Location link must be a valid URL (or leave empty)");
+      }
+    }
+
+    const line1 = `${doorNo}, ${streetName}, ${area}`;
 
     try {
+      setSubmitting(true);
       const payload: any = {
         items: cart,
-        address,
-        deliveryFee: 50, // Standard fee
+        address: {
+          line1,
+          line2: area,
+          city,
+          state: addressForm.state || MADURAI_STATE,
+          postalCode,
+          country: "India",
+          phone
+        },
+        deliveryFee,
         deliveryDate,
-        deliveryTime
+        deliveryTime,
+        mapUrl: addressForm.mapUrl.trim() || undefined,
+        customerNotes: customerNotes.trim() || undefined
       };
 
       if (customerType === "existing") {
         payload.customerId = selectedUserId;
       } else {
-        payload.newCustomer = newCustomer;
+        payload.newCustomer = {
+          name: newCustomer.name.trim(),
+          email: newCustomer.email.trim(),
+          phone: newCustomer.phone.trim()
+        };
       }
 
-      await createAdminOrder(token!, payload);
-      setSuccess("Order booked successfully!");
+      const res = await createAdminOrder(token!, payload);
+      const orderId = res.order?._id;
+      setSuccess(
+        `Order booked successfully! Same delivery flow as online orders. Invoice is ready.`
+      );
+      setLastOrderId(orderId || null);
       setCart([]);
+      setCustomerNotes("");
       setNewCustomer({ name: "", email: "", phone: "" });
-      setAddress({ line1: "", city: "Chennai", state: "Tamil Nadu", postalCode: "" });
+      setAddressForm(emptyAddressForm());
       setSelectedUserId("");
+      if (orderId) {
+        // Offer invoice immediately
+        try {
+          await handleDownloadInvoice(orderId);
+        } catch {
+          // success message already shown; invoice still available from Invoices page
+        }
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to book order");
+      setError(err.message || "Failed to book order");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   return (
-    <DashboardShell title="Manual Order Booking" description="Create an order on behalf of a customer" navLinks={ADMIN_NAV_LINKS}>
+    <DashboardShell
+      title="Manual Order Booking"
+      description="Book a home-delivery order for a customer who could not place it online. Same delivery + invoice flow."
+      navLinks={ADMIN_NAV_LINKS}
+    >
       <div className="space-y-6">
         {error && (
           <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-xl flex items-center gap-3">
@@ -180,217 +283,356 @@ export default function AdminManualBooking() {
           </div>
         )}
         {success && (
-          <div className="bg-teal-500/10 border border-teal-500/50 text-teal-400 p-4 rounded-xl flex items-center gap-3">
-            <span className="font-bold">✓</span>
-            {success}
+          <div className="bg-teal-500/10 border border-teal-500/50 text-teal-400 p-4 rounded-xl space-y-2">
+            <div className="flex items-center gap-3">
+              <span className="font-bold">✓</span>
+              {success}
+            </div>
+            {lastOrderId && (
+              <button
+                type="button"
+                onClick={() => handleDownloadInvoice(lastOrderId)}
+                className="text-sm font-bold underline text-teal-300 hover:text-teal-200"
+              >
+                Download invoice again
+              </button>
+            )}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          
-          {/* Left Column: Customer & Products */}
-          <div className="space-y-6">
-            
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">1. Customer Details</h2>
-              <div className="flex gap-4 mb-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" checked={customerType === "existing"} onChange={() => setCustomerType("existing")} className="text-teal-500" />
-                  <span className="text-white/80">Existing Customer</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="radio" checked={customerType === "new"} onChange={() => setCustomerType("new")} className="text-teal-500" />
-                  <span className="text-white/80">New Customer</span>
-                </label>
-              </div>
+        {loading ? (
+          <div className="text-center text-slate-400 py-16">Loading...</div>
+        ) : (
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4">1. Customer Details</h2>
+                <div className="flex gap-4 mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={customerType === "existing"}
+                      onChange={() => setCustomerType("existing")}
+                      className="text-teal-500"
+                    />
+                    <span className="text-white/80">Existing Customer</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={customerType === "new"}
+                      onChange={() => setCustomerType("new")}
+                      className="text-teal-500"
+                    />
+                    <span className="text-white/80">New Customer</span>
+                  </label>
+                </div>
 
-              {customerType === "existing" ? (
-                <div>
-                  <label className="block text-sm text-white/60 mb-2">Select Customer</label>
-                  <select
-                    value={selectedUserId}
-                    onChange={e => setSelectedUserId(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                  >
-                    <option value="" className="bg-cyan-950">-- Select Customer --</option>
-                    {users.map(u => (
-                      <option key={u._id} value={u._id} className="bg-cyan-950">
-                        {u.name} ({u.phone || u.email})
+                {customerType === "existing" ? (
+                  <div>
+                    <label className="block text-sm text-white/60 mb-2">Select Customer</label>
+                    <select
+                      value={selectedUserId}
+                      onChange={(e) => setSelectedUserId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                    >
+                      <option value="" className="bg-cyan-950">
+                        -- Select Customer --
                       </option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    value={newCustomer.name}
-                    onChange={e => setNewCustomer({...newCustomer, name: e.target.value})}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email Address"
-                    value={newCustomer.email}
-                    onChange={e => setNewCustomer({...newCustomer, email: e.target.value})}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Phone Number"
-                    value={newCustomer.phone}
-                    onChange={e => setNewCustomer({...newCustomer, phone: e.target.value})}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
-                  />
-                </div>
-              )}
-            </div>
-
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">2. Add Products</h2>
-              <div className="relative mb-4">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">🔍</span>
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white focus:border-teal-500 outline-none"
-                />
-              </div>
-
-              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                {filteredProducts.slice(0, 10).map(product => (
-                  <ProductAddRow key={product._id} product={product} onAdd={handleAddToCart} />
-                ))}
-                {filteredProducts.length === 0 && (
-                  <div className="text-center text-white/40 py-4">No products found</div>
+                      {users.map((u) => (
+                        <option key={u._id} value={u._id} className="bg-cyan-950">
+                          {u.name} ({u.phone || u.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      placeholder="Full Name *"
+                      value={newCustomer.name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Email Address *"
+                      value={newCustomer.email}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Phone Number *"
+                      value={newCustomer.phone}
+                      onChange={(e) => {
+                        const phone = e.target.value;
+                        setNewCustomer({ ...newCustomer, phone });
+                        setAddressForm((prev) => ({ ...prev, phone: prev.phone || phone }));
+                      }}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                  </div>
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* Right Column: Cart & Checkout Details */}
-          <div className="space-y-6">
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4 flex justify-between">
-                <span>3. Order Items</span>
-                <span className="text-teal-400">₹{formatPrice(cartTotal)}</span>
-              </h2>
-              
-              {cart.length === 0 ? (
-                <div className="text-center py-8 text-white/40 flex flex-col items-center gap-2">
-                  <span className="text-2xl opacity-50">📦</span>
-                  <p>Cart is empty</p>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4">2. Add Products</h2>
+                <div className="relative mb-4">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2 text-white focus:border-teal-500 outline-none"
+                  />
                 </div>
-              ) : (
-                <div className="space-y-3 mb-4 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                  {cart.map((item, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-white/5 rounded-xl p-3">
-                      <div>
-                        <p className="font-semibold text-white text-sm">{item.productName}</p>
-                        <p className="text-xs text-white/60">
-                          {item.quantity} {item.unit} {item.cutName ? `• ${item.cutName}` : ''}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <span className="font-bold text-teal-400">₹{formatPrice(item.totalPrice)}</span>
-                        <button
-                          type="button"
-                          onClick={() => setCart(cart.filter((_, i) => i !== idx))}
-                          className="text-red-400 hover:text-red-300 font-bold"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
+
+                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                  {filteredProducts.slice(0, 10).map((product) => (
+                    <ProductAddRow key={product._id} product={product} onAdd={handleAddToCart} />
                   ))}
+                  {filteredProducts.length === 0 && (
+                    <div className="text-center text-white/40 py-4">No products found</div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
 
-            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">4. Delivery Details</h2>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm text-white/60 mb-1">Date</label>
-                  <input
-                    type="date"
-                    required
-                    value={deliveryDate}
-                    onChange={e => setDeliveryDate(e.target.value)}
-                    min={new Date().toISOString().split("T")[0]}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-white/60 mb-1">Time</label>
-                  <select
-                    value={deliveryTime}
-                    onChange={e => setDeliveryTime(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
-                  >
-                    {DELIVERY_TIMES.map(t => (
-                      <option key={t} value={t} className="bg-cyan-950">{t}</option>
+            <div className="space-y-6">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4 flex justify-between">
+                  <span>3. Order Items</span>
+                  <span className="text-teal-400">₹{formatPrice(cartTotal)}</span>
+                </h2>
+
+                {cart.length === 0 ? (
+                  <div className="text-center py-8 text-white/40 flex flex-col items-center gap-2">
+                    <span className="text-2xl opacity-50">📦</span>
+                    <p>Cart is empty</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 mb-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                    {cart.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between bg-white/5 rounded-xl p-3"
+                      >
+                        <div>
+                          <p className="font-semibold text-white text-sm">{item.productName}</p>
+                          <p className="text-xs text-white/60">
+                            {item.quantity} {item.unit}{" "}
+                            {item.cutName ? `• ${item.cutName}` : ""}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <span className="font-bold text-teal-400">
+                            ₹{formatPrice(item.totalPrice)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setCart(cart.filter((_, i) => i !== idx))}
+                            className="text-red-400 hover:text-red-300 font-bold"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
                     ))}
-                  </select>
-                </div>
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  required
-                  readOnly={isAddressReadOnly}
-                  placeholder="Address Line 1"
-                  value={address.line1}
-                  onChange={e => setAddress({...address, line1: e.target.value})}
-                  className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 ${isAddressReadOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
-                />
-                <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <h2 className="text-xl font-bold text-white mb-4">4. Delivery Details</h2>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm text-white/60 mb-1">Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={deliveryDate}
+                      onChange={(e) => setDeliveryDate(e.target.value)}
+                      min={new Date().toISOString().split("T")[0]}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-white/60 mb-1">Time *</label>
+                    <select
+                      value={deliveryTime}
+                      onChange={(e) => setDeliveryTime(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    >
+                      {DELIVERY_TIMES.map((t) => (
+                        <option key={t} value={t} className="bg-cyan-950">
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-3 mb-4">
+                  <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">
+                    Address (same as online booking)
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Door No *"
+                      value={addressForm.doorNo}
+                      onChange={(e) =>
+                        setAddressForm({ ...addressForm, doorNo: e.target.value })
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                    <input
+                      type="text"
+                      required
+                      placeholder="Street Name *"
+                      value={addressForm.streetName}
+                      onChange={(e) =>
+                        setAddressForm({ ...addressForm, streetName: e.target.value })
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                  </div>
                   <input
                     type="text"
                     required
-                    readOnly={isAddressReadOnly}
-                    placeholder="City"
-                    value={address.city}
-                    onChange={e => setAddress({...address, city: e.target.value})}
-                    className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 ${isAddressReadOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    placeholder="Area *"
+                    value={addressForm.area}
+                    onChange={(e) => setAddressForm({ ...addressForm, area: e.target.value })}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
                   />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        placeholder="City *"
+                        value={addressForm.city}
+                        onChange={(e) =>
+                          setAddressForm({ ...addressForm, city: e.target.value })
+                        }
+                        className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white focus:border-teal-500 ${
+                          addressForm.city && !isMaduraiCity(addressForm.city)
+                            ? "border-red-500/60"
+                            : "border-white/10"
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        inputMode="numeric"
+                        maxLength={6}
+                        placeholder="Pincode *"
+                        value={addressForm.postalCode}
+                        list="manual-madurai-pincodes"
+                        onChange={(e) =>
+                          setAddressForm({
+                            ...addressForm,
+                            postalCode: e.target.value.replace(/\D/g, "").slice(0, 6)
+                          })
+                        }
+                        className={`w-full bg-white/5 border rounded-xl px-4 py-2.5 text-white focus:border-teal-500 ${
+                          addressForm.postalCode.length === 6 &&
+                          !isMaduraiPincode(addressForm.postalCode)
+                            ? "border-red-500/60"
+                            : "border-white/10"
+                        }`}
+                      />
+                      <datalist id="manual-madurai-pincodes">
+                        {MADURAI_PINCODES.map((pin) => (
+                          <option key={pin} value={pin} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
                   <input
                     type="text"
                     required
-                    readOnly={isAddressReadOnly}
-                    placeholder="Pincode"
-                    value={address.postalCode}
-                    onChange={e => setAddress({...address, postalCode: e.target.value})}
-                    className={`w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 ${isAddressReadOnly ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    placeholder="Delivery phone *"
+                    value={addressForm.phone}
+                    onChange={(e) =>
+                      setAddressForm({ ...addressForm, phone: e.target.value })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                  />
+                  <div>
+                    <input
+                      type="url"
+                      placeholder="Google Maps location link (optional)"
+                      value={addressForm.mapUrl}
+                      onChange={(e) =>
+                        setAddressForm({ ...addressForm, mapUrl: e.target.value })
+                      }
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                    <p className="text-[11px] text-slate-500 mt-1">
+                      Helps the delivery partner find the house faster.
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-amber-300/80">{MADURAI_DELIVERY_MESSAGE}</p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm text-white/60 mb-1">
+                    Cutting / cleaning notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={customerNotes}
+                    onChange={(e) => setCustomerNotes(e.target.value)}
+                    placeholder="e.g. Curry cut, clean well, no head, pieces for fry..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 resize-y min-h-[80px]"
                   />
                 </div>
-              </div>
 
-              <button
-                type="submit"
-                disabled={loading || cart.length === 0}
-                className="w-full mt-6 bg-gradient-to-r from-teal-400 to-emerald-400 text-cyan-950 font-bold py-3 rounded-xl hover:from-teal-300 hover:to-emerald-300 transition-all disabled:opacity-50"
-              >
-                {loading ? "Booking..." : "Book Order Now"}
-              </button>
+                <div className="flex justify-between text-sm text-slate-400 mb-3">
+                  <span>Delivery fee</span>
+                  <span className="text-white">₹{formatPrice(deliveryFee)}</span>
+                </div>
+                <div className="flex justify-between text-base font-bold text-white mb-4">
+                  <span>Approx. total</span>
+                  <span className="text-teal-400">
+                    ₹{formatPrice(cartTotal + deliveryFee)}
+                  </span>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submitting || cart.length === 0}
+                  className="w-full bg-gradient-to-r from-teal-400 to-emerald-400 text-cyan-950 font-bold py-3 rounded-xl hover:from-teal-300 hover:to-emerald-300 transition-all disabled:opacity-50"
+                >
+                  {submitting ? "Booking..." : "Book Order & Generate Invoice"}
+                </button>
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        )}
       </div>
     </DashboardShell>
   );
 }
 
-// Sub-component for adding products
-function ProductAddRow({ product, onAdd }: { product: any, onAdd: (p: any, c: any, q: number) => void }) {
+function ProductAddRow({
+  product,
+  onAdd
+}: {
+  product: any;
+  onAdd: (p: any, c: any, q: number) => void;
+}) {
   const [qty, setQty] = useState(product.unit === "kg" ? 1 : 1);
   const [selectedCutIdx, setSelectedCutIdx] = useState(0);
-  
+
   const cuts = product.availableCuts || [];
   const selectedCut = cuts.length > 0 ? cuts[selectedCutIdx] : null;
 
@@ -399,34 +641,36 @@ function ProductAddRow({ product, onAdd }: { product: any, onAdd: (p: any, c: an
       <div className="flex justify-between items-start">
         <div>
           <p className="font-semibold text-white text-sm">{product.name}</p>
-          <p className="text-teal-400 text-xs">₹{formatPrice(product.minPrice)} / {product.unit || 'kg'}</p>
+          <p className="text-teal-400 text-xs">
+            ₹{formatPrice(product.minPrice)} / {product.unit || "kg"}
+          </p>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2 mt-1">
         {cuts.length > 0 && (
-          <select 
-            value={selectedCutIdx} 
+          <select
+            value={selectedCutIdx}
             onChange={(e) => setSelectedCutIdx(Number(e.target.value))}
             className="flex-1 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
           >
             {cuts.map((c: any, i: number) => (
               <option key={i} value={i} className="bg-cyan-950">
-                {c.name} {c.price > 0 ? `(+₹${c.price})` : ''}
+                {c.name} {c.price > 0 ? `(₹${c.price})` : ""}
               </option>
             ))}
           </select>
         )}
-        
-        <input 
-          type="number" 
-          value={qty} 
+
+        <input
+          type="number"
+          value={qty}
           onChange={(e) => setQty(Number(e.target.value))}
           step={product.unit === "kg" ? "0.1" : "1"}
           min={product.unit === "kg" ? "0.1" : "1"}
           className="w-16 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
         />
-        
+
         <button
           type="button"
           onClick={() => onAdd(product, selectedCut, qty)}
@@ -438,4 +682,3 @@ function ProductAddRow({ product, onAdd }: { product: any, onAdd: (p: any, c: an
     </div>
   );
 }
-

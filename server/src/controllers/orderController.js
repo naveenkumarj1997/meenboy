@@ -978,33 +978,67 @@ const reorderAssignments = async (req, res, next) => {
 
 const createAdminOrder = async (req, res, next) => {
   try {
-    const { items, address, deliveryFee = 0, deliveryDate, deliveryTime, mapUrl, customerId, newCustomer } = req.body;
+    const {
+      items,
+      address,
+      deliveryFee = 0,
+      deliveryDate,
+      deliveryTime,
+      mapUrl,
+      customerNotes = "",
+      customerId,
+      newCustomer
+    } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Order must contain at least one item" });
     }
 
+    if (!address?.line1 || !address?.city || !address?.state || !address?.postalCode) {
+      return res.status(400).json({ message: "Complete delivery address is required (door/street, city, pincode)" });
+    }
+
     let finalCustomerId = customerId;
+    let customerDoc = null;
 
     // Create new user if provided
     if (newCustomer && !finalCustomerId) {
       const { name, email, phone } = newCustomer;
+      if (!name?.trim() || !email?.trim() || !phone?.trim()) {
+        return res.status(400).json({ message: "New customer name, email and phone are required" });
+      }
       // Generate a random password of 12 chars
       const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
       
-      const user = await User.create({
-        name,
-        email,
-        phone,
+      customerDoc = await User.create({
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        phone: String(phone).trim(),
         password: randomPassword,
         role: "customer",
-        address
+        address: {
+          line1: address.line1,
+          line2: address.line2 || "",
+          city: address.city,
+          state: address.state,
+          postalCode: address.postalCode,
+          country: address.country || "India",
+          phone: address.phone || String(phone).trim()
+        },
+        mapUrl: mapUrl || ""
       });
-      finalCustomerId = user._id;
+      finalCustomerId = customerDoc._id;
     }
 
     if (!finalCustomerId) {
       return res.status(400).json({ message: "A customer ID or new customer details must be provided" });
+    }
+
+    if (!customerDoc) {
+      customerDoc = await User.findById(finalCustomerId);
+      if (!customerDoc) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
     }
 
     // Still perform date availability checks
@@ -1046,26 +1080,52 @@ const createAdminOrder = async (req, res, next) => {
       }
     }
 
-    const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const total = subtotal + deliveryFee;
+    const notesText = String(customerNotes || "").trim();
+    const itemsWithNotes = notesText
+      ? items.map((item) => ({
+          ...item,
+          notes: item.notes?.trim() ? item.notes : notesText
+        }))
+      : items;
+
+    const subtotal = itemsWithNotes.reduce((sum, item) => sum + item.totalPrice, 0);
+    const total = subtotal + Number(deliveryFee || 0);
     const dailyUpdate = deliveryDate
       ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
       : null;
 
     const order = await Order.create({
       customer: finalCustomerId,
-      items: snapshotOrderItems(items),
+      items: snapshotOrderItems(itemsWithNotes),
       subtotal,
-      deliveryFee,
+      deliveryFee: Number(deliveryFee || 0),
       total,
       estimatedTotal: total,
       dailyPriceUpdated: Boolean(dailyUpdate),
       dailyPriceUpdatedAt: dailyUpdate ? dailyUpdate.updatedAt : undefined,
-      address,
+      address: {
+        line1: address.line1,
+        line2: address.line2 || "",
+        city: address.city,
+        state: address.state || "Tamil Nadu",
+        postalCode: address.postalCode,
+        country: address.country || "India",
+        phone: address.phone || customerDoc.phone || ""
+      },
       deliveryDate,
       deliveryTime,
-      mapUrl
+      mapUrl: mapUrl || "",
+      customerNotes: notesText
     });
+
+    // Generate invoice immediately (same as online order invoice flow)
+    try {
+      const relativePath = await generateInvoice(order, customerDoc);
+      order.invoicePath = relativePath;
+      await order.save();
+    } catch (pdfErr) {
+      console.error("Admin booking invoice generation failed:", pdfErr.message);
+    }
 
     await createNotification({
       user: finalCustomerId,

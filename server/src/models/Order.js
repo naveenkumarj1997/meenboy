@@ -110,6 +110,12 @@ const orderSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    customerNotes: {
+      type: String,
+      trim: true,
+      maxlength: 1000,
+      default: ""
+    },
     invoicePath: {
       type: String,
       trim: true

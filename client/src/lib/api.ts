@@ -149,10 +149,16 @@ export const uploadAdminImage = async (token: string, file: File) => {
   return data as { success: boolean; message: string; url: string };
 };
 
-export const uploadPartnerDocument = async (token: string, file: File, phone: string) => {
+export const uploadPartnerDocument = async (
+  token: string,
+  file: File,
+  phone: string,
+  documentType: string
+) => {
   const formData = new FormData();
   formData.append("document", file);
   formData.append("phone", phone);
+  formData.append("documentType", documentType);
 
   const response = await fetch(`${API_BASE}/upload/document`, {
     method: "POST",
@@ -162,13 +168,37 @@ export const uploadPartnerDocument = async (token: string, file: File, phone: st
     body: formData
   });
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data?.message || "Upload failed");
   }
 
-  return data as { success: boolean; message: string; url: string; phone: string };
+  return data as {
+    success: boolean;
+    message: string;
+    hasDocument: boolean;
+    documentType: string;
+    documentFileName: string;
+    phone: string;
+  };
 };
+
+export const fetchPartnerDocumentBlob = async (token: string, userId: string) => {
+  const response = await fetch(`${API_BASE}/users/${userId}/document`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.message || "Failed to open document");
+  }
+  return response.blob();
+};
+
+export const deletePartnerDocument = async (token: string, userId: string) =>
+  request<{ message: string; hasDocument: boolean }>(`/users/${userId}/document`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
 export interface OrderPayload {
   items: {
@@ -205,6 +235,8 @@ export const createOrder = async (token: string, payload: OrderPayload) =>
 
 export interface AdminOrderPayload extends OrderPayload {
   customerId?: string;
+  customerNotes?: string;
+  deliveryFee?: number;
   newCustomer?: {
     name: string;
     email: string;

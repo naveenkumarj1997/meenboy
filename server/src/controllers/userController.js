@@ -1,5 +1,12 @@
 const User = require("../models/User");
 
+const DOC_TYPE_LABELS = {
+  aadhaar: "Aadhaar",
+  dl: "Driving License",
+  rc: "RC Book",
+  voter_id: "Voter ID"
+};
+
 // @desc    Get all users (customers, delivery_partners, admins)
 // @route   GET /api/users
 // @access  Private/Admin
@@ -8,12 +15,19 @@ const getAllUsers = async (req, res, next) => {
     const { role } = req.query;
     const query = role ? { role } : {};
     
-    // Don't fetch passwords
+    // Don't fetch passwords or heavy document binary
     const users = await User.find(query)
-      .select("-password")
-      .sort({ createdAt: -1 });
+      .select("-password -documentData")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    res.json({ users });
+    const shaped = users.map((u) => ({
+      ...u,
+      hasDocument: Boolean(u.documentUploadedAt || u.documentFileName || u.documentUrl),
+      documentTypeLabel: DOC_TYPE_LABELS[u.documentType] || u.documentType || ""
+    }));
+
+    res.json({ users: shaped });
   } catch (error) {
     next(error);
   }
@@ -639,6 +653,70 @@ const confirmSalaryCollection = async (req, res, next) => {
   }
 };
 
+// @desc    View partner verification PDF from DB
+// @route   GET /api/users/:id/document
+// @access  Private/Admin (or the partner themselves)
+const getPartnerDocument = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const isAdmin = req.user.role === "admin";
+    const isSelf = String(req.user._id) === String(id);
+
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ message: "Not authorized to view this document" });
+    }
+
+    const user = await User.findById(id).select("+documentData");
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.documentData || !user.documentData.length) {
+      return res.status(404).json({ message: "No document uploaded for this partner" });
+    }
+
+    const fileName = user.documentFileName || `${user.documentType || "document"}.pdf`;
+    res.setHeader("Content-Type", user.documentMimeType || "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${fileName.replace(/"/g, "")}"`);
+    res.setHeader("Content-Length", user.documentData.length);
+    res.send(user.documentData);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete partner verification PDF from DB (free storage)
+// @route   DELETE /api/users/:id/document
+// @access  Private/Admin
+const deletePartnerDocument = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await User.updateOne(
+      { _id: user._id },
+      {
+        $unset: { documentData: "", documentUploadedAt: "" },
+        $set: {
+          documentMimeType: "",
+          documentFileName: "",
+          documentType: "",
+          documentUrl: ""
+        }
+      }
+    );
+
+    res.json({
+      message: "Document deleted from database successfully",
+      hasDocument: false
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getAllUsers,
   updateUser,
@@ -652,5 +730,7 @@ module.exports = {
   savePartnerSalary,
   getMyEarnings,
   confirmSalaryCollection,
-  getMyOrderPaymentStatus
+  getMyOrderPaymentStatus,
+  getPartnerDocument,
+  deletePartnerDocument
 };

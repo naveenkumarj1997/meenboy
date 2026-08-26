@@ -51,6 +51,29 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    // Partner verification PDF stored in DB (max ~200KB)
+    documentType: {
+      type: String,
+      enum: ["aadhaar", "dl", "rc", "voter_id", ""],
+      default: ""
+    },
+    documentFileName: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    documentMimeType: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    documentData: {
+      type: Buffer,
+      select: false
+    },
+    documentUploadedAt: {
+      type: Date
+    },
     address: {
       line1: { type: String, trim: true },
       line2: { type: String, trim: true },

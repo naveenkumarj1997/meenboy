@@ -36,7 +36,9 @@ const register = async (req, res, next) => {
         role: user.role,
         status: user.status,
         phone: user.phone,
-        documentUrl: user.documentUrl
+        documentUrl: user.documentUrl,
+        hasDocument: Boolean(user.documentUploadedAt || user.documentUrl),
+        documentType: user.documentType || ""
       }
     });
   } catch (error) {
@@ -82,7 +84,9 @@ const login = async (req, res, next) => {
         role: user.role,
         status: user.status,
         phone: user.phone,
-        documentUrl: user.documentUrl
+        documentUrl: user.documentUrl,
+        hasDocument: Boolean(user.documentUploadedAt || user.documentUrl),
+        documentType: user.documentType || ""
       }
     });
   } catch (error) {
@@ -92,7 +96,16 @@ const login = async (req, res, next) => {
 
 const me = async (req, res) => {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  res.status(200).json({ user: req.user });
+  const u = req.user.toObject ? req.user.toObject() : req.user;
+  delete u.documentData;
+  res.status(200).json({
+    user: {
+      ...u,
+      id: u._id || u.id,
+      hasDocument: Boolean(u.documentUploadedAt || u.documentUrl),
+      documentType: u.documentType || ""
+    }
+  });
 };
 
 const listDeliveryPartners = async (req, res, next) => {

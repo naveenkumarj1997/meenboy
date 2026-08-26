@@ -152,6 +152,17 @@ const generateInvoice = (order, user) => {
         billY += 14;
       });
 
+      if (order.customerNotes && String(order.customerNotes).trim()) {
+        billY += 6;
+        doc.font("InvoiceBold").fontSize(10).fillColor("#000000").text("Cutting / cleaning notes:", 50, billY);
+        billY += 14;
+        doc.font("InvoiceRegular").fontSize(9).fillColor("#333333");
+        const notesHeight = doc.heightOfString(String(order.customerNotes).trim(), { width: 280 });
+        doc.text(String(order.customerNotes).trim(), 50, billY, { width: 280 });
+        billY += notesHeight + 4;
+        doc.fillColor("#000000");
+      }
+
       // --- Price status ---
       const priceConfirmed = Boolean(order.dailyPriceUpdated);
       let noticeY = billY + 18;

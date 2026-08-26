@@ -8,21 +8,22 @@ const NAV_LINKS = [
   { label: "Earnings", href: "/dashboard/delivery/earnings" }
 ];
 
-function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (url: string, phone: string) => void }) {
+function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [phone, setPhone] = useState("");
+  const [documentType, setDocumentType] = useState("aadhaar");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || !phone) return;
-    
-    if (file.size > 1024 * 1024) {
-      setError("File size must be under 1MB.");
+    if (!file || !phone || !documentType) return;
+
+    if (file.size > 200 * 1024) {
+      setError("PDF must be under 200 KB. Compress the file and try again.");
       return;
     }
-    if (file.type !== "application/pdf") {
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
       setError("File must be a PDF.");
       return;
     }
@@ -30,8 +31,8 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (u
     try {
       setLoading(true);
       setError("");
-      const res = await uploadPartnerDocument(token, file, phone);
-      onSuccess(res.url, res.phone);
+      await uploadPartnerDocument(token, file, phone, documentType);
+      onSuccess();
     } catch (err: any) {
       setError(err.message || "Failed to upload document");
     } finally {
@@ -41,9 +42,11 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (u
 
   return (
     <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 mt-10">
-      <h2 className="text-xl font-bold text-white mb-4">Required Documents</h2>
+      <h2 className="text-xl font-bold text-white mb-4">Required Document</h2>
       <p className="text-sm text-slate-400 mb-6">
-        Please upload a single PDF (Under 1MB) containing your Driving License, RC Book, Insurance, and Aadhaar Card.
+        Upload <span className="text-teal-300 font-medium">any one</span> PDF proof:
+        Aadhaar, Driving License, RC Book, or Voter ID.
+        File must be under <span className="text-amber-300 font-medium">200 KB</span>.
       </p>
 
       {error && <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">{error}</div>}
@@ -62,14 +65,34 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (u
         </div>
 
         <div>
-          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Verification Document (PDF)</label>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Document Type</label>
+          <select
+            required
+            value={documentType}
+            onChange={(e) => setDocumentType(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+          >
+            <option value="aadhaar">Aadhaar</option>
+            <option value="dl">Driving License (DL)</option>
+            <option value="rc">RC Book</option>
+            <option value="voter_id">Voter ID</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">PDF Document (max 200 KB)</label>
           <input 
             type="file" 
-            accept="application/pdf"
+            accept="application/pdf,.pdf"
             required
             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-teal-500/20 file:text-teal-400 hover:file:bg-teal-500/30 cursor-pointer"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
+          {file && (
+            <p className={`text-xs mt-2 ${file.size > 200 * 1024 ? "text-rose-400" : "text-slate-500"}`}>
+              Selected: {file.name} ({Math.round(file.size / 1024)} KB)
+            </p>
+          )}
         </div>
 
         <button 
@@ -77,7 +100,7 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: (u
           disabled={loading || !file || !phone}
           className="w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4"
         >
-          {loading ? "Uploading..." : "Submit Documents"}
+          {loading ? "Uploading..." : "Submit Document"}
         </button>
       </form>
     </div>
@@ -274,15 +297,17 @@ export default function DeliveryDashboard() {
     }
   };
 
-  const [localDocumentUrl, setLocalDocumentUrl] = useState<string | undefined>((user as any)?.documentUrl);
+  const [localHasDocument, setLocalHasDocument] = useState<boolean>(
+    Boolean((user as any)?.hasDocument || (user as any)?.documentUrl || (user as any)?.documentUploadedAt)
+  );
 
   if (user?.status === "pending") {
-    if (!localDocumentUrl) {
+    if (!localHasDocument) {
       return (
         <DashboardShell title="Delivery Partner Dashboard" description={`Welcome, ${user?.name}.`} navLinks={NAV_LINKS}>
           <DocumentUploadForm 
             token={token!} 
-            onSuccess={(url) => setLocalDocumentUrl(url)} 
+            onSuccess={() => setLocalHasDocument(true)} 
           />
         </DashboardShell>
       );
