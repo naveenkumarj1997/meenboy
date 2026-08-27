@@ -38,6 +38,7 @@ export default function AdminCollectedPayments() {
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) fetchCollections();
@@ -62,6 +63,35 @@ export default function AdminCollectedPayments() {
       setError(err.message || "Failed to load collected payments");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteCollection = async (record: any) => {
+    if (
+      !window.confirm(
+        `Delete this ₹${Number(record.amount || 0).toFixed(2)} collection for ${record.customer?.name || "customer"}?\n\nThe amount will be added back to their pending balance. Use this to remove a duplicate/mistaken entry.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setDeletingId(record._id);
+      setError("");
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/users/collected-payments/${record._id}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || "Failed to delete collection");
+      await fetchCollections();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete collection");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -101,7 +131,7 @@ export default function AdminCollectedPayments() {
   return (
     <DashboardShell
       title="Collected Payments Log"
-      description="View the history of all manual payment collections from customers."
+      description="History of admin collections from pending dues. Use Undo to remove a duplicate entry and restore pending."
       navLinks={NAV_LINKS}
     >
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
@@ -163,16 +193,17 @@ export default function AdminCollectedPayments() {
                 <th className="px-6 py-4">Customer</th>
                 <th className="px-6 py-4 text-right">Amount</th>
                 <th className="px-6 py-4">Collected By</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {loading && filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">Loading collection logs...</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Loading collection logs...</td>
                 </tr>
               ) : filteredAndSorted.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">No collection records found.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No collection records found.</td>
                 </tr>
               ) : (
                 currentItems.map((record) => (
@@ -192,7 +223,7 @@ export default function AdminCollectedPayments() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="font-black text-teal-400 text-lg">
-                        ₹{record.amount.toFixed(2)}
+                        ₹{Number(record.amount || 0).toFixed(2)}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -200,6 +231,17 @@ export default function AdminCollectedPayments() {
                         <span className="text-xs">👤</span>
                         <span className="font-bold text-xs">{record.admin?.name || "Unknown Admin"}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <button
+                        type="button"
+                        disabled={deletingId === record._id}
+                        onClick={() => handleDeleteCollection(record)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-500/15 border border-rose-500/30 text-rose-300 hover:bg-rose-500/25 disabled:opacity-40"
+                        title="Remove duplicate/mistaken entry and restore pending"
+                      >
+                        {deletingId === record._id ? "..." : "Undo"}
+                      </button>
                     </td>
                   </tr>
                 ))

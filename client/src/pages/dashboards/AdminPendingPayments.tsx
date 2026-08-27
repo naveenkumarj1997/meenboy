@@ -36,6 +36,7 @@ export default function AdminPendingPayments() {
   
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [collectAmount, setCollectAmount] = useState<number | "">("");
+  const [collecting, setCollecting] = useState(false);
 
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
   const [userBreakdowns, setUserBreakdowns] = useState<Record<string, any>>({});
@@ -71,8 +72,21 @@ export default function AdminPendingPayments() {
   };
 
   const handleCollect = async () => {
-    if (!selectedUser || !collectAmount || collectAmount <= 0) return;
+    if (!selectedUser || collecting) return;
+    const amount = Number(collectAmount);
+    const pending = Number(selectedUser.pendingBalance) || 0;
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Enter a valid amount to collect");
+      return;
+    }
+    if (amount > pending + 0.001) {
+      setError(`Cannot collect ₹${amount.toFixed(2)}. Pending is only ₹${pending.toFixed(2)}`);
+      return;
+    }
+
     try {
+      setCollecting(true);
       setError("");
       setSuccess("");
       const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/users/${selectedUser._id}/collect-payment`, {
@@ -81,32 +95,38 @@ export default function AdminPendingPayments() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({ amount: Number(collectAmount) })
+        body: JSON.stringify({ amount: Math.round(amount * 100) / 100 })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to collect payment");
-      
-      setSuccess(`Successfully collected ₹${collectAmount} from ${selectedUser.name}`);
-      // If the row is currently expanded, close the expanded view.
+
+      const remaining = Number(data.remainingPending ?? data.user?.pendingBalance ?? 0);
+      setSuccess(
+        remaining > 0
+          ? `Collected ₹${amount.toFixed(2)} from ${selectedUser.name}. Remaining pending: ₹${remaining.toFixed(2)}`
+          : `Collected ₹${amount.toFixed(2)} from ${selectedUser.name}. Pending cleared.`
+      );
+
       if (expandedUserId === selectedUser._id) {
         setExpandedUserId(null);
       }
-      
+
       const collectedUserId = selectedUser._id;
-      
+
       setSelectedUser(null);
       setCollectAmount("");
-      
-      // Clear the stored breakdown for this user so it's fresh next time they click "View Breakdown"
+
       setUserBreakdowns(prev => {
         const newBreakdowns = { ...prev };
         delete newBreakdowns[collectedUserId];
         return newBreakdowns;
       });
-      
+
       fetchPendingPayments();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setCollecting(false);
     }
   };
 
@@ -541,26 +561,45 @@ export default function AdminPendingPayments() {
               <input 
                 type="number"
                 inputMode="decimal"
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white text-base outline-none focus:border-teal-500"
-                value={collectAmount}
-                onChange={(e) => setCollectAmount(Number(e.target.value))}
+                step="0.01"
+                min="0.01"
                 max={selectedUser.pendingBalance}
+                disabled={collecting}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white text-base outline-none focus:border-teal-500 disabled:opacity-60"
+                value={collectAmount}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    setCollectAmount("");
+                    return;
+                  }
+                  setCollectAmount(Number(v));
+                }}
               />
+              <p className="text-[11px] text-slate-500 mt-2">
+                Enter partial or full amount. Remaining pending stays on the list (e.g. 550 − 300 = 250).
+              </p>
             </div>
 
             <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
               <button 
-                onClick={() => setSelectedUser(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-medium transition-colors"
+                type="button"
+                onClick={() => {
+                  if (collecting) return;
+                  setSelectedUser(null);
+                }}
+                disabled={collecting}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-medium transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button 
+                type="button"
                 onClick={handleCollect}
-                disabled={!collectAmount || collectAmount <= 0}
+                disabled={collecting || !collectAmount || Number(collectAmount) <= 0}
                 className="flex-1 bg-teal-500 hover:bg-teal-400 text-white py-3 rounded-lg font-bold transition-colors disabled:opacity-50"
               >
-                Confirm Collection
+                {collecting ? "Saving..." : "Confirm Collection"}
               </button>
             </div>
           </div>

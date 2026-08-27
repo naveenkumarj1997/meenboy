@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { getPartnerAssignments, updateDeliveryStatus, reorderAssignments, uploadPartnerDocument } from "../../lib/api";
+import { formatQuantityLabel } from "../../lib/weightOptions";
 
 const NAV_LINKS = [
   { label: "Deliveries", href: "/dashboard/delivery" },
@@ -492,11 +493,53 @@ export default function DeliveryDashboard() {
                         </a>
                       )}
                       
-                      <div className="text-white text-sm bg-slate-800/50 p-3 rounded-lg border border-slate-800">
-                        <div className="font-medium mb-1">To Collect: <span className="text-emerald-400 font-bold">₹{order.total?.toFixed(2)}</span></div>
-                        <div className="text-slate-400 text-xs truncate">
-                          Items: {order.items?.map((i: any) => `${i.quantity}x ${i.productName}`).join(", ")}
+                      <div className="text-white text-sm bg-slate-800/50 p-3 rounded-lg border border-slate-800 space-y-2">
+                        <div className="font-medium">
+                          To Collect:{" "}
+                          <span className="text-emerald-400 font-bold">
+                            ₹{order.total?.toFixed(2)}
+                          </span>
                         </div>
+                        <div className="space-y-1.5">
+                          <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
+                            Order items
+                          </div>
+                          {(order.items || []).length === 0 ? (
+                            <div className="text-xs text-slate-500">No items</div>
+                          ) : (
+                            (order.items || []).map((item: any, idx: number) => (
+                              <div
+                                key={idx}
+                                className="text-sm text-slate-200 bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-2"
+                              >
+                                <div className="font-semibold text-white">
+                                  {idx + 1}. {item.productName}
+                                  {item.cutName ? (
+                                    <span className="text-teal-300 font-medium"> · {item.cutName}</span>
+                                  ) : null}
+                                </div>
+                                <div className="text-xs text-slate-400 mt-0.5">
+                                  Qty: {formatQuantityLabel(item.quantity, item.unit)}
+                                </div>
+                                {item.notes?.trim() && (
+                                  <div className="text-xs text-amber-300 mt-1">
+                                    Note: {item.notes}
+                                  </div>
+                                )}
+                              </div>
+                            ))
+                          )}
+                        </div>
+                        {String(order.customerNotes || "").trim() && (
+                          <div className="text-sm text-amber-100 bg-amber-500/15 border border-amber-500/30 rounded-lg px-2.5 py-2">
+                            <div className="text-[10px] uppercase tracking-wider font-bold text-amber-300 mb-1">
+                              Cutting / cleaning notes
+                            </div>
+                            <div className="whitespace-pre-wrap break-words">
+                              {order.customerNotes}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

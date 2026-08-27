@@ -372,6 +372,8 @@ const updateDeliveryStatus = async (req, res, next) => {
       return res.status(400).json({ message: "Reason is required for failed delivery." });
     }
 
+    const wasAlreadyDelivered = existing.status === "delivered";
+
     const assignment = await DeliveryAssignment.findOneAndUpdate(
       { _id: assignmentId, deliveryPartner: req.user._id },
       {
@@ -398,8 +400,9 @@ const updateDeliveryStatus = async (req, res, next) => {
       );
     }
 
-    if (status === "delivered") {
-      const unpaidAmount = Math.max(0, orderTotal - collected);
+    // Only add pending once — when first moving to delivered (avoids double unpaid on re-save)
+    if (status === "delivered" && !wasAlreadyDelivered) {
+      const unpaidAmount = Math.round(Math.max(0, orderTotal - collected) * 100) / 100;
       if (unpaidAmount > 0) {
         await User.findByIdAndUpdate(
           assignment.order.customer,

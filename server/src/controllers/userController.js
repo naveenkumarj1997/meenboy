@@ -110,32 +110,66 @@ const getPendingPayments = async (req, res, next) => {
 const collectPendingPayment = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { amount } = req.body;
+    let amount = Number(req.body.amount);
 
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(amount) || amount <= 0) {
       return res.status(400).json({ message: "Invalid collection amount" });
     }
 
-    const user = await User.findById(id);
+    // Money in 2 decimals
+    amount = Math.round(amount * 100) / 100;
 
-    if (!user) {
+    const existing = await User.findById(id).select("name pendingBalance");
+    if (!existing) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    user.pendingBalance = Math.max(0, user.pendingBalance - amount);
-    const updatedUser = await user.save();
-    
-    // Create ManualCollection record
+    const pending = Math.round((Number(existing.pendingBalance) || 0) * 100) / 100;
+    if (pending <= 0) {
+      return res.status(400).json({ message: "No pending balance to collect" });
+    }
+    if (amount > pending) {
+      return res.status(400).json({
+        message: `Cannot collect ₹${amount.toFixed(2)}. Pending balance is only ₹${pending.toFixed(2)}`
+      });
+    }
+
+    // Atomic deduct — blocks double-click / race that would wipe remaining balance
+    // and create duplicate ManualCollection rows
+    const user = await User.findOneAndUpdate(
+      { _id: id, pendingBalance: { $gte: amount } },
+      { $inc: { pendingBalance: -amount } },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(409).json({
+        message: "Balance changed or payment already collected. Refresh and try again."
+      });
+    }
+
+    // Clean float leftovers (e.g. 249.999999 → 250.00 / 0)
+    const remaining = Math.max(0, Math.round((Number(user.pendingBalance) || 0) * 100) / 100);
+    if (remaining !== user.pendingBalance) {
+      user.pendingBalance = remaining;
+      await user.save();
+    }
+
     const ManualCollection = require("../models/ManualCollection");
     await ManualCollection.create({
       customer: user._id,
       admin: req.user._id,
-      amount: amount
+      amount
     });
-    
-    updatedUser.password = undefined;
 
-    res.json({ user: updatedUser, message: "Payment collected successfully" });
+    user.password = undefined;
+
+    res.json({
+      user,
+      message: "Payment collected successfully",
+      collectedAmount: amount,
+      remainingPending: user.pendingBalance
+    });
   } catch (error) {
     next(error);
   }
@@ -153,6 +187,45 @@ const getCollectedPayments = async (req, res, next) => {
       .sort({ createdAt: -1 });
       
     res.json({ collections });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete a mistaken manual collection and restore pending balance
+// @route   DELETE /api/users/collected-payments/:collectionId
+// @access  Private/Admin
+const deleteCollectedPayment = async (req, res, next) => {
+  try {
+    const ManualCollection = require("../models/ManualCollection");
+    const collection = await ManualCollection.findById(req.params.collectionId);
+    if (!collection) {
+      return res.status(404).json({ message: "Collection record not found" });
+    }
+
+    const amount = Math.round((Number(collection.amount) || 0) * 100) / 100;
+    const customerId = collection.customer;
+
+    await collection.deleteOne();
+
+    if (amount > 0 && customerId) {
+      await User.findByIdAndUpdate(customerId, {
+        $inc: { pendingBalance: amount }
+      });
+      const user = await User.findById(customerId).select("pendingBalance");
+      if (user) {
+        user.pendingBalance = Math.max(
+          0,
+          Math.round((Number(user.pendingBalance) || 0) * 100) / 100
+        );
+        await user.save();
+      }
+    }
+
+    res.json({
+      message: "Collection deleted and amount restored to pending balance",
+      restoredAmount: amount
+    });
   } catch (error) {
     next(error);
   }
@@ -724,6 +797,7 @@ module.exports = {
   getPendingPayments,
   collectPendingPayment,
   getCollectedPayments,
+  deleteCollectedPayment,
   getMyPendingBreakdown,
   getUserPendingBreakdown,
   getPartnerSalariesByDate,

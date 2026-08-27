@@ -11,7 +11,7 @@ import {
   updateOrderStatus,
   updateAdminOrder
 } from "../../lib/api";
-import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption } from "../../lib/weightOptions";
+import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption, formatQuantityLabel } from "../../lib/weightOptions";
 import {
   PieChart,
   Pie,
@@ -23,6 +23,59 @@ import {
   ResponsiveContainer
 } from "recharts";
 
+/** Items + cutting/cleaning notes for admin / partner prep */
+function OrderItemsAndNotes({
+  items,
+  customerNotes,
+  categoryMap,
+  getCategoryColor,
+  compact = false
+}: {
+  items?: any[];
+  customerNotes?: string;
+  categoryMap?: Record<string, string>;
+  getCategoryColor?: (cat: string) => string;
+  compact?: boolean;
+}) {
+  const notes = String(customerNotes || "").trim();
+  const itemNotes = (items || [])
+    .map((i) => String(i.notes || "").trim())
+    .filter(Boolean);
+  // Prefer order-level notes; fall back to unique item notes
+  const prepNotes =
+    notes ||
+    [...new Set(itemNotes)].join(" · ");
+
+  return (
+    <div className={`space-y-1.5 ${compact ? "max-w-[260px]" : ""}`}>
+      {(items || []).map((item: any, idx: number) => (
+        <div key={idx} className="leading-snug">
+          <span
+            className={
+              getCategoryColor
+                ? `inline-block px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded border ${getCategoryColor(
+                    categoryMap?.[item.product] || ""
+                  )}`
+                : "text-xs text-slate-200"
+            }
+          >
+            {formatQuantityLabel(item.quantity, item.unit)} · {item.productName}
+            {item.cutName ? ` (${item.cutName})` : ""}
+          </span>
+          {item.notes?.trim() && item.notes.trim() !== notes && (
+            <div className="text-[10px] text-amber-300/90 mt-0.5 pl-0.5">Note: {item.notes}</div>
+          )}
+        </div>
+      ))}
+      {prepNotes && (
+        <div className="text-[10px] sm:text-[11px] text-amber-200 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1.5 mt-1">
+          <span className="font-bold uppercase tracking-wider text-amber-300/90">Cutting / cleaning: </span>
+          {prepNotes}
+        </div>
+      )}
+    </div>
+  );
+}
 const ADMIN_NAV_LINKS = [
   { label: "Overview", href: "/dashboard/admin" },
   { label: "Profile", href: "/dashboard/admin/profile" },
@@ -441,16 +494,13 @@ export default function AdminDeliveryTracking() {
                       <div className="text-xs text-slate-400">{order.address?.city}, {order.address?.postalCode}</div>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="flex flex-wrap gap-2">
-                        {order.items.map((item: any, idx: number) => (
-                          <span 
-                            key={idx} 
-                            className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded border ${getCategoryColor(productCategoryMap[item.product] || "")}`}
-                          >
-                            {item.quantity}x {item.productName}
-                          </span>
-                        ))}
-                      </div>
+                      <OrderItemsAndNotes
+                        items={order.items}
+                        customerNotes={order.customerNotes}
+                        categoryMap={productCategoryMap}
+                        getCategoryColor={getCategoryColor}
+                        compact
+                      />
                     </td>
                     <td className="px-4 py-4 text-xs">
                       <div>{order.deliveryDate}</div>
@@ -601,16 +651,13 @@ export default function AdminDeliveryTracking() {
                       <div className="text-xs text-slate-400">{a.order?.address?.city}, {a.order?.address?.postalCode}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-wrap gap-2 max-w-[200px]">
-                        {a.order?.items?.map((item: any, idx: number) => (
-                          <span 
-                            key={idx} 
-                            className={`px-2 py-1 text-[10px] uppercase font-bold tracking-wider rounded border ${getCategoryColor(productCategoryMap[item.product] || "")}`}
-                          >
-                            {item.quantity}x {item.productName}
-                          </span>
-                        ))}
-                      </div>
+                      <OrderItemsAndNotes
+                        items={a.order?.items}
+                        customerNotes={a.order?.customerNotes}
+                        categoryMap={productCategoryMap}
+                        getCategoryColor={getCategoryColor}
+                        compact
+                      />
                     </td>
                     <td className="px-6 py-4 text-xs">
                       <div>{a.order?.deliveryDate}</div>
@@ -735,8 +782,14 @@ export default function AdminDeliveryTracking() {
                             <div className="font-medium text-white">{order.customer?.name || "Guest"}</div>
                             <div className="text-xs text-slate-400">{order.address?.city}, {order.address?.postalCode}</div>
                           </td>
-                          <td className="px-4 py-4 text-xs max-w-[220px]">
-                            {order.items?.map((item: any) => `${item.quantity}x ${item.productName}`).join(", ")}
+                          <td className="px-4 py-4">
+                            <OrderItemsAndNotes
+                              items={order.items}
+                              customerNotes={order.customerNotes}
+                              categoryMap={productCategoryMap}
+                              getCategoryColor={getCategoryColor}
+                              compact
+                            />
                           </td>
                           <td className="px-4 py-4 text-xs">
                             <div>{order.deliveryDate}</div>
