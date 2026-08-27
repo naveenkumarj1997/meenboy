@@ -30,6 +30,13 @@ const userSchema = new mongoose.Schema(
       enum: roles,
       default: "customer"
     },
+    // How the customer account was created
+    customerSource: {
+      type: String,
+      enum: ["website", "manual"],
+      default: "website",
+      index: true
+    },
     status: {
       type: String,
       enum: ["active", "blocked", "pending", "rejected"],

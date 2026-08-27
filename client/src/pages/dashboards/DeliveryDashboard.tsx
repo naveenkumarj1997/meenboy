@@ -3,6 +3,7 @@ import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { getPartnerAssignments, updateDeliveryStatus, reorderAssignments, uploadPartnerDocument } from "../../lib/api";
 import { formatQuantityLabel } from "../../lib/weightOptions";
+import { BookingSourceBadge } from "../../components/SourceBadges";
 
 const NAV_LINKS = [
   { label: "Deliveries", href: "/dashboard/delivery" },
@@ -478,6 +479,7 @@ export default function DeliveryDashboard() {
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
                         {isNext && <span className="bg-teal-500 text-teal-950 text-xs font-bold px-2 py-0.5 rounded animate-pulse">UP NEXT</span>}
                         <span className="text-white font-bold">Order #{String(order._id).slice(-6).toUpperCase()}</span>
+                        <BookingSourceBadge source={order.bookingSource} />
                         <span className="text-slate-400 text-sm">{order.deliveryDate} • {order.deliveryTime}</span>
                       </div>
                       
@@ -605,8 +607,11 @@ export default function DeliveryDashboard() {
               {pastAssignments.map((a) => (
                 <div key={a._id} className="bg-slate-900/50 border border-slate-800 p-5 rounded-xl flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
                   <div className="w-full">
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="font-bold text-white text-lg">Order #{String(a.order?._id).slice(-6).toUpperCase()}</div>
+                    <div className="flex justify-between items-center mb-3 gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="font-bold text-white text-lg">Order #{String(a.order?._id).slice(-6).toUpperCase()}</div>
+                        <BookingSourceBadge source={a.order?.bookingSource} />
+                      </div>
                       <div className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${a.status === 'delivered' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
                         {a.status}
                       </div>
@@ -653,8 +658,9 @@ export default function DeliveryDashboard() {
         <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-white mb-1">Update Delivery</h3>
-            <div className="text-slate-400 text-sm mb-2">
-              Order #{String(selectedAssignment.order?._id).slice(-6).toUpperCase()}
+            <div className="text-slate-400 text-sm mb-2 flex items-center gap-2 flex-wrap">
+              <span>Order #{String(selectedAssignment.order?._id).slice(-6).toUpperCase()}</span>
+              <BookingSourceBadge source={selectedAssignment.order?.bookingSource} />
             </div>
             <div className="text-teal-300 text-sm font-semibold mb-6">
               Order total: ₹{Number(selectedAssignment.order?.total || 0).toFixed(2)}

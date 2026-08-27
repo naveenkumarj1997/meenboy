@@ -114,7 +114,8 @@ const createOrder = async (req, res, next) => {
       address,
       deliveryDate,
       deliveryTime,
-      mapUrl
+      mapUrl,
+      bookingSource: "website"
     });
 
     await createNotification({
@@ -1004,21 +1005,32 @@ const createAdminOrder = async (req, res, next) => {
     let finalCustomerId = customerId;
     let customerDoc = null;
 
+    const normalizePhoneDigits = (raw) => {
+      const digits = String(raw || "").replace(/\D/g, "");
+      return digits.length >= 10 ? digits.slice(-10) : digits;
+    };
+
     // Create new user if provided
     if (newCustomer && !finalCustomerId) {
       const { name, email, phone } = newCustomer;
       if (!name?.trim() || !email?.trim() || !phone?.trim()) {
         return res.status(400).json({ message: "New customer name, email and phone are required" });
       }
+      const cleanPhone = normalizePhoneDigits(phone);
+      if (cleanPhone.length < 10) {
+        return res.status(400).json({ message: "Valid 10-digit phone number is required" });
+      }
       // Generate a random password of 12 chars
       const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
+      const addressPhone = normalizePhoneDigits(address.phone) || cleanPhone;
       
       customerDoc = await User.create({
         name: name.trim(),
         email: email.trim().toLowerCase(),
-        phone: String(phone).trim(),
+        phone: cleanPhone,
         password: randomPassword,
         role: "customer",
+        customerSource: "manual",
         address: {
           line1: address.line1,
           line2: address.line2 || "",
@@ -1026,7 +1038,7 @@ const createAdminOrder = async (req, res, next) => {
           state: address.state,
           postalCode: address.postalCode,
           country: address.country || "India",
-          phone: address.phone || String(phone).trim()
+          phone: addressPhone
         },
         mapUrl: mapUrl || ""
       });
@@ -1113,12 +1125,13 @@ const createAdminOrder = async (req, res, next) => {
         state: address.state || "Tamil Nadu",
         postalCode: address.postalCode,
         country: address.country || "India",
-        phone: address.phone || customerDoc.phone || ""
+        phone: normalizePhoneDigits(address.phone || customerDoc.phone || "")
       },
       deliveryDate,
       deliveryTime,
       mapUrl: mapUrl || "",
-      customerNotes: notesText
+      customerNotes: notesText,
+      bookingSource: "manual"
     });
 
     // Generate invoice immediately (same as online order invoice flow)

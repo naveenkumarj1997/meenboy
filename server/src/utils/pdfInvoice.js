@@ -36,6 +36,20 @@ const formatInvoiceQuantity = (item) => {
   return `${kg} kg`;
 };
 
+/** Strip spaces / NBSP / odd Unicode so Tamil PDF fonts never show □ boxes */
+const sanitizePhoneForPdf = (raw) => {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (!digits) return "";
+  return digits.length >= 10 ? digits.slice(-10) : digits;
+};
+
+/** Remove invisible / non-printable chars that PDF fonts often lack */
+const sanitizePdfText = (raw) =>
+  String(raw || "")
+    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]/g, " ")
+    .replace(/[^\S\n]+/g, " ")
+    .trim();
+
 const getInvoicePriceChanges = (items = []) =>
   items
     .map((item) => {
@@ -63,14 +77,14 @@ const getInvoicePriceChanges = (items = []) =>
 
 const buildBillToLines = (order, user) => {
   const lines = [];
-  lines.push(user?.name || "Customer");
+  lines.push(sanitizePdfText(user?.name || "Customer"));
 
-  const line1 = (order.address?.line1 || "").trim();
-  const line2 = (order.address?.line2 || "").trim();
-  const city = (order.address?.city || "").trim();
-  const state = (order.address?.state || "").trim();
-  const postalCode = (order.address?.postalCode || "").trim();
-  const phone = (order.address?.phone || "").trim();
+  const line1 = sanitizePdfText(order.address?.line1 || "");
+  const line2 = sanitizePdfText(order.address?.line2 || "");
+  const city = sanitizePdfText(order.address?.city || "");
+  const state = sanitizePdfText(order.address?.state || "");
+  const postalCode = sanitizePdfText(order.address?.postalCode || "");
+  const phone = sanitizePhoneForPdf(order.address?.phone || user?.phone);
 
   if (line1) lines.push(line1);
 

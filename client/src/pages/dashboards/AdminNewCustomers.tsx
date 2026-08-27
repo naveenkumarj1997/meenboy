@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { getAllUsers, updateUser } from "../../lib/api";
+import { CustomerSourceBadge } from "../../components/SourceBadges";
 
 const NAV_LINKS = [
   { label: "Overview", href: "/dashboard/admin" },
@@ -82,6 +83,7 @@ export default function AdminNewCustomers() {
             <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4 font-medium">Customer Details</th>
+                <th className="px-6 py-4 font-medium">Customer type</th>
                 <th className="px-6 py-4 font-medium">Phone Number</th>
                 <th className="px-6 py-4 font-medium">Joined Date</th>
                 <th className="px-6 py-4 font-medium">Actions</th>
@@ -90,11 +92,11 @@ export default function AdminNewCustomers() {
             <tbody className="divide-y divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">Loading new customers...</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Loading new customers...</td>
                 </tr>
               ) : newCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
                     <div className="text-4xl mb-3">✅</div>
                     <div>No new customers to review!</div>
                   </td>
@@ -105,6 +107,9 @@ export default function AdminNewCustomers() {
                     <td className="px-6 py-4">
                       <div className="font-bold text-white">{customer.name}</div>
                       <div className="text-xs text-slate-400">{customer.email}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <CustomerSourceBadge source={customer.customerSource} role="customer" />
                     </td>
                     <td className="px-6 py-4">
                       {customer.phone ? (

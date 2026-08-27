@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { getAllUsers, updateUser } from "../../lib/api";
+import { CustomerSourceBadge } from "../../components/SourceBadges";
 
 const NAV_LINKS = [
   { label: "Overview", href: "/dashboard/admin" },
@@ -207,6 +208,7 @@ export default function AdminUsers() {
               <tr>
                 <th className="px-6 py-4 font-medium">Name & Email</th>
                 <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Customer type</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Joined</th>
                 <th className="px-6 py-4 font-medium">Actions</th>
@@ -215,11 +217,11 @@ export default function AdminUsers() {
             <tbody className="divide-y divide-slate-800/50">
               {loading && filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Loading users...</td>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Loading users...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No users found.</td>
+                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">No users found.</td>
                 </tr>
               ) : (
                 currentUsers.map(user => (
@@ -245,6 +247,13 @@ export default function AdminUsers() {
                       </div>
                     </td>
                     <td className="px-6 py-4 capitalize">{user.role.replace("_", " ")}</td>
+                    <td className="px-6 py-4">
+                      {user.role === "customer" ? (
+                        <CustomerSourceBadge source={user.customerSource} role={user.role} />
+                      ) : (
+                        <span className="text-xs text-slate-500">—</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs font-bold rounded ${user.status === 'blocked' ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                         {user.status || 'active'}

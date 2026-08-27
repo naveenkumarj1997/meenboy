@@ -14,6 +14,12 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
       index: true
     },
+    bookingSource: {
+      type: String,
+      enum: ["website", "manual"],
+      default: "website",
+      index: true
+    },
     items: [
       {
         product: {

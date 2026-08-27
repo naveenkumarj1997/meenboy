@@ -22,7 +22,8 @@ const register = async (req, res, next) => {
       password,
       role,
       phone,
-      status: role === "delivery_partner" ? "pending" : "active"
+      status: role === "delivery_partner" ? "pending" : "active",
+      customerSource: role === "customer" ? "website" : undefined
     });
 
     const token = generateToken(user._id, user.role);

@@ -12,6 +12,7 @@ import {
   updateAdminOrder
 } from "../../lib/api";
 import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption, formatQuantityLabel } from "../../lib/weightOptions";
+import { BookingSourceBadge } from "../../components/SourceBadges";
 import {
   PieChart,
   Pie,
@@ -488,7 +489,12 @@ export default function AdminDeliveryTracking() {
               <tbody className="divide-y divide-slate-800/50">
                 {unassignedOrders.map(order => (
                   <tr key={order._id} className="hover:bg-slate-800/20">
-                    <td className="px-4 py-4 font-mono text-white">#{order._id.slice(-6).toUpperCase()}</td>
+                    <td className="px-4 py-4 font-mono text-white">
+                      <div>#{order._id.slice(-6).toUpperCase()}</div>
+                      <div className="mt-1.5">
+                        <BookingSourceBadge source={order.bookingSource} />
+                      </div>
+                    </td>
                     <td className="px-4 py-4">
                       <div className="font-medium text-white">{order.customer?.name || "Guest"}</div>
                       <div className="text-xs text-slate-400">{order.address?.city}, {order.address?.postalCode}</div>
@@ -645,7 +651,12 @@ export default function AdminDeliveryTracking() {
               <tbody className="divide-y divide-slate-800/50">
                 {currentAssignments.map(a => (
                   <tr key={a._id} className="hover:bg-slate-800/20">
-                    <td className="px-6 py-4 font-mono text-white">#{String(a.order?._id || a.order).slice(-6).toUpperCase()}</td>
+                    <td className="px-6 py-4 font-mono text-white">
+                      <div>#{String(a.order?._id || a.order).slice(-6).toUpperCase()}</div>
+                      <div className="mt-1.5">
+                        <BookingSourceBadge source={a.order?.bookingSource} />
+                      </div>
+                    </td>
                     <td className="px-6 py-4">
                       <div className="font-medium text-white">{a.order?.customer?.name || "Guest"}</div>
                       <div className="text-xs text-slate-400">{a.order?.address?.city}, {a.order?.address?.postalCode}</div>
@@ -777,7 +788,12 @@ export default function AdminDeliveryTracking() {
                     <tbody className="divide-y divide-slate-800/50">
                       {pageOrders.map((order) => (
                         <tr key={order._id} className="hover:bg-slate-800/20">
-                          <td className="px-4 py-4 font-mono text-white">#{String(order._id).slice(-6).toUpperCase()}</td>
+                          <td className="px-4 py-4 font-mono text-white">
+                            <div>#{String(order._id).slice(-6).toUpperCase()}</div>
+                            <div className="mt-1.5">
+                              <BookingSourceBadge source={order.bookingSource} />
+                            </div>
+                          </td>
                           <td className="px-4 py-4">
                             <div className="font-medium text-white">{order.customer?.name || "Guest"}</div>
                             <div className="text-xs text-slate-400">{order.address?.city}, {order.address?.postalCode}</div>
