@@ -87,10 +87,10 @@ export default function AdminManualBooking() {
         if (!token) return;
         setLoading(true);
         const [usersRes, productsRes] = await Promise.all([
-          getAllUsers(token),
+          getAllUsers(token, { role: "customer", realOnly: true }),
           getAdminProducts(token)
         ]);
-        setUsers(usersRes.users.filter((u: any) => u.role === "customer"));
+        setUsers(usersRes.users);
         setProducts(productsRes.data.products.filter((p: any) => p.isActive));
       } catch (err: any) {
         setError(err.message || "Failed to load data");

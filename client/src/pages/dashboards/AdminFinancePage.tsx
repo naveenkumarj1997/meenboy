@@ -17,12 +17,14 @@ const ADMIN_NAV_LINKS = [
   { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
+  { label: "Delivery Amount Collection", href: "/dashboard/admin/delivery-amount-collection" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
   { label: "Settlements", href: "/dashboard/admin/settlements" },
   { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
   { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
   { label: "Users", href: "/dashboard/admin/users" },
-  { label: "Money", href: "/dashboard/admin/finance" },
+  { label: "Money Management", href: "/dashboard/admin/money-management" },
+  { label: "Manual Ledger", href: "/dashboard/admin/finance" },
   { label: "Availability", href: "/dashboard/admin/availability" },
   { label: "Walk-in", href: "/dashboard/admin/walk-in" },
   { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
@@ -93,7 +95,7 @@ export default function AdminFinancePage() {
 
   if (loading) {
     return (
-      <DashboardShell title="Money Management" description="Loading finances..." navLinks={ADMIN_NAV_LINKS}>
+      <DashboardShell title="Manual Ledger" description="Loading..." navLinks={ADMIN_NAV_LINKS}>
         <div className="flex justify-center py-10">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
         </div>
@@ -103,8 +105,8 @@ export default function AdminFinancePage() {
 
   return (
     <DashboardShell
-      title="Money Management"
-      description="Track collections and payments"
+      title="Manual Ledger"
+      description="Manual cash in/out entries (optional). Use Money Management for real profit tracking."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (

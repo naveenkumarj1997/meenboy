@@ -16,6 +16,17 @@ const connectDB = async () => {
     });
     // eslint-disable-next-line no-console
     console.log(`MongoDB connected: ${connection.connection.host}`);
+
+    try {
+      const { syncRealUserFlags } = require("../utils/syncRealUsers");
+      const { marked } = await syncRealUserFlags();
+      // eslint-disable-next-line no-console
+      console.log(`Real user flags synced (real: ${marked.realMarked}, test: ${marked.testMarked}).`);
+    } catch (syncErr) {
+      // eslint-disable-next-line no-console
+      console.warn(`Real user sync skipped: ${syncErr.message}`);
+    }
+
     return true;
   } catch (error) {
     // eslint-disable-next-line no-console

@@ -1,6 +1,6 @@
 const express = require("express");
 const { protect, authorizeRoles } = require("../middleware/auth");
-const { getAllUsers, updateUser, deleteUser, getPendingPayments, collectPendingPayment, getMyPendingBreakdown, getCollectedPayments, deleteCollectedPayment, getUserPendingBreakdown, getPartnerSalariesByDate, savePartnerSalary, getMyEarnings, confirmSalaryCollection, getMyOrderPaymentStatus, getPartnerDocument, deletePartnerDocument } = require("../controllers/userController");
+const { getAllUsers, updateUser, deleteUser, getPendingPayments, collectPendingPayment, getMyPendingBreakdown, getCollectedPayments, deleteCollectedPayment, getUserPendingBreakdown, getPartnerSalariesByDate, getPartnerCollectionHistory, savePartnerSalary, getMyEarnings, confirmSalaryCollection, getMyOrderPaymentStatus, getPartnerDocument, deletePartnerDocument } = require("../controllers/userController");
 
 const router = express.Router();
 
@@ -22,6 +22,7 @@ router.get("/pending-payments", getPendingPayments);
 router.get("/collected-payments", getCollectedPayments);
 router.delete("/collected-payments/:collectionId", deleteCollectedPayment);
 router.get("/partner-salaries/:date", getPartnerSalariesByDate);
+router.get("/partner-collection-history/:partnerId", getPartnerCollectionHistory);
 router.post("/partner-salaries", savePartnerSalary);
 router.get("/:id/pending-breakdown", getUserPendingBreakdown);
 router.post("/:id/collect-payment", collectPendingPayment);

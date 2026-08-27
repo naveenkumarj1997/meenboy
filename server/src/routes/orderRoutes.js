@@ -16,6 +16,7 @@ const {
   listInvoicesForAdmin,
   downloadInvoice,
   downloadPartnerDayReport,
+  downloadPartnerCollectionReport,
   downloadVendorCategoryReport,
   listAllAssignments,
   getDeliveryStats,
@@ -76,6 +77,12 @@ router.get(
   protect,
   authorizeRoles("admin"),
   downloadPartnerDayReport
+);
+router.get(
+  "/reports/partner-collection",
+  protect,
+  authorizeRoles("admin"),
+  downloadPartnerCollectionReport
 );
 router.get(
   "/reports/vendor-category",

@@ -111,7 +111,13 @@ const me = async (req, res) => {
 
 const listDeliveryPartners = async (req, res, next) => {
   try {
-    const partners = await User.find({ role: "delivery_partner" }).select("-password");
+    const includePending = String(req.query.includePending || "").toLowerCase() === "true";
+    const query = {
+      role: "delivery_partner",
+      isRealUser: true,
+      status: includePending ? { $in: ["active", "pending"] } : "active"
+    };
+    const partners = await User.find(query).select("-password").sort({ name: 1 });
     res.json({ deliveryPartners: partners });
   } catch (error) {
     next(error);

@@ -4,6 +4,7 @@ const {
   addTransaction,
   getTransactions,
   getFinanceSummary,
+  getMoneyManagement,
   updateTransactionStatus
 } = require("../controllers/financeController");
 
@@ -18,6 +19,7 @@ router.route("/")
   .get(getTransactions);
 
 router.get("/summary", getFinanceSummary);
+router.get("/money-management", getMoneyManagement);
 
 router.put("/:id/status", updateTransactionStatus);
 

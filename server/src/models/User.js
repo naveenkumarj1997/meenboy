@@ -42,6 +42,12 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "blocked", "pending", "rejected"],
       default: "active"
     },
+    /** Production user — new accounts default to real; mark false for test accounts */
+    isRealUser: {
+      type: Boolean,
+      default: true,
+      index: true
+    },
     isNoticed: {
       type: Boolean,
       default: false
@@ -93,6 +99,13 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0
+    },
+    adminPreferences: {
+      usersAccountFilter: {
+        type: String,
+        enum: ["real", "test"],
+        default: "real"
+      }
     }
   },
   {

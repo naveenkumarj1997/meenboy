@@ -146,3 +146,20 @@ exports.updateTransactionStatus = async (req, res) => {
     res.status(500).json({ message: "Server error updating transaction" });
   }
 };
+
+// @desc    Real-business money management dashboard (excludes pre-launch test data)
+// @route   GET /api/finance/money-management
+// @access  Admin
+exports.getMoneyManagement = async (req, res) => {
+  try {
+    const { getMoneyManagementData } = require("../utils/moneyManagement");
+    const period = String(req.query.period || "today").toLowerCase();
+    const allowed = ["today", "week", "month", "all"];
+    const safePeriod = allowed.includes(period) ? period : "today";
+    const data = await getMoneyManagementData(safePeriod);
+    res.status(200).json(data);
+  } catch (error) {
+    console.error("Error fetching money management data:", error);
+    res.status(500).json({ message: "Server error fetching money management data" });
+  }
+};

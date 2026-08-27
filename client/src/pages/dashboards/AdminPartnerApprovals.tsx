@@ -22,7 +22,7 @@ export default function AdminPartnerApprovals() {
     try {
       setLoading(true);
       setError("");
-      const res = await getAllUsers(token!, "delivery_partner");
+      const res = await getAllUsers(token!, { role: "delivery_partner", realOnly: true });
       const all = res.users || [];
       setPendingPartners(all.filter((u: any) => u.status === "pending"));
       setPartnersWithDocs(

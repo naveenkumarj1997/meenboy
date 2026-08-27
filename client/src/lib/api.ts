@@ -383,6 +383,71 @@ export const getTodayDeliveryStatus = async (
     headers: { Authorization: `Bearer ${token}` }
   });
 };
+
+export const getPartnerSalariesByDate = async (token: string, date: string) =>
+  request<{
+    stats: Array<{
+      partnerId: string;
+      name: string;
+      phone?: string;
+      deliveredCount: number;
+      failedCount: number;
+      codCollected: number;
+      upiCollected: number;
+      salaryAmount: number;
+      partnerConfirmed: boolean;
+    }>;
+  }>(`/users/partner-salaries/${date}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const savePartnerSalary = async (
+  token: string,
+  payload: { date: string; partnerId: string; amount: number }
+) =>
+  request<{ salary: any; message: string }>("/users/partner-salaries", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const getPartnerCollectionHistory = async (
+  token: string,
+  partnerId: string,
+  limit = 30
+) =>
+  request<{
+    history: Array<{
+      date: string;
+      deliveryCount: number;
+      deliveredCount: number;
+      codCollected: number;
+      upiCollected: number;
+      totalCollected: number;
+      totalOrderAmount: number;
+      totalPending: number;
+      salaryAmount: number;
+      netAfterSalary: number;
+    }>;
+  }>(`/users/partner-collection-history/${partnerId}?limit=${limit}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const downloadPartnerCollectionReport = async (
+  token: string,
+  params: { date: string; partnerId: string }
+) => {
+  const qs = new URLSearchParams({ date: params.date, partnerId: params.partnerId });
+  const response = await fetch(`${API_BASE}/orders/reports/partner-collection?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to download collection report");
+  }
+  return response.blob();
+};
+
 export const getDeliveryStats = async (token: string) =>
   request<{ stats: any }>("/orders/delivery-stats", {
     headers: { Authorization: `Bearer ${token}` }
@@ -434,10 +499,18 @@ export const reorderAssignments = async (token: string, assignments: { id: strin
 
 // ─── User Management API ─────────────────────────────────────────────────────────────
 
-export const getAllUsers = async (token: string, role?: string) =>
-  request<{ users: any[] }>(`/users${role ? `?role=${role}` : ''}`, {
+export const getAllUsers = async (
+  token: string,
+  options?: { role?: string; realOnly?: boolean }
+) => {
+  const params = new URLSearchParams();
+  if (options?.role) params.set("role", options.role);
+  if (options?.realOnly) params.set("realOnly", "true");
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return request<{ users: any[] }>(`/users${qs}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+};
 
 export const updateUser = async (token: string, userId: string, payload: any) =>
   request<{ user: any; message: string }>(`/users/${userId}`, {
@@ -467,6 +540,24 @@ export interface TransactionPayload {
 
 export const getFinanceSummary = async (token: string) =>
   request<any>("/finance/summary", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const getMoneyManagement = async (
+  token: string,
+  period: "today" | "week" | "month" | "all" = "today"
+) =>
+  request<{
+    businessStartDate: string;
+    today: string;
+    period: string;
+    range: { from: string; to: string };
+    summary: Record<string, number>;
+    periods: Record<string, Record<string, number> & { from: string; to: string }>;
+    customerPendingTotal: number;
+    customersWithPending: number;
+    daily: Array<Record<string, number | string>>;
+  }>(`/finance/money-management?period=${period}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 

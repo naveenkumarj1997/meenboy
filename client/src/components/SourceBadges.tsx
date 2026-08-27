@@ -15,6 +15,21 @@ export function BookingSourceBadge({ source }: { source?: string }) {
   );
 }
 
+export function RealUserBadge({ isRealUser }: { isRealUser?: boolean }) {
+  const real = Boolean(isRealUser);
+  return (
+    <span
+      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+        real
+          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+          : "bg-slate-500/15 text-slate-400 border-slate-500/30"
+      }`}
+    >
+      {real ? "Real user" : "Test user"}
+    </span>
+  );
+}
+
 /** Badge for how the customer account was created */
 export function CustomerSourceBadge({ source, role }: { source?: string; role?: string }) {
   if (role && role !== "customer") return null;

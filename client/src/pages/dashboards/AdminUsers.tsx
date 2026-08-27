@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { getAllUsers, updateUser } from "../../lib/api";
-import { CustomerSourceBadge } from "../../components/SourceBadges";
+import { CustomerSourceBadge, RealUserBadge } from "../../components/SourceBadges";
 
 const NAV_LINKS = [
   { label: "Overview", href: "/dashboard/admin" },
@@ -18,24 +18,28 @@ const NAV_LINKS = [
   { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
+  { label: "Delivery Amount Collection", href: "/dashboard/admin/delivery-amount-collection" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
   { label: "Settlements", href: "/dashboard/admin/settlements" },
   { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
   { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
   { label: "Users", href: "/dashboard/admin/users" },
-  { label: "Money", href: "/dashboard/admin/finance" },
+  { label: "Money Management", href: "/dashboard/admin/money-management" },
+  { label: "Manual Ledger", href: "/dashboard/admin/finance" },
   { label: "Availability", href: "/dashboard/admin/availability" },
   { label: "Walk-in", href: "/dashboard/admin/walk-in" },
   { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
 ];
 
 export default function AdminUsers() {
-  const { token } = useAuth();
+  const { token, user: authUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [accountFilter, setAccountFilter] = useState<"real" | "test">("real");
+  const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: "createdAt", direction: "desc" });
   
   const [searchQuery, setSearchQuery] = useState("");
@@ -54,20 +58,52 @@ export default function AdminUsers() {
   });
 
   useEffect(() => {
-    if (token) fetchUsers();
+    const saved = authUser?.adminPreferences?.usersAccountFilter;
+    if (saved === "real" || saved === "test") {
+      setAccountFilter(saved);
+    }
+    setPrefsLoaded(true);
+  }, [authUser?.adminPreferences?.usersAccountFilter]);
+
+  useEffect(() => {
+    if (token && prefsLoaded) fetchUsers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, roleFilter, sortConfig]);
+  }, [token, roleFilter, sortConfig, prefsLoaded]);
+
+  const persistAccountFilter = async (next: "real" | "test") => {
+    setAccountFilter(next);
+    const adminId = authUser?.id || authUser?._id;
+    if (!token || !adminId) return;
+    try {
+      await updateUser(token, String(adminId), {
+        adminPreferences: { usersAccountFilter: next }
+      });
+      const stored = localStorage.getItem("fishfriendly_auth_user");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        parsed.adminPreferences = { ...parsed.adminPreferences, usersAccountFilter: next };
+        localStorage.setItem("fishfriendly_auth_user", JSON.stringify(parsed));
+      }
+    } catch {
+      // Filter still works locally; preference saves on next successful request
+    }
+  };
+
+  const isRealAccount = (user: any) => user.role === "admin" || user.isRealUser === true;
+  const isTestAccount = (user: any) => user.role !== "admin" && user.isRealUser === false;
 
   // Reset page when filter/sort/search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [roleFilter, sortConfig, searchQuery]);
+  }, [roleFilter, sortConfig, searchQuery, accountFilter]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError("");
-      const res = await getAllUsers(token!, roleFilter === "all" ? undefined : roleFilter);
+      const res = await getAllUsers(token!, {
+        role: roleFilter === "all" ? undefined : roleFilter
+      });
       let fetchedUsers = res.users;
       
       // Sort logic
@@ -139,7 +175,25 @@ export default function AdminUsers() {
     }
   };
 
-  const filteredUsers = users.filter(user => {
+  const handleToggleRealUser = async (user: any) => {
+    if (user.role === "admin") return;
+    try {
+      setError("");
+      const next = !user.isRealUser;
+      await updateUser(token!, user._id, { isRealUser: next });
+      setSuccess(next ? `${user.name} marked as real user` : `${user.name} marked as test user (hidden from dropdowns)`);
+      setUsers(users.map((u) => (u._id === user._id ? { ...u, isRealUser: next } : u)));
+    } catch (err: any) {
+      setError(err.message || "Failed to update account type");
+    }
+  };
+
+  const filteredUsers = users.filter((user) => {
+    const matchesAccount =
+      accountFilter === "real" ? isRealAccount(user) : isTestAccount(user);
+
+    if (!matchesAccount) return false;
+
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -161,16 +215,48 @@ export default function AdminUsers() {
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
       {success && <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">{success}</div>}
 
-      <div className="flex gap-4 mb-6">
-        {["all", "customer", "delivery_partner", "admin"].map(role => (
-          <button
-            key={role}
-            onClick={() => setRoleFilter(role)}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${roleFilter === role ? "bg-teal-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
-          >
-            {role.replace("_", " ")}
-          </button>
-        ))}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
+        <div className="flex flex-wrap gap-2">
+          {["all", "customer", "delivery_partner", "admin"].map(role => (
+            <button
+              key={role}
+              onClick={() => setRoleFilter(role)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${roleFilter === role ? "bg-teal-500 text-white" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+            >
+              {role.replace("_", " ")}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <span className="text-xs text-slate-500 uppercase tracking-wider font-bold hidden sm:inline">
+            Show
+          </span>
+          <div className="inline-flex rounded-lg border border-slate-700 overflow-hidden bg-slate-900">
+            <button
+              type="button"
+              onClick={() => persistAccountFilter("real")}
+              className={`px-4 py-2 text-sm font-bold transition-colors ${
+                accountFilter === "real"
+                  ? "bg-emerald-500 text-emerald-950"
+                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              }`}
+            >
+              Real
+            </button>
+            <button
+              type="button"
+              onClick={() => persistAccountFilter("test")}
+              className={`px-4 py-2 text-sm font-bold transition-colors border-l border-slate-700 ${
+                accountFilter === "test"
+                  ? "bg-slate-600 text-white"
+                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+              }`}
+            >
+              Test
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-6 items-start md:items-center justify-between">
@@ -208,6 +294,7 @@ export default function AdminUsers() {
               <tr>
                 <th className="px-6 py-4 font-medium">Name & Email</th>
                 <th className="px-6 py-4 font-medium">Role</th>
+                <th className="px-6 py-4 font-medium">Account</th>
                 <th className="px-6 py-4 font-medium">Customer type</th>
                 <th className="px-6 py-4 font-medium">Status</th>
                 <th className="px-6 py-4 font-medium">Joined</th>
@@ -217,11 +304,11 @@ export default function AdminUsers() {
             <tbody className="divide-y divide-slate-800/50">
               {loading && filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">Loading users...</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">Loading users...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-500">No users found.</td>
+                  <td colSpan={7} className="px-6 py-8 text-center text-slate-500">No users found.</td>
                 </tr>
               ) : (
                 currentUsers.map(user => (
@@ -248,6 +335,13 @@ export default function AdminUsers() {
                     </td>
                     <td className="px-6 py-4 capitalize">{user.role.replace("_", " ")}</td>
                     <td className="px-6 py-4">
+                      {user.role === "admin" ? (
+                        <span className="text-xs text-slate-500">Admin</span>
+                      ) : (
+                        <RealUserBadge isRealUser={user.isRealUser} />
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
                       {user.role === "customer" ? (
                         <CustomerSourceBadge source={user.customerSource} role={user.role} />
                       ) : (
@@ -265,6 +359,20 @@ export default function AdminUsers() {
                     <td className="px-6 py-4">
                       <div className="flex gap-2 items-center">
                         <button onClick={() => openEdit(user)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs transition-colors">Edit</button>
+
+                        {user.role !== "admin" && (
+                          <button
+                            onClick={() => handleToggleRealUser(user)}
+                            className={`px-3 py-1.5 rounded text-xs transition-colors ${
+                              user.isRealUser
+                                ? "bg-slate-700 hover:bg-slate-600 text-slate-300"
+                                : "bg-amber-500/20 hover:bg-amber-500/30 text-amber-300"
+                            }`}
+                            title={user.isRealUser ? "Mark as test user (hide from lists)" : "Mark as real user"}
+                          >
+                            {user.isRealUser ? "Mark test" : "Mark real"}
+                          </button>
+                        )}
                         
                         {/* Toggle Switch Style for Block/Unblock */}
                         <button 

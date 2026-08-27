@@ -12,8 +12,13 @@ const DOC_TYPE_LABELS = {
 // @access  Private/Admin
 const getAllUsers = async (req, res, next) => {
   try {
-    const { role } = req.query;
+    const { role, realOnly } = req.query;
     const query = role ? { role } : {};
+
+    if (String(realOnly).toLowerCase() === "true") {
+      query.isRealUser = true;
+      query.status = { $ne: "blocked" };
+    }
     
     // Don't fetch passwords or heavy document binary
     const users = await User.find(query)
@@ -56,6 +61,11 @@ const updateUser = async (req, res, next) => {
     if (address !== undefined) user.address = address;
     if (password) user.password = password;
     if (isNoticed !== undefined) user.isNoticed = isNoticed;
+    if (req.body.isRealUser !== undefined) user.isRealUser = Boolean(req.body.isRealUser);
+    if (req.body.adminPreferences?.usersAccountFilter) {
+      if (!user.adminPreferences) user.adminPreferences = {};
+      user.adminPreferences.usersAccountFilter = req.body.adminPreferences.usersAccountFilter;
+    }
 
     const updatedUser = await user.save();
     
@@ -94,7 +104,7 @@ const deleteUser = async (req, res, next) => {
 // @access  Private/Admin
 const getPendingPayments = async (req, res, next) => {
   try {
-    const users = await User.find({ pendingBalance: { $gt: 0 } })
+    const users = await User.find({ pendingBalance: { $gt: 0 }, isRealUser: true })
       .select("-password")
       .sort({ pendingBalance: -1 });
 
@@ -606,6 +616,90 @@ const getPartnerSalariesByDate = async (req, res, next) => {
   }
 };
 
+// @desc    Partner collection + salary history (for admin)
+// @route   GET /api/users/partner-collection-history/:partnerId
+// @access  Private/Admin
+const getPartnerCollectionHistory = async (req, res, next) => {
+  try {
+    const { partnerId } = req.params;
+    const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 90);
+
+    const Order = require("../models/Order");
+    const DeliveryAssignment = require("../models/DeliveryAssignment");
+    const PartnerSalary = require("../models/PartnerSalary");
+
+    const assignments = await DeliveryAssignment.find({ deliveryPartner: partnerId })
+      .populate({
+        path: "order",
+        select: "deliveryDate total"
+      })
+      .lean();
+
+    const byDate = {};
+
+    for (const a of assignments) {
+      const date = a.order?.deliveryDate;
+      if (!date) continue;
+
+      if (!byDate[date]) {
+        byDate[date] = {
+          date,
+          deliveryCount: 0,
+          deliveredCount: 0,
+          codCollected: 0,
+          upiCollected: 0,
+          totalCollected: 0,
+          totalOrderAmount: 0,
+          totalPending: 0,
+          salaryAmount: 0
+        };
+      }
+
+      const row = byDate[date];
+      const orderTotal = Number(a.order?.total || 0);
+      const collected = a.status === "delivered" ? Number(a.paymentCollected || 0) : 0;
+      const pending =
+        a.status === "delivered" ? Math.max(0, orderTotal - collected) : orderTotal;
+
+      row.deliveryCount += 1;
+      row.totalOrderAmount += orderTotal;
+      row.totalPending += pending;
+
+      if (a.status === "delivered") {
+        row.deliveredCount += 1;
+        row.totalCollected += collected;
+        if (a.paymentMethod === "cash" || a.paymentMethod === "partial_cash") {
+          row.codCollected += collected;
+        } else if (a.paymentMethod === "upi" || a.paymentMethod === "partial_upi") {
+          row.upiCollected += collected;
+        }
+      }
+    }
+
+    const dates = Object.keys(byDate).sort((a, b) => b.localeCompare(a)).slice(0, limit);
+
+    const salaries = await PartnerSalary.find({
+      deliveryPartner: partnerId,
+      date: { $in: dates }
+    }).lean();
+
+    const salaryByDate = {};
+    salaries.forEach((s) => {
+      salaryByDate[s.date] = Number(s.amount || 0);
+    });
+
+    const history = dates.map((date) => ({
+      ...byDate[date],
+      salaryAmount: salaryByDate[date] || 0,
+      netAfterSalary: byDate[date].totalCollected - (salaryByDate[date] || 0)
+    }));
+
+    res.json({ history });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Save partner salary for a specific date
 // @route   POST /api/users/partner-salaries
 // @access  Private/Admin
@@ -801,6 +895,7 @@ module.exports = {
   getMyPendingBreakdown,
   getUserPendingBreakdown,
   getPartnerSalariesByDate,
+  getPartnerCollectionHistory,
   savePartnerSalary,
   getMyEarnings,
   confirmSalaryCollection,

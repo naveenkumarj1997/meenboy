@@ -11,12 +11,14 @@ import AdminTodayDeliveryStatus from "./pages/dashboards/AdminTodayDeliveryStatu
 import AdminOverallReports from "./pages/dashboards/AdminOverallReports";
 import AdminPendingPayments from "./pages/dashboards/AdminPendingPayments";
 import AdminCollectedPayments from "./pages/dashboards/AdminCollectedPayments";
+import AdminDeliveryAmountCollection from "./pages/dashboards/AdminDeliveryAmountCollection";
 import AdminPurchases from "./pages/dashboards/AdminPurchases";
 import AdminSettlements from "./pages/dashboards/AdminSettlements";
 import AdminPartnerSalary from "./pages/dashboards/AdminPartnerSalary";
 import AdminEarnings from "./pages/dashboards/AdminEarnings";
 import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
+import AdminMoneyManagement from "./pages/dashboards/AdminMoneyManagement";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
 import AdminWalkIn from "./pages/dashboards/AdminWalkIn";
@@ -109,12 +111,14 @@ function App() {
           <Route path="/dashboard/admin/overall-reports" element={<AdminOverallReports />} />
           <Route path="/dashboard/admin/pending-payments" element={<AdminPendingPayments />} />
           <Route path="/dashboard/admin/collected-payments" element={<AdminCollectedPayments />} />
+          <Route path="/dashboard/admin/delivery-amount-collection" element={<AdminDeliveryAmountCollection />} />
           <Route path="/dashboard/admin/purchases" element={<AdminPurchases />} />
           <Route path="/dashboard/admin/settlements" element={<AdminSettlements />} />
           <Route path="/dashboard/admin/partner-salary" element={<AdminPartnerSalary />} />
           <Route path="/dashboard/admin/earnings" element={<AdminEarnings />} />
           <Route path="/dashboard/admin/users" element={<AdminUsers />} />
           <Route path="/dashboard/admin/finance" element={<AdminFinancePage />} />
+          <Route path="/dashboard/admin/money-management" element={<AdminMoneyManagement />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
           <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />
           <Route path="/dashboard/admin/manual-booking" element={<AdminManualBooking />} />

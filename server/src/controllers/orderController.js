@@ -10,6 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const { generateInvoice } = require("../utils/pdfInvoice");
 const { generatePartnerDayReport } = require("../utils/pdfDeliveryReport");
+const { generatePartnerCollectionReport } = require("../utils/pdfPartnerCollectionReport");
 const {
   generateVendorCategoryReport,
   generateVendorAllCategoriesReport
@@ -760,6 +761,96 @@ const downloadPartnerDayReport = async (req, res, next) => {
   }
 };
 
+const downloadPartnerCollectionReport = async (req, res, next) => {
+  try {
+    const { date, partnerId } = req.query;
+
+    if (!date || !partnerId) {
+      return res.status(400).json({ message: "date and partnerId query params are required" });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const partner = await User.findOne({
+      _id: partnerId,
+      role: "delivery_partner"
+    }).select("name phone email");
+
+    if (!partner) {
+      return res.status(404).json({ message: "Delivery partner not found" });
+    }
+
+    const orders = await Order.find({ deliveryDate: date }).select("_id").lean();
+    const orderIds = orders.map((o) => o._id);
+
+    const assignments = await DeliveryAssignment.find({
+      deliveryPartner: partnerId,
+      order: { $in: orderIds }
+    })
+      .populate({
+        path: "order",
+        populate: { path: "customer", select: "name phone" }
+      })
+      .sort({ sequence: 1, createdAt: 1 })
+      .lean();
+
+    let totalOrderAmount = 0;
+    let totalCollected = 0;
+    let totalCod = 0;
+    let totalUpi = 0;
+    let totalPending = 0;
+    let deliveredCount = 0;
+
+    for (const a of assignments) {
+      const orderTotal = Number(a.order?.total || 0);
+      const collected = a.status === "delivered" ? Number(a.paymentCollected || 0) : 0;
+      const pending =
+        a.status === "delivered" ? Math.max(0, orderTotal - collected) : orderTotal;
+
+      totalOrderAmount += orderTotal;
+      totalCollected += collected;
+      totalPending += pending;
+
+      if (a.status === "delivered") {
+        deliveredCount += 1;
+        if (a.paymentMethod === "cash" || a.paymentMethod === "partial_cash") {
+          totalCod += collected;
+        } else if (a.paymentMethod === "upi" || a.paymentMethod === "partial_upi") {
+          totalUpi += collected;
+        }
+      }
+    }
+
+    const PartnerSalary = require("../models/PartnerSalary");
+    const salaryDoc = await PartnerSalary.findOne({ date, deliveryPartner: partnerId }).lean();
+    const salaryAmount = Number(salaryDoc?.amount || 0);
+
+    const totals = {
+      deliveryCount: assignments.length,
+      deliveredCount,
+      totalOrderAmount,
+      totalCollected,
+      totalCod,
+      totalUpi,
+      totalPending
+    };
+
+    const { filePath, fileName } = await generatePartnerCollectionReport({
+      partner,
+      date,
+      assignments,
+      salaryAmount,
+      totals
+    });
+
+    res.download(filePath, fileName);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const buildVendorRowsForDate = async (date, categoryFilter) => {
   const PRODUCT_CATEGORIES = Product.PRODUCT_CATEGORIES || [
     "Seafood",
@@ -1312,6 +1403,7 @@ module.exports = {
   listInvoicesForAdmin,
   downloadInvoice,
   downloadPartnerDayReport,
+  downloadPartnerCollectionReport,
   downloadVendorCategoryReport,
   listAllAssignments,
   getDeliveryStats,
