@@ -72,6 +72,143 @@ const getCategoryTheme = (categoryLabel) => {
   return CATEGORY_THEMES[categoryLabel] || CATEGORY_THEMES.Other;
 };
 
+const buildVendorRowValues = (row, rowNumber) => [
+  String(rowNumber),
+  String(row.productName || "-"),
+  String(row.cutName || "-"),
+  `${row.quantity}${row.unit || "kg"}`,
+  String(row.customerName || "Guest"),
+  row.orderId ? `#${String(row.orderId).slice(-6).toUpperCase()}` : "-"
+];
+
+const drawVendorPrepRows = ({
+  doc,
+  rows,
+  cols,
+  left,
+  contentWidth,
+  borderColor,
+  altRowBg,
+  padX,
+  padY,
+  theme,
+  drawTableHeader,
+  startY,
+  pageBannerHeight = 18
+}) => {
+  const notesColIdx = cols.findIndex((c) => c.key === "notes");
+  const notesCol = cols[notesColIdx];
+  const notesLeft =
+    left + cols.slice(0, notesColIdx).reduce((sum, col) => sum + col.width, 0);
+  const rightPartLeft = notesLeft + notesCol.width;
+  const rightPartWidth = left + contentWidth - rightPartLeft;
+
+  let y = startY;
+  let displayIndex = 0;
+
+  const ensureSpace = (needed) => {
+    if (y + needed > doc.page.height - 50) {
+      doc.addPage();
+      doc.rect(0, 0, doc.page.width, pageBannerHeight).fill(theme.banner);
+      y = drawTableHeader(28);
+    }
+  };
+
+  const drawVerticalSplits = (yPos, rowHeight, includeNotes = true) => {
+    let x = left;
+    for (let i = 0; i < cols.length - 1; i++) {
+      x += cols[i].width;
+      if (!includeNotes && i + 1 === notesColIdx) continue;
+      if (includeNotes && i + 1 === notesColIdx) continue;
+      doc.moveTo(x, yPos).lineTo(x, yPos + rowHeight).stroke();
+    }
+  };
+
+  let i = 0;
+  while (i < rows.length) {
+    const row = rows[i];
+    let span = row.notesRowSpan ?? 1;
+    if (span === 0) {
+      i++;
+      continue;
+    }
+
+    const group = rows.slice(i, i + span);
+    const displayNotes = String(row.displayNotes ?? row.notes ?? "").trim();
+
+    const rowHeights = group.map((groupRow, gi) => {
+      const values = buildVendorRowValues(groupRow, displayIndex + gi + 1);
+      doc.font("ReportRegular").fontSize(8);
+      const heights = values.map((val, valueIdx) => {
+        const colIdx =
+          valueIdx < notesColIdx ? valueIdx : valueIdx + 1;
+        return doc.heightOfString(String(val), {
+          width: cols[colIdx].width - padX * 2,
+          lineGap: 2
+        });
+      });
+      return Math.max(...heights, 18) + padY * 2;
+    });
+
+    const spanHeight = rowHeights.reduce((sum, h) => sum + h, 0);
+    ensureSpace(spanHeight + 2);
+
+    const groupY = y;
+    group.forEach((groupRow, gi) => {
+      const rowHeight = rowHeights[gi];
+      if ((displayIndex + gi) % 2 === 0) {
+        doc.rect(left, y, contentWidth, rowHeight).fill(altRowBg);
+      }
+
+      let x = left;
+      cols.forEach((col, colIdx) => {
+        if (col.key === "notes") {
+          x += col.width;
+          return;
+        }
+
+        const valueIdx = colIdx < notesColIdx ? colIdx : colIdx - 1;
+        const values = buildVendorRowValues(groupRow, displayIndex + gi + 1);
+        doc
+          .fillColor("#0f172a")
+          .font("ReportRegular")
+          .fontSize(8)
+          .text(values[valueIdx], x + padX, y + padY, {
+            width: col.width - padX * 2,
+            height: rowHeight - padY * 2,
+            align: col.key === "sno" || col.key === "qty" ? "center" : "left",
+            lineGap: 2
+          });
+        x += col.width;
+      });
+
+      doc.strokeColor(borderColor).lineWidth(0.8);
+      doc.rect(left, y, notesLeft - left, rowHeight).stroke();
+      doc.rect(rightPartLeft, y, rightPartWidth, rowHeight).stroke();
+      drawVerticalSplits(y, rowHeight, false);
+      y += rowHeight;
+    });
+
+    const notesText = displayNotes || "-";
+    const highlightNotes = displayNotes.length > 0;
+    doc
+      .fillColor(highlightNotes ? "#b45309" : "#0f172a")
+      .font(highlightNotes ? "ReportBold" : "ReportRegular")
+      .fontSize(8)
+      .text(notesText, notesLeft + padX, groupY + padY, {
+        width: notesCol.width - padX * 2,
+        height: spanHeight - padY * 2,
+        lineGap: 2
+      });
+    doc.strokeColor(borderColor).rect(notesLeft, groupY, notesCol.width, spanHeight).stroke();
+
+    displayIndex += span;
+    i += span;
+  }
+
+  return y;
+};
+
 /**
  * Vendor prep PDF — list of items by category for a delivery date.
  * @param {{ date: string, categoryLabel: string, rows: Array<{
@@ -211,53 +348,6 @@ const generateVendorCategoryReport = ({ date, categoryLabel, rows, totals = [] }
         }
       };
 
-      rows.forEach((row, index) => {
-        const notes = String(row.notes || "").trim() || "-";
-        const values = [
-          String(index + 1),
-          String(row.productName || "-"),
-          String(row.cutName || "-"),
-          `${row.quantity}${row.unit || "kg"}`,
-          String(row.customerName || "Guest"),
-          notes,
-          row.orderId ? `#${String(row.orderId).slice(-6).toUpperCase()}` : "-"
-        ];
-
-        doc.font("ReportRegular").fontSize(8);
-        const heights = values.map((val, i) =>
-          doc.heightOfString(String(val), { width: cols[i].width - padX * 2, lineGap: 2 })
-        );
-        const rowHeight = Math.max(...heights, 18) + padY * 2;
-
-        ensureSpace(rowHeight + 2);
-
-        if (index % 2 === 0) {
-          doc.rect(left, y, contentWidth, rowHeight).fill(altRowBg);
-        }
-
-        let x = left;
-        const textY = y + padY;
-        cols.forEach((col, i) => {
-          const isNotes = col.key === "notes" && notes !== "-";
-          doc
-            .fillColor(isNotes ? "#b45309" : "#0f172a")
-            .font(isNotes ? "ReportBold" : "ReportRegular")
-            .fontSize(8)
-            .text(values[i], x + padX, textY, {
-              width: col.width - padX * 2,
-              height: rowHeight - padY * 2,
-              align: col.key === "sno" || col.key === "qty" ? "center" : "left",
-              lineGap: 2
-            });
-          x += col.width;
-        });
-
-        doc.x = left;
-        doc.y = y + rowHeight;
-        drawCellBorders(y, rowHeight);
-        y += rowHeight;
-      });
-
       if (rows.length === 0) {
         ensureSpace(40);
         const emptyH = 36;
@@ -271,6 +361,21 @@ const generateVendorCategoryReport = ({ date, categoryLabel, rows, totals = [] }
             align: "center"
           });
         y += emptyH;
+      } else {
+        y = drawVendorPrepRows({
+          doc,
+          rows,
+          cols,
+          left,
+          contentWidth,
+          borderColor,
+          altRowBg,
+          padX,
+          padY,
+          theme,
+          drawTableHeader,
+          startY: y
+        });
       }
 
       // Totals summary
@@ -508,16 +613,12 @@ const generateVendorAllCategoriesReport = async ({ date, sections }) => {
 
         y = drawTableHeader(y);
 
-        const ensureSpace = (needed) => {
-          if (y + needed > doc.page.height - 50) {
+        if (!section.rows.length) {
+          if (y + 36 > doc.page.height - 50) {
             doc.addPage();
             doc.rect(0, 0, doc.page.width, 14).fill(theme.banner);
             y = drawTableHeader(28);
           }
-        };
-
-        if (!section.rows.length) {
-          ensureSpace(36);
           doc.rect(left, y, contentWidth, 32).strokeColor(borderColor).lineWidth(0.8).stroke();
           doc
             .font("ReportRegular")
@@ -528,51 +629,23 @@ const generateVendorAllCategoriesReport = async ({ date, sections }) => {
               align: "center"
             });
           y += 32;
-          return;
-        }
-
-        section.rows.forEach((row, index) => {
-          const notes = String(row.notes || "").trim() || "-";
-          const values = [
-            String(index + 1),
-            String(row.productName || "-"),
-            String(row.cutName || "-"),
-            `${row.quantity}${row.unit || "kg"}`,
-            String(row.customerName || "Guest"),
-            notes,
-            row.orderId ? `#${String(row.orderId).slice(-6).toUpperCase()}` : "-"
-          ];
-
-          doc.font("ReportRegular").fontSize(8);
-          const heights = values.map((val, i) =>
-            doc.heightOfString(String(val), { width: cols[i].width - padX * 2, lineGap: 2 })
-          );
-          const rowHeight = Math.max(...heights, 18) + padY * 2;
-          ensureSpace(rowHeight + 2);
-
-          if (index % 2 === 0) doc.rect(left, y, contentWidth, rowHeight).fill(altRowBg);
-
-          let x = left;
-          cols.forEach((col, i) => {
-            const isNotes = col.key === "notes" && notes !== "-";
-            doc
-              .fillColor(isNotes ? "#b45309" : "#0f172a")
-              .font(isNotes ? "ReportBold" : "ReportRegular")
-              .fontSize(8)
-              .text(values[i], x + padX, y + padY, {
-                width: col.width - padX * 2,
-                height: rowHeight - padY * 2,
-                align: col.key === "sno" || col.key === "qty" ? "center" : "left",
-                lineGap: 2
-              });
-            x += col.width;
+        } else {
+          y = drawVendorPrepRows({
+            doc,
+            rows: section.rows,
+            cols,
+            left,
+            contentWidth,
+            borderColor,
+            altRowBg,
+            padX,
+            padY,
+            theme,
+            drawTableHeader,
+            startY: y,
+            pageBannerHeight: 14
           });
-
-          doc.x = left;
-          doc.y = y + rowHeight;
-          drawCellBorders(y, rowHeight);
-          y += rowHeight;
-        });
+        }
 
         if (section.totals?.length) {
           y += 12;

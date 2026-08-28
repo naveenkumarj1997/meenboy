@@ -362,6 +362,8 @@ export const getVendorPrepPreview = async (
       quantity: number;
       unit?: string;
       notes?: string;
+      displayNotes?: string;
+      notesRowSpan?: number;
       orderId?: string;
       customerName?: string;
       bookingSource?: string;

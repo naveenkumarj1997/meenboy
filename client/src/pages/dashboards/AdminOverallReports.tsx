@@ -26,6 +26,8 @@ type VendorRow = {
   quantity: number;
   unit: string;
   notes: string;
+  displayNotes?: string;
+  notesRowSpan?: number;
   orderId: string;
   category: string;
   customerName: string;
@@ -116,6 +118,8 @@ export default function AdminOverallReports() {
                 quantity: row.quantity,
                 unit: row.unit || "kg",
                 notes: row.notes || "",
+                displayNotes: row.displayNotes ?? row.notes ?? "",
+                notesRowSpan: row.notesRowSpan ?? 1,
                 orderId: String(row.orderId || ""),
                 category: section.categoryLabel,
                 customerName: row.customerName || "Guest"
@@ -132,6 +136,8 @@ export default function AdminOverallReports() {
               quantity: row.quantity,
               unit: row.unit || "kg",
               notes: row.notes || "",
+              displayNotes: row.displayNotes ?? row.notes ?? "",
+              notesRowSpan: row.notesRowSpan ?? 1,
               orderId: String(row.orderId || ""),
               category: res.categoryLabel || vendorCategory,
               customerName: row.customerName || "Guest"
@@ -549,13 +555,20 @@ export default function AdminOverallReports() {
                           {row.quantity}
                           {row.unit}
                         </td>
-                        <td className="px-4 py-3">
-                          {row.notes ? (
-                            <span className="text-amber-300 font-medium">{row.notes}</span>
-                          ) : (
-                            <span className="text-slate-500">-</span>
-                          )}
-                        </td>
+                        {row.notesRowSpan !== 0 && (
+                          <td
+                            className="px-4 py-3 align-top"
+                            rowSpan={row.notesRowSpan && row.notesRowSpan > 1 ? row.notesRowSpan : undefined}
+                          >
+                            {(row.displayNotes ?? row.notes) ? (
+                              <span className="text-amber-300 font-medium">
+                                {row.displayNotes ?? row.notes}
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">-</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-4 py-3 font-mono text-xs">
                           #{row.orderId.slice(-6).toUpperCase()}
                         </td>

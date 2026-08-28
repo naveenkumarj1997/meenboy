@@ -69,6 +69,55 @@ const buildTotals = (rows) => {
     .sort((a, b) => a.label.localeCompare(b.label));
 };
 
+/**
+ * Same order with repeated note text → show note once across item rows (merged cell).
+ * Different notes per item in one order → each row keeps its own note.
+ */
+const annotateVendorNoteGroups = (rows) => {
+  if (!rows?.length) return [];
+
+  const annotated = rows.map((row) => ({ ...row }));
+  let i = 0;
+
+  while (i < annotated.length) {
+    const orderId = String(annotated[i].orderId || "");
+    let j = i + 1;
+    while (j < annotated.length && String(annotated[j].orderId || "") === orderId) {
+      j++;
+    }
+
+    const groupSize = j - i;
+    const noteTexts = annotated.slice(i, j).map((r) => String(r.notes || "").trim());
+    const firstNonEmpty = noteTexts.find((n) => n);
+    const allShareSameNote =
+      firstNonEmpty &&
+      noteTexts.every((n) => !n || n === firstNonEmpty);
+
+    if (allShareSameNote && groupSize > 1) {
+      for (let k = i; k < j; k++) {
+        annotated[k].displayNotes = k === i ? firstNonEmpty : "";
+        annotated[k].notesRowSpan = k === i ? groupSize : 0;
+      }
+    } else {
+      for (let k = i; k < j; k++) {
+        annotated[k].displayNotes = noteTexts[k - i] || "";
+        annotated[k].notesRowSpan = 1;
+      }
+    }
+
+    i = j;
+  }
+
+  return annotated;
+};
+
+const annotateRowsByCategory = (rowsByCategory) => {
+  Object.keys(rowsByCategory).forEach((cat) => {
+    rowsByCategory[cat] = annotateVendorNoteGroups(rowsByCategory[cat] || []);
+  });
+  return rowsByCategory;
+};
+
 const buildVendorRowsForDate = async (date, categoryFilterInput) => {
   const categoryFilter = normalizeVendorCategoryFilter(categoryFilterInput);
 
@@ -133,6 +182,8 @@ const buildVendorRowsForDate = async (date, categoryFilterInput) => {
     });
   });
 
+  annotateRowsByCategory(rowsByCategory);
+
   const stats = {
     totalOrders: orders.length,
     manualOrders: orders.filter((o) => o.bookingSource === "manual").length,
@@ -164,5 +215,6 @@ module.exports = {
   getVendorSectionForProductCategory,
   buildVendorRowsForDate,
   buildTotals,
+  annotateVendorNoteGroups,
   isAllowedVendorCategoryFilter
 };
