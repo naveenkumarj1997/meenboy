@@ -6,19 +6,30 @@ import {
   downloadPartnerDayReport,
   downloadVendorCategoryReport,
   getAdminOrders,
-  getAdminProducts,
   getAllAssignments,
-  getDeliveryPartners
+  getDeliveryPartners,
+  getVendorPrepPreview
 } from "../../lib/api";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
 
 const VENDOR_CATEGORIES = [
-  "Seafood",
-  "Fish",
+  "Fish & Seafood",
   "Chicken",
   "Mutton",
   "Country Chicken"
 ] as const;
+
+type VendorRow = {
+  key: string;
+  productName: string;
+  cutName: string;
+  quantity: number;
+  unit: string;
+  notes: string;
+  orderId: string;
+  category: string;
+  customerName: string;
+};
 
 const todayLocal = () => {
   const d = new Date();
@@ -33,7 +44,13 @@ export default function AdminOverallReports() {
   const [partners, setPartners] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
-  const [productCategoryMap, setProductCategoryMap] = useState<Record<string, string>>({});
+  const [vendorRows, setVendorRows] = useState<VendorRow[]>([]);
+  const [vendorStats, setVendorStats] = useState<{
+    totalOrders: number;
+    manualOrders: number;
+    websiteOrders: number;
+  } | null>(null);
+  const [vendorPreviewLoading, setVendorPreviewLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [generatingVendor, setGeneratingVendor] = useState(false);
@@ -51,22 +68,14 @@ export default function AdminOverallReports() {
       try {
         setLoading(true);
         setError("");
-        const [partRes, assignRes, orderRes, prodRes] = await Promise.all([
+        const [partRes, assignRes, orderRes] = await Promise.all([
           getDeliveryPartners(token),
           getAllAssignments(token),
-          getAdminOrders(token),
-          getAdminProducts(token)
+          getAdminOrders(token)
         ]);
         setPartners(partRes.deliveryPartners || []);
         setAssignments(assignRes.assignments || []);
         setOrders(orderRes.orders || []);
-
-        const catMap: Record<string, string> = {};
-        const products = prodRes?.data?.products || (prodRes as any)?.products || [];
-        products.forEach((p: any) => {
-          catMap[String(p._id || p.id)] = p.category;
-        });
-        setProductCategoryMap(catMap);
       } catch (err: any) {
         setError(err.message || "Failed to load report data");
       } finally {
@@ -75,6 +84,76 @@ export default function AdminOverallReports() {
     };
     load();
   }, [token]);
+
+  useEffect(() => {
+    if (!token || !vendorDate) {
+      setVendorRows([]);
+      setVendorStats(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadVendorPreview = async () => {
+      try {
+        setVendorPreviewLoading(true);
+        const res = await getVendorPrepPreview(token, {
+          date: vendorDate,
+          category: vendorCategory
+        });
+        if (cancelled) return;
+
+        setVendorStats(res.stats);
+
+        if (vendorCategory === "all" && res.sections) {
+          const rows: VendorRow[] = [];
+          res.sections.forEach((section) => {
+            section.rows.forEach((row, idx) => {
+              rows.push({
+                key: `${section.categoryLabel}-${row.orderId}-${idx}`,
+                productName: row.productName,
+                cutName: row.cutName || "",
+                quantity: row.quantity,
+                unit: row.unit || "kg",
+                notes: row.notes || "",
+                orderId: String(row.orderId || ""),
+                category: section.categoryLabel,
+                customerName: row.customerName || "Guest"
+              });
+            });
+          });
+          setVendorRows(rows);
+        } else {
+          setVendorRows(
+            (res.rows || []).map((row, idx) => ({
+              key: `${row.orderId}-${idx}`,
+              productName: row.productName,
+              cutName: row.cutName || "",
+              quantity: row.quantity,
+              unit: row.unit || "kg",
+              notes: row.notes || "",
+              orderId: String(row.orderId || ""),
+              category: res.categoryLabel || vendorCategory,
+              customerName: row.customerName || "Guest"
+            }))
+          );
+        }
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || "Failed to load vendor prep preview");
+          setVendorRows([]);
+          setVendorStats(null);
+        }
+      } finally {
+        if (!cancelled) setVendorPreviewLoading(false);
+      }
+    };
+
+    loadVendorPreview();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, vendorDate, vendorCategory]);
 
   const partnerByOrderId = useMemo(() => {
     const map: Record<string, any> = {};
@@ -111,47 +190,6 @@ export default function AdminOverallReports() {
         String(a.order?.deliveryTime || "").localeCompare(String(b.order?.deliveryTime || ""))
       );
   }, [assignments, orders, partnerId, date, isAll, partnerByOrderId]);
-
-  const vendorRows = useMemo(() => {
-    if (!vendorDate) return [];
-    const rows: Array<{
-      key: string;
-      productName: string;
-      cutName: string;
-      quantity: number;
-      unit: string;
-      notes: string;
-      orderId: string;
-      category: string;
-      customerName: string;
-    }> = [];
-
-    orders
-      .filter((o) => o.deliveryDate === vendorDate && o.status !== "cancelled")
-      .forEach((order) => {
-        (order.items || []).forEach((item: any, idx: number) => {
-          const category = productCategoryMap[String(item.product)] || "Other";
-          if (vendorCategory !== "all" && category !== vendorCategory) return;
-          rows.push({
-            key: `${order._id}-${idx}`,
-            productName: item.productName,
-            cutName: item.cutName || "",
-            quantity: item.quantity,
-            unit: item.unit || "kg",
-            notes: item.notes || "",
-            orderId: String(order._id),
-            category,
-            customerName: order.customer?.name || "Guest"
-          });
-        });
-      });
-
-    return rows.sort((a, b) => {
-      const c = a.category.localeCompare(b.category);
-      if (c !== 0) return c;
-      return a.productName.localeCompare(b.productName);
-    });
-  }, [orders, productCategoryMap, vendorCategory, vendorDate]);
 
   const selectedPartner = partners.find((p) => p._id === partnerId);
 
@@ -386,8 +424,9 @@ export default function AdminOverallReports() {
       <section>
         <h3 className="text-xl font-bold text-white mb-1">Vendor Prep Lists</h3>
         <p className="text-sm text-slate-400 mb-4">
-          Send category PDFs to chicken / mutton / fish vendors so they can cut and prepare
-          before the delivery day. Includes customer Special Notes.
+          Send category PDFs to vendors so they can cut and prepare before the delivery day.
+          Includes website orders and manual bookings. Fish and Seafood are combined for one
+          vendor.
         </p>
 
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-6 mb-6">
@@ -465,12 +504,16 @@ export default function AdminOverallReports() {
                 {vendorCategory === "all" ? "ALL Categories" : vendorCategory}
               </h4>
               <p className="text-sm text-slate-400">
-                {vendorDate} · {vendorRows.length} item
-                {vendorRows.length === 1 ? "" : "s"}
+                {vendorDate} · {vendorRows.length} item{vendorRows.length === 1 ? "" : "s"}
+                {vendorStats
+                  ? ` · ${vendorStats.totalOrders} order${vendorStats.totalOrders === 1 ? "" : "s"} (${vendorStats.manualOrders} manual, ${vendorStats.websiteOrders} website)`
+                  : ""}
               </p>
             </div>
 
-            {vendorRows.length === 0 ? (
+            {vendorPreviewLoading ? (
+              <div className="p-8 text-center text-slate-400">Loading vendor prep list...</div>
+            ) : vendorRows.length === 0 ? (
               <div className="p-8 text-center text-slate-400">
                 No items for this category on the selected date.
               </div>

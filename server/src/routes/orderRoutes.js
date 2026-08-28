@@ -18,6 +18,7 @@ const {
   downloadPartnerDayReport,
   downloadPartnerCollectionReport,
   downloadVendorCategoryReport,
+  getVendorPrepPreview,
   listAllAssignments,
   getDeliveryStats,
   getTodayDeliveryStatus,
@@ -83,6 +84,12 @@ router.get(
   protect,
   authorizeRoles("admin"),
   downloadPartnerCollectionReport
+);
+router.get(
+  "/reports/vendor-prep",
+  protect,
+  authorizeRoles("admin"),
+  getVendorPrepPreview
 );
 router.get(
   "/reports/vendor-category",

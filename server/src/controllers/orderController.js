@@ -15,6 +15,12 @@ const {
   generateVendorCategoryReport,
   generateVendorAllCategoriesReport
 } = require("../utils/pdfVendorCategoryReport");
+const {
+  buildVendorRowsForDate,
+  VENDOR_REPORT_SECTIONS,
+  normalizeVendorCategoryFilter,
+  isAllowedVendorCategoryFilter
+} = require("../utils/vendorPrep");
 
 const applyDailyPriceFlags = async (orders) => {
   if (!orders.length) return orders;
@@ -31,6 +37,7 @@ const applyDailyPriceFlags = async (orders) => {
 const snapshotOrderItems = (items = []) =>
   items.map((item) => ({
     ...item,
+    product: String(item.product?._id || item.product || "").trim(),
     estimatedUnitPrice: item.estimatedUnitPrice ?? item.unitPrice,
     estimatedTotalPrice: item.estimatedTotalPrice ?? item.totalPrice
   }));
@@ -851,87 +858,57 @@ const downloadPartnerCollectionReport = async (req, res, next) => {
   }
 };
 
-const buildVendorRowsForDate = async (date, categoryFilter) => {
-  const PRODUCT_CATEGORIES = Product.PRODUCT_CATEGORIES || [
-    "Seafood",
-    "Fish",
-    "Chicken",
-    "Mutton",
-    "Country Chicken"
-  ];
+const getVendorPrepPreview = async (req, res, next) => {
+  try {
+    const { date, category } = req.query;
 
-  const orders = await Order.find({
-    deliveryDate: date,
-    status: { $ne: "cancelled" }
-  })
-    .populate("customer", "name")
-    .sort({ deliveryTime: 1, createdAt: 1 })
-    .lean();
+    if (!date) {
+      return res.status(400).json({ message: "date query param is required" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
 
-  const productIds = [
-    ...new Set(
-      orders.flatMap((o) => (o.items || []).map((item) => String(item.product)).filter(Boolean))
-    )
-  ];
-
-  const products = await Product.find({ _id: { $in: productIds } })
-    .select("name category unit")
-    .lean();
-
-  const categoryByProduct = {};
-  const unitByProduct = {};
-  products.forEach((p) => {
-    categoryByProduct[String(p._id)] = p.category;
-    unitByProduct[String(p._id)] = p.unit || "kg";
-  });
-
-  const rowsByCategory = {};
-  PRODUCT_CATEGORIES.forEach((cat) => {
-    rowsByCategory[cat] = [];
-  });
-  rowsByCategory.Other = [];
-
-  orders.forEach((order) => {
-    (order.items || []).forEach((item) => {
-      const cat = categoryByProduct[String(item.product)] || "Other";
-      if (categoryFilter && categoryFilter !== "all" && cat !== categoryFilter) {
-        return;
-      }
-      if (!rowsByCategory[cat]) rowsByCategory[cat] = [];
-      rowsByCategory[cat].push({
-        productName: item.productName,
-        cutName: item.cutName || "",
-        quantity: item.quantity,
-        unit: item.unit || unitByProduct[String(item.product)] || "kg",
-        notes: item.notes || "",
-        orderId: order._id,
-        customerName: order.customer?.name || "Guest"
+    const categoryFilter = normalizeVendorCategoryFilter(category);
+    if (categoryFilter !== "all" && !isAllowedVendorCategoryFilter(categoryFilter)) {
+      return res.status(400).json({
+        message: `category must be one of: all, ${VENDOR_REPORT_SECTIONS.join(", ")}`
       });
-    });
-  });
+    }
 
-  const buildTotals = (rows) => {
-    const map = {};
-    rows.forEach((r) => {
-      const key = `${r.productName}||${r.cutName || "-"}||${r.unit || "kg"}`;
-      if (!map[key]) {
-        map[key] = {
-          label: r.cutName ? `${r.productName} (${r.cutName})` : r.productName,
-          quantity: 0,
-          unit: r.unit || "kg"
-        };
+    const { rowsByCategory, buildTotals, stats } = await buildVendorRowsForDate(
+      date,
+      categoryFilter
+    );
+
+    if (categoryFilter === "all") {
+      const sections = VENDOR_REPORT_SECTIONS.map((cat) => ({
+        categoryLabel: cat,
+        rows: rowsByCategory[cat] || [],
+        totals: buildTotals(rowsByCategory[cat] || [])
+      })).filter((s) => s.rows.length > 0);
+
+      if ((rowsByCategory.Other || []).length) {
+        sections.push({
+          categoryLabel: "Other",
+          rows: rowsByCategory.Other,
+          totals: buildTotals(rowsByCategory.Other)
+        });
       }
-      map[key].quantity += Number(r.quantity) || 0;
-    });
-    return Object.values(map)
-      .map((t) => ({
-        ...t,
-        quantity: Math.round(t.quantity * 1000) / 1000
-      }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  };
 
-  return { rowsByCategory, buildTotals, PRODUCT_CATEGORIES };
+      return res.json({ stats, sections, categoryFilter });
+    }
+
+    res.json({
+      stats,
+      categoryLabel: categoryFilter,
+      rows: rowsByCategory[categoryFilter] || [],
+      totals: buildTotals(rowsByCategory[categoryFilter] || []),
+      categoryFilter
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 const downloadVendorCategoryReport = async (req, res, next) => {
@@ -945,22 +922,18 @@ const downloadVendorCategoryReport = async (req, res, next) => {
       return res.status(400).json({ message: "date must be YYYY-MM-DD" });
     }
 
-    const categoryFilter =
-      !category || String(category).toLowerCase() === "all" ? "all" : String(category);
+    const categoryFilter = normalizeVendorCategoryFilter(category);
 
-    const { rowsByCategory, buildTotals, PRODUCT_CATEGORIES } = await buildVendorRowsForDate(
-      date,
-      categoryFilter
-    );
+    const { rowsByCategory, buildTotals } = await buildVendorRowsForDate(date, categoryFilter);
 
-    if (categoryFilter !== "all" && !PRODUCT_CATEGORIES.includes(categoryFilter)) {
+    if (categoryFilter !== "all" && !isAllowedVendorCategoryFilter(categoryFilter)) {
       return res.status(400).json({
-        message: `category must be one of: all, ${PRODUCT_CATEGORIES.join(", ")}`
+        message: `category must be one of: all, ${VENDOR_REPORT_SECTIONS.join(", ")}`
       });
     }
 
     if (categoryFilter === "all") {
-      const sections = PRODUCT_CATEGORIES.map((cat) => ({
+      const sections = VENDOR_REPORT_SECTIONS.map((cat) => ({
         categoryLabel: cat,
         rows: rowsByCategory[cat] || [],
         totals: buildTotals(rowsByCategory[cat] || [])
@@ -979,7 +952,7 @@ const downloadVendorCategoryReport = async (req, res, next) => {
         sections:
           sections.length > 0
             ? sections
-            : PRODUCT_CATEGORIES.map((cat) => ({
+            : VENDOR_REPORT_SECTIONS.map((cat) => ({
                 categoryLabel: cat,
                 rows: [],
                 totals: []
@@ -1405,6 +1378,7 @@ module.exports = {
   downloadPartnerDayReport,
   downloadPartnerCollectionReport,
   downloadVendorCategoryReport,
+  getVendorPrepPreview,
   listAllAssignments,
   getDeliveryStats,
   getTodayDeliveryStatus,

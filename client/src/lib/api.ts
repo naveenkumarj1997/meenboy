@@ -344,6 +344,49 @@ export const downloadVendorCategoryReport = async (
   return response.blob();
 };
 
+export const getVendorPrepPreview = async (
+  token: string,
+  params: { date: string; category?: string }
+) =>
+  request<{
+    stats: {
+      totalOrders: number;
+      manualOrders: number;
+      websiteOrders: number;
+    };
+    categoryFilter?: string;
+    categoryLabel?: string;
+    rows?: Array<{
+      productName: string;
+      cutName?: string;
+      quantity: number;
+      unit?: string;
+      notes?: string;
+      orderId?: string;
+      customerName?: string;
+      bookingSource?: string;
+    }>;
+    totals?: Array<{ label: string; quantity: number; unit?: string }>;
+    sections?: Array<{
+      categoryLabel: string;
+      rows: Array<{
+        productName: string;
+        cutName?: string;
+        quantity: number;
+        unit?: string;
+        notes?: string;
+        orderId?: string;
+        customerName?: string;
+        bookingSource?: string;
+      }>;
+      totals: Array<{ label: string; quantity: number; unit?: string }>;
+    }>;
+  }>(`/orders/reports/vendor-prep?date=${encodeURIComponent(params.date)}&category=${encodeURIComponent(
+    params.category && params.category !== "all" ? params.category : "all"
+  )}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
 export const getAdminOrders = async (token: string) =>
   request<{ orders: any[] }>("/orders/admin", {
     headers: { Authorization: `Bearer ${token}` }

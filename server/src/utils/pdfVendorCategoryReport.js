@@ -15,6 +15,12 @@ const { resolvePdfFonts } = require("./pdfFonts");
 
 /** Distinct theme per category so vendors can spot the right PDF quickly */
 const CATEGORY_THEMES = {
+  "Fish & Seafood": {
+    primary: "#0e7490",
+    banner: "#06b6d4",
+    soft: "#cffafe",
+    label: "#155e75"
+  },
   Fish: {
     primary: "#0369a1",
     banner: "#0ea5e9",
@@ -59,8 +65,12 @@ const CATEGORY_THEMES = {
   }
 };
 
-const getCategoryTheme = (categoryLabel) =>
-  CATEGORY_THEMES[categoryLabel] || CATEGORY_THEMES.Other;
+const getCategoryTheme = (categoryLabel) => {
+  if (categoryLabel === "Fish" || categoryLabel === "Seafood") {
+    return CATEGORY_THEMES["Fish & Seafood"];
+  }
+  return CATEGORY_THEMES[categoryLabel] || CATEGORY_THEMES.Other;
+};
 
 /**
  * Vendor prep PDF — list of items by category for a delivery date.
@@ -431,7 +441,7 @@ const generateVendorAllCategoriesReport = async ({ date, sections }) => {
       doc.moveDown(0.5).font("ReportBold").fontSize(9).fillColor("#334155").text("Category colors:");
       let legendX = left;
       const legendY = doc.y + 4;
-      ["Fish", "Seafood", "Chicken", "Mutton", "Country Chicken"].forEach((cat) => {
+      ["Fish & Seafood", "Chicken", "Mutton", "Country Chicken"].forEach((cat) => {
         const t = getCategoryTheme(cat);
         doc.roundedRect(legendX, legendY, 12, 12, 2).fill(t.banner);
         doc
