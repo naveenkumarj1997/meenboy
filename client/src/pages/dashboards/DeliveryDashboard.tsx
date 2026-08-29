@@ -482,6 +482,10 @@ export default function DeliveryDashboard() {
                         <BookingSourceBadge source={order.bookingSource} />
                         <span className="text-slate-400 text-sm">{order.deliveryDate} • {order.deliveryTime}</span>
                       </div>
+
+                      <div className="text-lg font-bold text-teal-300 mb-2">
+                        {order.customer?.name || "Customer"}
+                      </div>
                       
                       <div className="text-slate-300 text-sm mb-3">
                         <div className="font-medium text-white mb-1">{order.address?.line1}, {order.address?.line2}</div>
@@ -658,9 +662,12 @@ export default function DeliveryDashboard() {
         <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
           <div className="bg-slate-900 border border-slate-800 rounded-t-2xl sm:rounded-2xl max-w-md w-full p-5 sm:p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
             <h3 className="text-xl font-bold text-white mb-1">Update Delivery</h3>
-            <div className="text-slate-400 text-sm mb-2 flex items-center gap-2 flex-wrap">
+            <div className="text-slate-400 text-sm mb-1 flex items-center gap-2 flex-wrap">
               <span>Order #{String(selectedAssignment.order?._id).slice(-6).toUpperCase()}</span>
               <BookingSourceBadge source={selectedAssignment.order?.bookingSource} />
+            </div>
+            <div className="text-teal-300 font-bold text-base mb-2">
+              {selectedAssignment.order?.customer?.name || "Customer"}
             </div>
             <div className="text-teal-300 text-sm font-semibold mb-6">
               Order total: ₹{Number(selectedAssignment.order?.total || 0).toFixed(2)}

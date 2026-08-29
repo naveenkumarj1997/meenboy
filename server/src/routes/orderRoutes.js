@@ -20,6 +20,8 @@ const {
   downloadVendorCategoryReport,
   getVendorPrepPreview,
   getCategoryOrdersReport,
+  getAllOrdersReport,
+  downloadAllOrdersReport,
   downloadCategoryOrdersReport,
   listAllAssignments,
   getDeliveryStats,
@@ -92,6 +94,18 @@ router.get(
   protect,
   authorizeRoles("admin"),
   getCategoryOrdersReport
+);
+router.get(
+  "/reports/all-orders",
+  protect,
+  authorizeRoles("admin"),
+  getAllOrdersReport
+);
+router.get(
+  "/reports/all-orders/pdf",
+  protect,
+  authorizeRoles("admin"),
+  downloadAllOrdersReport
 );
 router.get(
   "/reports/category-orders/pdf",

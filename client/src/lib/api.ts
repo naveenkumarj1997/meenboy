@@ -434,6 +434,64 @@ export const getCategoryOrdersReport = async (
     { headers: { Authorization: `Bearer ${token}` } }
   );
 
+export interface AllOrdersReportItem {
+  productName: string;
+  cutName?: string;
+  quantity: number;
+  unit?: string;
+  notes?: string;
+  unitPrice: number;
+  totalPrice: number;
+  productCategory: string;
+}
+
+export interface AllOrdersReportOrder {
+  orderId: string;
+  customerName: string;
+  phone: string;
+  email?: string;
+  address: string;
+  deliveryTime: string;
+  deliveryDate: string;
+  status: string;
+  bookingSource: string;
+  partnerName: string;
+  partnerPhone?: string;
+  assignmentStatus?: string;
+  paymentCollected?: number;
+  paymentMethod?: string;
+  mapUrl?: string;
+  customerNotes?: string;
+  subtotal: number;
+  deliveryFee: number;
+  total: number;
+  paymentStatus?: string;
+  items: AllOrdersReportItem[];
+  createdAt?: string;
+}
+
+export const getAllOrdersReport = async (token: string, params: { date: string }) =>
+  request<{
+    date: string;
+    stats: { orderCount: number; itemCount: number };
+    orders: AllOrdersReportOrder[];
+  }>(
+    `/orders/reports/all-orders?date=${encodeURIComponent(params.date)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+export const downloadAllOrdersReport = async (token: string, params: { date: string }) => {
+  const qs = new URLSearchParams({ date: params.date });
+  const response = await fetch(`${API_BASE}/orders/reports/all-orders/pdf?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to generate all orders PDF");
+  }
+  return response.blob();
+};
+
 export const downloadCategoryOrdersReport = async (
   token: string,
   params: { date: string; group: string }

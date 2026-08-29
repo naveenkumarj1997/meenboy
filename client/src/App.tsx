@@ -6,6 +6,7 @@ import AdminProductsPage from "./pages/dashboards/AdminProductsPage";
 import AdminDailyPrices from "./pages/dashboards/AdminDailyPrices";
 import AdminInvoices from "./pages/dashboards/AdminInvoices";
 import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
+import AdminAllOrders from "./pages/dashboards/AdminAllOrders";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
 import AdminTodayDeliveryStatus from "./pages/dashboards/AdminTodayDeliveryStatus";
 import AdminOverallReports from "./pages/dashboards/AdminOverallReports";
@@ -106,6 +107,7 @@ function App() {
           <Route path="/dashboard/admin/daily-prices" element={<AdminDailyPrices />} />
           <Route path="/dashboard/admin/invoices" element={<AdminInvoices />} />
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
+          <Route path="/dashboard/admin/all-orders" element={<AdminAllOrders />} />
           <Route path="/dashboard/admin/today-delivery-status" element={<AdminTodayDeliveryStatus />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />
           <Route path="/dashboard/admin/overall-reports" element={<AdminOverallReports />} />

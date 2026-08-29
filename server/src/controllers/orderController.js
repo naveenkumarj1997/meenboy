@@ -23,7 +23,9 @@ const {
 } = require("../utils/vendorPrep");
 const { ORDER_CATEGORY_GROUPS } = require("../utils/categoryOrderGroups");
 const { buildCategoryOrdersForDate } = require("../utils/buildCategoryOrdersReport");
+const { buildAllOrdersForDate } = require("../utils/buildAllOrdersReport");
 const { generateCategoryOrdersReport } = require("../utils/pdfCategoryOrdersReport");
+const { generateAllOrdersReport } = require("../utils/pdfAllOrdersReport");
 
 const applyDailyPriceFlags = async (orders) => {
   if (!orders.length) return orders;
@@ -945,6 +947,48 @@ const getCategoryOrdersReport = async (req, res, next) => {
   }
 };
 
+const getAllOrdersReport = async (req, res, next) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "date query param is required" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const data = await buildAllOrdersForDate(date);
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const downloadAllOrdersReport = async (req, res, next) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({ message: "date query param is required" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const data = await buildAllOrdersForDate(date);
+    const { filePath, fileName } = await generateAllOrdersReport({
+      date,
+      orders: data.orders,
+      stats: data.stats
+    });
+
+    res.download(filePath, fileName);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const downloadCategoryOrdersReport = async (req, res, next) => {
   try {
     const { date, group } = req.query;
@@ -1450,6 +1494,8 @@ module.exports = {
   downloadVendorCategoryReport,
   getVendorPrepPreview,
   getCategoryOrdersReport,
+  getAllOrdersReport,
+  downloadAllOrdersReport,
   downloadCategoryOrdersReport,
   listAllAssignments,
   getDeliveryStats,

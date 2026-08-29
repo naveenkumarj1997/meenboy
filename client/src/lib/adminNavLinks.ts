@@ -7,6 +7,7 @@ export const ADMIN_NAV_LINKS = [
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
   { label: "Invoices", href: "/dashboard/admin/invoices" },
   { label: "Order Management", href: "/dashboard/admin/deliveries" },
+  { label: "ALL Orders", href: "/dashboard/admin/all-orders" },
   { label: "Today Delivery Status", href: "/dashboard/admin/today-delivery-status" },
   { label: "Partner Report", href: "/dashboard/admin/partner-report" },
   { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
