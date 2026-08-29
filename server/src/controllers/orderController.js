@@ -21,6 +21,9 @@ const {
   normalizeVendorCategoryFilter,
   isAllowedVendorCategoryFilter
 } = require("../utils/vendorPrep");
+const { ORDER_CATEGORY_GROUPS } = require("../utils/categoryOrderGroups");
+const { buildCategoryOrdersForDate } = require("../utils/buildCategoryOrdersReport");
+const { generateCategoryOrdersReport } = require("../utils/pdfCategoryOrdersReport");
 
 const applyDailyPriceFlags = async (orders) => {
   if (!orders.length) return orders;
@@ -260,11 +263,18 @@ const updateAdminOrder = async (req, res, next) => {
         quantity: item.quantity,
         unit: item.unit || "kg",
         cutName: item.cutName,
-        notes: item.notes,
+        notes: String(item.notes || "").trim(),
         unitPrice: item.unitPrice,
         totalPrice: Number(item.quantity) * Number(item.unitPrice)
       }));
       order.subtotal = order.items.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+      const itemNotesSummary = order.items
+        .map((item) => item.notes)
+        .filter(Boolean)
+        .join(" | ");
+      if (itemNotesSummary) {
+        order.customerNotes = itemNotesSummary;
+      }
     }
 
     if (deliveryFee != null && deliveryFee !== "") {
@@ -911,6 +921,58 @@ const getVendorPrepPreview = async (req, res, next) => {
   }
 };
 
+const getCategoryOrdersReport = async (req, res, next) => {
+  try {
+    const { date, group } = req.query;
+
+    if (!date || !group) {
+      return res.status(400).json({ message: "date and group query params are required" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const data = await buildCategoryOrdersForDate(date, group);
+    res.json({
+      groups: ORDER_CATEGORY_GROUPS.map((g) => ({ id: g.id, label: g.label })),
+      ...data
+    });
+  } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
+const downloadCategoryOrdersReport = async (req, res, next) => {
+  try {
+    const { date, group } = req.query;
+
+    if (!date || !group) {
+      return res.status(400).json({ message: "date and group query params are required" });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      return res.status(400).json({ message: "date must be YYYY-MM-DD" });
+    }
+
+    const data = await buildCategoryOrdersForDate(date, group);
+    const { filePath, fileName } = await generateCategoryOrdersReport({
+      date,
+      groupLabel: data.groupLabel,
+      rows: data.rows,
+      stats: data.stats
+    });
+
+    res.download(filePath, fileName);
+  } catch (error) {
+    if (error.statusCode === 400) {
+      return res.status(400).json({ message: error.message });
+    }
+    next(error);
+  }
+};
+
 const downloadVendorCategoryReport = async (req, res, next) => {
   try {
     const { date, category } = req.query;
@@ -1159,13 +1221,21 @@ const createAdminOrder = async (req, res, next) => {
       }
     }
 
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      notes: String(item.notes || "").trim()
+    }));
+
     const notesText = String(customerNotes || "").trim();
-    const itemsWithNotes = notesText
-      ? items.map((item) => ({
-          ...item,
-          notes: item.notes?.trim() ? item.notes : notesText
-        }))
-      : items;
+    const itemsWithNotes = normalizedItems.map((item) => ({
+      ...item,
+      notes: item.notes || notesText
+    }));
+
+    const itemNotesSummary = itemsWithNotes
+      .map((item) => item.notes)
+      .filter(Boolean)
+      .join(" | ");
 
     const subtotal = itemsWithNotes.reduce((sum, item) => sum + item.totalPrice, 0);
     const total = subtotal + Number(deliveryFee || 0);
@@ -1194,7 +1264,7 @@ const createAdminOrder = async (req, res, next) => {
       deliveryDate,
       deliveryTime,
       mapUrl: mapUrl || "",
-      customerNotes: notesText,
+      customerNotes: itemNotesSummary || notesText,
       bookingSource: "manual"
     });
 
@@ -1379,6 +1449,8 @@ module.exports = {
   downloadPartnerCollectionReport,
   downloadVendorCategoryReport,
   getVendorPrepPreview,
+  getCategoryOrdersReport,
+  downloadCategoryOrdersReport,
   listAllAssignments,
   getDeliveryStats,
   getTodayDeliveryStatus,

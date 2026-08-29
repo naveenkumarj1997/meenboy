@@ -18,6 +18,7 @@ import {
   isMaduraiDeliveryAllowed
 } from "../../lib/maduraiDelivery";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
+import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG } from "../../lib/weightOptions";
 
 const DELIVERY_TIMES = [
   "06:00 AM - 07:00 AM",
@@ -78,7 +79,6 @@ export default function AdminManualBooking() {
   const [deliveryDate, setDeliveryDate] = useState("");
   const [deliveryTime, setDeliveryTime] = useState(DELIVERY_TIMES[0]);
   const [addressForm, setAddressForm] = useState(emptyAddressForm());
-  const [customerNotes, setCustomerNotes] = useState("");
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,19 +117,22 @@ export default function AdminManualBooking() {
           mapUrl: user.mapUrl || ""
         });
       }
-    } else if (customerType === "new") {
-      setAddressForm((prev) => ({
-        ...emptyAddressForm(),
-        phone: newCustomer.phone || prev.phone
-      }));
     }
   }, [customerType, selectedUserId, users]);
+
+  useEffect(() => {
+    if (customerType === "new") {
+      setSelectedUserId("");
+      setNewCustomer({ name: "", email: "", phone: "" });
+      setAddressForm(emptyAddressForm());
+    }
+  }, [customerType]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
   }, [products, searchQuery]);
 
-  const handleAddToCart = (product: any, selectedCut: any, qty: number) => {
+  const handleAddToCart = (product: any, selectedCut: any, qty: number, notes = "") => {
     const cutName = selectedCut?.name;
     const price = selectedCut && selectedCut.price > 0 ? selectedCut.price : product.minPrice;
 
@@ -143,9 +146,16 @@ export default function AdminManualBooking() {
         quantity: qty,
         unit: product.unit || "kg",
         cutName,
+        notes: String(notes || "").trim(),
         totalPrice: price * qty
       }
     ]);
+  };
+
+  const updateCartItem = (idx: number, patch: Record<string, unknown>) => {
+    setCart((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, ...patch } : item))
+    );
   };
 
   const cartTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -229,8 +239,7 @@ export default function AdminManualBooking() {
         deliveryFee,
         deliveryDate,
         deliveryTime,
-        mapUrl: addressForm.mapUrl.trim() || undefined,
-        customerNotes: customerNotes.trim() || undefined
+        mapUrl: addressForm.mapUrl.trim() || undefined
       };
 
       if (customerType === "existing") {
@@ -250,7 +259,6 @@ export default function AdminManualBooking() {
       );
       setLastOrderId(orderId || null);
       setCart([]);
-      setCustomerNotes("");
       setNewCustomer({ name: "", email: "", phone: "" });
       setAddressForm(emptyAddressForm());
       setSelectedUserId("");
@@ -368,8 +376,12 @@ export default function AdminManualBooking() {
                       value={newCustomer.phone}
                       onChange={(e) => {
                         const phone = e.target.value;
+                        const previousPhone = newCustomer.phone;
                         setNewCustomer({ ...newCustomer, phone });
-                        setAddressForm((prev) => ({ ...prev, phone: prev.phone || phone }));
+                        setAddressForm((prev) => ({
+                          ...prev,
+                          phone: !prev.phone || prev.phone === previousPhone ? phone : prev.phone
+                        }));
                       }}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
                     />
@@ -414,30 +426,44 @@ export default function AdminManualBooking() {
                     <p>Cart is empty</p>
                   </div>
                 ) : (
-                  <div className="space-y-3 mb-4 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                  <div className="space-y-3 mb-4 max-h-[320px] overflow-y-auto pr-2 custom-scrollbar">
                     {cart.map((item, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between bg-white/5 rounded-xl p-3"
+                        className="bg-white/5 rounded-xl p-3 space-y-2 border border-white/5"
                       >
-                        <div>
-                          <p className="font-semibold text-white text-sm">{item.productName}</p>
-                          <p className="text-xs text-white/60">
-                            {item.quantity} {item.unit}{" "}
-                            {item.cutName ? `• ${item.cutName}` : ""}
-                          </p>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-white text-sm">{item.productName}</p>
+                            <p className="text-xs text-white/60">
+                              {item.quantity} {item.unit}
+                              {item.cutName ? ` • ${item.cutName}` : ""}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="font-bold text-teal-400">
+                              ₹{formatPrice(item.totalPrice)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCart(cart.filter((_, i) => i !== idx))}
+                              className="text-red-400 hover:text-red-300 font-bold"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <span className="font-bold text-teal-400">
-                            ₹{formatPrice(item.totalPrice)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => setCart(cart.filter((_, i) => i !== idx))}
-                            className="text-red-400 hover:text-red-300 font-bold"
-                          >
-                            ✕
-                          </button>
+                        <div>
+                          <label className="block text-[10px] uppercase tracking-wider text-amber-300/80 font-bold mb-1">
+                            Cutting / cleaning notes (this item)
+                          </label>
+                          <textarea
+                            rows={2}
+                            value={item.notes || ""}
+                            onChange={(e) => updateCartItem(idx, { notes: e.target.value })}
+                            placeholder="e.g. Curry cut, clean well, no head..."
+                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-teal-500 resize-y min-h-[52px]"
+                          />
                         </div>
                       </div>
                     ))}
@@ -583,19 +609,6 @@ export default function AdminManualBooking() {
                   <p className="text-[11px] text-amber-300/80">{MADURAI_DELIVERY_MESSAGE}</p>
                 </div>
 
-                <div className="mb-4">
-                  <label className="block text-sm text-white/60 mb-1">
-                    Cutting / cleaning notes
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={customerNotes}
-                    onChange={(e) => setCustomerNotes(e.target.value)}
-                    placeholder="e.g. Curry cut, clean well, no head, pieces for fry..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 resize-y min-h-[80px]"
-                  />
-                </div>
-
                 <div className="flex justify-between text-sm text-slate-400 mb-3">
                   <span>Delivery fee</span>
                   <span className="text-teal-400 font-medium">Free</span>
@@ -628,13 +641,17 @@ function ProductAddRow({
   onAdd
 }: {
   product: any;
-  onAdd: (p: any, c: any, q: number) => void;
+  onAdd: (p: any, c: any, q: number, notes?: string) => void;
 }) {
-  const [qty, setQty] = useState(product.unit === "kg" ? 1 : 1);
+  const isKg = !product.unit || product.unit.toLowerCase() === "kg";
+  const [qty, setQty] = useState(isKg ? DEFAULT_WEIGHT_KG : 1);
   const [selectedCutIdx, setSelectedCutIdx] = useState(0);
+  const [itemNotes, setItemNotes] = useState("");
 
   const cuts = product.availableCuts || [];
   const selectedCut = cuts.length > 0 ? cuts[selectedCutIdx] : null;
+  const unitPrice =
+    selectedCut && selectedCut.price > 0 ? selectedCut.price : product.minPrice;
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
@@ -642,17 +659,17 @@ function ProductAddRow({
         <div>
           <p className="font-semibold text-white text-sm">{product.name}</p>
           <p className="text-teal-400 text-xs">
-            ₹{formatPrice(product.minPrice)} / {product.unit || "kg"}
+            ₹{formatPrice(unitPrice)} / {product.unit || "kg"}
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mt-1">
+      <div className="flex items-center gap-2 mt-1 flex-wrap">
         {cuts.length > 0 && (
           <select
             value={selectedCutIdx}
             onChange={(e) => setSelectedCutIdx(Number(e.target.value))}
-            className="flex-1 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
+            className="flex-1 min-w-[120px] bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
           >
             {cuts.map((c: any, i: number) => (
               <option key={i} value={i} className="bg-cyan-950">
@@ -662,23 +679,54 @@ function ProductAddRow({
           </select>
         )}
 
-        <input
-          type="number"
-          value={qty}
-          onChange={(e) => setQty(Number(e.target.value))}
-          step={product.unit === "kg" ? "0.1" : "1"}
-          min={product.unit === "kg" ? "0.1" : "1"}
-          className="w-16 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
-        />
+        {isKg ? (
+          <select
+            value={qty}
+            onChange={(e) => setQty(Number(e.target.value))}
+            className="min-w-[110px] bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
+          >
+            {WEIGHT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value} className="bg-cyan-950">
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="number"
+            value={qty}
+            onChange={(e) => setQty(Math.max(1, Number(e.target.value) || 1))}
+            step="1"
+            min="1"
+            className="w-16 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
+          />
+        )}
 
         <button
           type="button"
-          onClick={() => onAdd(product, selectedCut, qty)}
-          className="bg-teal-500 text-white p-1.5 rounded-lg hover:bg-teal-400 transition-colors font-bold"
+          onClick={() => {
+            onAdd(product, selectedCut, qty, itemNotes);
+            setItemNotes("");
+          }}
+          className="bg-teal-500 text-white p-1.5 rounded-lg hover:bg-teal-400 transition-colors font-bold shrink-0"
         >
           +
         </button>
       </div>
+
+      <textarea
+        rows={2}
+        value={itemNotes}
+        onChange={(e) => setItemNotes(e.target.value)}
+        placeholder="Cutting / cleaning notes for this item (optional)"
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs outline-none focus:border-teal-500/50 resize-y min-h-[44px]"
+      />
+
+      {isKg && (
+        <p className="text-[10px] text-white/45">
+          Selected: ₹{formatPrice(unitPrice * qty)}
+        </p>
+      )}
     </div>
   );
 }

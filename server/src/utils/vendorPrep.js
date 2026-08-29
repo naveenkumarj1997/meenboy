@@ -174,7 +174,7 @@ const buildVendorRowsForDate = async (date, categoryFilterInput) => {
         cutName: item.cutName || "",
         quantity: item.quantity,
         unit: item.unit || unitByProduct[productId] || "kg",
-        notes: item.notes || "",
+        notes: item.notes || order.customerNotes || "",
         orderId: order._id,
         customerName: order.customer?.name || "Guest",
         bookingSource: order.bookingSource || "website"

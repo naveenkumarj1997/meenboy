@@ -166,7 +166,13 @@ const generateInvoice = (order, user) => {
         billY += 14;
       });
 
-      if (order.customerNotes && String(order.customerNotes).trim()) {
+      const perItemNotes = (order.items || []).map((item) => String(item.notes || "").trim()).filter(Boolean);
+      const showOrderLevelNotes =
+        order.customerNotes &&
+        String(order.customerNotes).trim() &&
+        perItemNotes.length === 0;
+
+      if (showOrderLevelNotes) {
         billY += 6;
         doc.font("InvoiceBold").fontSize(10).fillColor("#000000").text("Cutting / cleaning notes:", 50, billY);
         billY += 14;
@@ -240,6 +246,11 @@ const generateInvoice = (order, user) => {
       order.items.forEach((item) => {
         let description = item.productName || "Item";
         if (item.cutName) description += ` - ${item.cutName}`;
+
+        const itemNote = String(item.notes || "").trim();
+        if (itemNote) {
+          description += `\nNote: ${sanitizePdfText(itemNote)}`;
+        }
 
         // Measure wrapped Tamil/English description height
         const descHeight = doc.heightOfString(description, { width: 230 });

@@ -9,8 +9,12 @@ import {
   assignDeliveryPartner,
   getCatalog,
   updateOrderStatus,
-  updateAdminOrder
+  updateAdminOrder,
+  getCategoryOrdersReport,
+  downloadCategoryOrdersReport,
+  CATEGORY_ORDER_GROUPS
 } from "../../lib/api";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption, formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
 import {
@@ -116,6 +120,14 @@ const DELIVERY_TIMES = [
 
 const isKgUnit = (unit?: string) => !unit || unit.toLowerCase() === "kg";
 
+const todayLocal = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
 const partnerIdFromAssignment = (assignments: any[], orderId: string) => {
   const assignment = assignments.find((a) => String(a.order?._id || a.order) === String(orderId));
   return String(assignment?.deliveryPartner?._id || assignment?.deliveryPartner || "");
@@ -146,6 +158,10 @@ export default function AdminDeliveryTracking() {
 
   const [selectedPartner, setSelectedPartner] = useState<Record<string, string>>({});
 
+  const [assignSearch, setAssignSearch] = useState("");
+  const [assignSortConfig, setAssignSortConfig] = useState({ key: "deliveryDate", direction: "asc" });
+  const [assignPage, setAssignPage] = useState(1);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "updatedAt", direction: "desc" });
@@ -159,6 +175,15 @@ export default function AdminDeliveryTracking() {
   const [ordersSearch, setOrdersSearch] = useState("");
   const [ordersPage, setOrdersPage] = useState(1);
   const [addProductId, setAddProductId] = useState("");
+
+  const [categoryListDate, setCategoryListDate] = useState(todayLocal());
+  const [categoryListGroup, setCategoryListGroup] = useState<string>("fish_seafood");
+  const [categoryListData, setCategoryListData] = useState<any | null>(null);
+  const [categoryListLoading, setCategoryListLoading] = useState(false);
+  const [categoryPdfGenerating, setCategoryPdfGenerating] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const [categorySortConfig, setCategorySortConfig] = useState({ key: "deliveryTime", direction: "asc" });
+  const [categoryPage, setCategoryPage] = useState(1);
 
   useEffect(() => {
     if (!token) return;
@@ -178,6 +203,67 @@ export default function AdminDeliveryTracking() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, sortConfig, selectedDate]);
+
+  useEffect(() => {
+    setAssignPage(1);
+  }, [assignSearch, assignSortConfig]);
+
+  useEffect(() => {
+    setCategoryPage(1);
+  }, [categorySearch, categorySortConfig, categoryListDate, categoryListGroup]);
+
+  useEffect(() => {
+    if (!token || !categoryListDate || !categoryListGroup) {
+      setCategoryListData(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadCategoryOrders = async () => {
+      try {
+        setCategoryListLoading(true);
+        const data = await getCategoryOrdersReport(token, {
+          date: categoryListDate,
+          group: categoryListGroup
+        });
+        if (!cancelled) setCategoryListData(data);
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err.message || "Failed to load category orders");
+          setCategoryListData(null);
+        }
+      } finally {
+        if (!cancelled) setCategoryListLoading(false);
+      }
+    };
+
+    loadCategoryOrders();
+    return () => {
+      cancelled = true;
+    };
+  }, [token, categoryListDate, categoryListGroup]);
+
+  const handleDownloadCategoryPdf = async () => {
+    if (!token || !categoryListDate || !categoryListGroup) return;
+    try {
+      setCategoryPdfGenerating(true);
+      setError("");
+      const blob = await downloadCategoryOrdersReport(token, {
+        date: categoryListDate,
+        group: categoryListGroup
+      });
+      const label =
+        CATEGORY_ORDER_GROUPS.find((g) => g.id === categoryListGroup)?.label || categoryListGroup;
+      const slug = label.replace(/[^a-zA-Z0-9]+/g, "_");
+      triggerPdfDownload(blob, `CategoryOrders-${categoryListDate}-${slug}.pdf`);
+      setSuccess(`PDF downloaded for ${label} on ${categoryListDate}.`);
+    } catch (err: any) {
+      setError(err.message || "Failed to download category orders PDF");
+    } finally {
+      setCategoryPdfGenerating(false);
+    }
+  };
 
   const fetchAllData = async (silent = false) => {
     try {
@@ -408,6 +494,105 @@ export default function AdminDeliveryTracking() {
     ["pending", "confirmed", "preparing"].includes(o.status) && !assignedOrderIds.has(String(o._id))
   );
 
+  const filteredUnassignedOrders = unassignedOrders.filter((order) => {
+    if (!assignSearch) return true;
+    const q = assignSearch.toLowerCase();
+    const orderId = String(order._id).slice(-6).toLowerCase();
+    const name = (order.customer?.name || "").toLowerCase();
+    const city = (order.address?.city || "").toLowerCase();
+    const pin = (order.address?.postalCode || "").toLowerCase();
+    const date = (order.deliveryDate || "").toLowerCase();
+    const phone = (order.address?.phone || order.customer?.phone || "").toLowerCase();
+    return (
+      orderId.includes(q) ||
+      name.includes(q) ||
+      city.includes(q) ||
+      pin.includes(q) ||
+      date.includes(q) ||
+      phone.includes(q)
+    );
+  });
+
+  filteredUnassignedOrders.sort((a, b) => {
+    const dir = assignSortConfig.direction === "asc" ? 1 : -1;
+    if (assignSortConfig.key === "customer") {
+      const nameA = (a.customer?.name || "").toLowerCase();
+      const nameB = (b.customer?.name || "").toLowerCase();
+      return nameA.localeCompare(nameB) * dir;
+    }
+    if (assignSortConfig.key === "order") {
+      return String(a._id).localeCompare(String(b._id)) * dir;
+    }
+    if (assignSortConfig.key === "deliveryTime") {
+      return String(a.deliveryTime || "").localeCompare(String(b.deliveryTime || "")) * dir;
+    }
+    if (assignSortConfig.key === "createdAt") {
+      return (new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) * dir;
+    }
+    // deliveryDate default
+    const dateCmp = String(a.deliveryDate || "").localeCompare(String(b.deliveryDate || ""));
+    if (dateCmp !== 0) return dateCmp * dir;
+    return String(a.deliveryTime || "").localeCompare(String(b.deliveryTime || "")) * dir;
+  });
+
+  const assignTotalPages = Math.ceil(filteredUnassignedOrders.length / itemsPerPage) || 1;
+  const safeAssignPage = Math.min(assignPage, assignTotalPages);
+  const assignPageOrders = filteredUnassignedOrders.slice(
+    (safeAssignPage - 1) * itemsPerPage,
+    safeAssignPage * itemsPerPage
+  );
+
+  const categoryRows = categoryListData?.rows || [];
+  const filteredCategoryRows = categoryRows.filter((row: any) => {
+    if (!categorySearch) return true;
+    const q = categorySearch.toLowerCase();
+    return (
+      String(row.orderId).slice(-6).toLowerCase().includes(q) ||
+      String(row.customerName || "").toLowerCase().includes(q) ||
+      String(row.phone || "").toLowerCase().includes(q) ||
+      String(row.address || "").toLowerCase().includes(q) ||
+      String(row.productName || "").toLowerCase().includes(q) ||
+      String(row.cutName || "").toLowerCase().includes(q) ||
+      String(row.partnerName || "").toLowerCase().includes(q) ||
+      String(row.status || "").toLowerCase().includes(q) ||
+      String(row.productCategory || "").toLowerCase().includes(q) ||
+      String(row.itemNotes || row.customerNotes || "").toLowerCase().includes(q)
+    );
+  });
+
+  filteredCategoryRows.sort((a: any, b: any) => {
+    const dir = categorySortConfig.direction === "asc" ? 1 : -1;
+    if (categorySortConfig.key === "customer") {
+      return String(a.customerName || "").localeCompare(String(b.customerName || "")) * dir;
+    }
+    if (categorySortConfig.key === "order") {
+      return String(a.orderId).localeCompare(String(b.orderId)) * dir;
+    }
+    if (categorySortConfig.key === "product") {
+      return String(a.productName || "").localeCompare(String(b.productName || "")) * dir;
+    }
+    if (categorySortConfig.key === "status") {
+      return String(a.status || "").localeCompare(String(b.status || "")) * dir;
+    }
+    if (categorySortConfig.key === "partner") {
+      return String(a.partnerName || "").localeCompare(String(b.partnerName || "")) * dir;
+    }
+    if (categorySortConfig.key === "total") {
+      return (Number(a.orderTotal || 0) - Number(b.orderTotal || 0)) * dir;
+    }
+    if (categorySortConfig.key === "category") {
+      return String(a.productCategory || "").localeCompare(String(b.productCategory || "")) * dir;
+    }
+    return String(a.deliveryTime || "").localeCompare(String(b.deliveryTime || "")) * dir;
+  });
+
+  const categoryTotalPages = Math.ceil(filteredCategoryRows.length / itemsPerPage) || 1;
+  const safeCategoryPage = Math.min(categoryPage, categoryTotalPages);
+  const categoryPageRows = filteredCategoryRows.slice(
+    (safeCategoryPage - 1) * itemsPerPage,
+    safeCategoryPage * itemsPerPage
+  );
+
   // Chart data formatting
   const pieData = stats ? [
     { name: "Completed", value: stats.completed },
@@ -474,75 +659,145 @@ export default function AdminDeliveryTracking() {
             No pending orders require assignment right now.
           </div>
         ) : (
-          <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-slate-300 min-w-[720px]">
-              <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
-                <tr>
-                  <th className="px-4 py-4 font-medium">Order ID</th>
-                  <th className="px-4 py-4 font-medium">Customer Details</th>
-                  <th className="px-4 py-4 font-medium">Items</th>
-                  <th className="px-4 py-4 font-medium">Delivery Slot</th>
-                  <th className="px-4 py-4 font-medium">Assign Partner</th>
-                  <th className="px-4 py-4 font-medium">Action</th>
-                  <th className="px-4 py-4 font-medium">Edit / Cancel</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {unassignedOrders.map(order => (
-                  <tr key={order._id} className="hover:bg-slate-800/20">
-                    <td className="px-4 py-4 font-mono text-white">
-                      <div>#{order._id.slice(-6).toUpperCase()}</div>
-                      <div className="mt-1.5">
-                        <BookingSourceBadge source={order.bookingSource} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="font-medium text-white">{order.customer?.name || "Guest"}</div>
-                      <div className="text-xs text-slate-400">{order.address?.city}, {order.address?.postalCode}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <OrderItemsAndNotes
-                        items={order.items}
-                        customerNotes={order.customerNotes}
-                        categoryMap={productCategoryMap}
-                        getCategoryColor={getCategoryColor}
-                        compact
-                      />
-                    </td>
-                    <td className="px-4 py-4 text-xs">
-                      <div>{order.deliveryDate}</div>
-                      <div className="text-slate-400">{order.deliveryTime}</div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <select
-                        className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white outline-none focus:border-teal-500 w-full"
-                        value={selectedPartner[order._id] || ""}
-                        onChange={(e) => setSelectedPartner(prev => ({ ...prev, [order._id]: e.target.value }))}
-                      >
-                        <option value="" disabled>Select Partner</option>
-                        {partners.map(p => (
-                          <option key={p._id} value={p._id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleAssign(order._id)}
-                        className="bg-indigo-500 hover:bg-indigo-400 text-white font-medium py-1.5 px-4 rounded-lg transition-colors text-xs"
-                      >
-                        Assign
-                      </button>
-                    </td>
-                    <td className="px-4 py-4">
-                      <ActionButtons order={order} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <>
+            <div className="flex flex-col md:flex-row gap-4 mb-4 items-start md:items-center justify-between">
+              <input
+                type="text"
+                placeholder="Search order ID, customer, phone, city, pincode, date..."
+                className="w-full md:w-96 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-teal-500 text-sm"
+                value={assignSearch}
+                onChange={(e) => setAssignSearch(e.target.value)}
+              />
+              <div className="flex gap-3 items-center w-full md:w-auto">
+                <span className="text-slate-400 text-sm shrink-0">Sort by:</span>
+                <select
+                  className="flex-1 md:flex-none bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-white outline-none focus:border-teal-500 text-sm"
+                  value={`${assignSortConfig.key}-${assignSortConfig.direction}`}
+                  onChange={(e) => {
+                    const [key, direction] = e.target.value.split("-");
+                    setAssignSortConfig({ key, direction });
+                  }}
+                >
+                  <option value="deliveryDate-asc">Delivery date (earliest)</option>
+                  <option value="deliveryDate-desc">Delivery date (latest)</option>
+                  <option value="deliveryTime-asc">Delivery slot (early)</option>
+                  <option value="deliveryTime-desc">Delivery slot (late)</option>
+                  <option value="customer-asc">Customer (A–Z)</option>
+                  <option value="customer-desc">Customer (Z–A)</option>
+                  <option value="order-asc">Order ID</option>
+                  <option value="order-desc">Order ID (reverse)</option>
+                  <option value="createdAt-desc">Newest first</option>
+                  <option value="createdAt-asc">Oldest first</option>
+                </select>
+              </div>
             </div>
-          </div>
+
+            {filteredUnassignedOrders.length === 0 ? (
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-8 text-center text-slate-400">
+                No matching orders. Try a different search.
+              </div>
+            ) : (
+              <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm text-slate-300 min-w-[720px]">
+                    <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
+                      <tr>
+                        <th className="px-4 py-4 font-medium">Order ID</th>
+                        <th className="px-4 py-4 font-medium">Customer Details</th>
+                        <th className="px-4 py-4 font-medium">Items</th>
+                        <th className="px-4 py-4 font-medium">Delivery Slot</th>
+                        <th className="px-4 py-4 font-medium">Assign Partner</th>
+                        <th className="px-4 py-4 font-medium">Action</th>
+                        <th className="px-4 py-4 font-medium">Edit / Cancel</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                      {assignPageOrders.map((order) => (
+                        <tr key={order._id} className="hover:bg-slate-800/20">
+                          <td className="px-4 py-4 font-mono text-white">
+                            <div>#{order._id.slice(-6).toUpperCase()}</div>
+                            <div className="mt-1.5">
+                              <BookingSourceBadge source={order.bookingSource} />
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="font-medium text-white">{order.customer?.name || "Guest"}</div>
+                            <div className="text-xs text-slate-400">{order.address?.city}, {order.address?.postalCode}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <OrderItemsAndNotes
+                              items={order.items}
+                              customerNotes={order.customerNotes}
+                              categoryMap={productCategoryMap}
+                              getCategoryColor={getCategoryColor}
+                              compact
+                            />
+                          </td>
+                          <td className="px-4 py-4 text-xs">
+                            <div>{order.deliveryDate}</div>
+                            <div className="text-slate-400">{order.deliveryTime}</div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <select
+                              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white outline-none focus:border-teal-500 w-full"
+                              value={selectedPartner[order._id] || ""}
+                              onChange={(e) => setSelectedPartner((prev) => ({ ...prev, [order._id]: e.target.value }))}
+                            >
+                              <option value="" disabled>Select Partner</option>
+                              {partners.map((p) => (
+                                <option key={p._id} value={p._id}>{p.name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              onClick={() => handleAssign(order._id)}
+                              className="bg-indigo-500 hover:bg-indigo-400 text-white font-medium py-1.5 px-4 rounded-lg transition-colors text-xs"
+                            >
+                              Assign
+                            </button>
+                          </td>
+                          <td className="px-4 py-4">
+                            <ActionButtons order={order} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {filteredUnassignedOrders.length > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-slate-400">
+                  Showing {(safeAssignPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(safeAssignPage * itemsPerPage, filteredUnassignedOrders.length)} of{" "}
+                  {filteredUnassignedOrders.length} unassigned order
+                  {filteredUnassignedOrders.length === 1 ? "" : "s"}
+                </div>
+                <div className="flex gap-2 items-center">
+                  <button
+                    disabled={safeAssignPage === 1}
+                    onClick={() => setAssignPage((p) => p - 1)}
+                    className="px-3 py-1.5 bg-slate-800 text-white rounded text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-3 py-1 text-sm text-slate-300">
+                    Page {safeAssignPage} of {assignTotalPages}
+                  </span>
+                  <button
+                    disabled={safeAssignPage === assignTotalPages}
+                    onClick={() => setAssignPage((p) => p + 1)}
+                    className="px-3 py-1.5 bg-slate-800 text-white rounded text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -740,6 +995,231 @@ export default function AdminDeliveryTracking() {
       })()}
       </div>
 
+      <div className="mt-10">
+        <h2 className="text-xl font-bold text-white mb-1">Orders by Category</h2>
+        <p className="text-sm text-slate-400 mb-4">
+          Internal list for your team — pick a delivery date and category to view full order details and download PDF.
+        </p>
+
+        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-6 mb-4">
+          <div className="flex flex-col lg:flex-row gap-4 lg:items-end justify-between">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Delivery date</label>
+              <input
+                type="date"
+                value={categoryListDate}
+                onChange={(e) => setCategoryListDate(e.target.value)}
+                className="bg-slate-950 border border-slate-700 rounded-lg px-4 py-2.5 text-white outline-none focus:border-teal-500 [color-scheme:dark]"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORY_ORDER_GROUPS.map((group) => (
+                <button
+                  key={group.id}
+                  type="button"
+                  onClick={() => setCategoryListGroup(group.id)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                    categoryListGroup === group.id
+                      ? "bg-teal-500/20 border-teal-500/40 text-teal-300"
+                      : "border-slate-700 text-slate-400 hover:border-slate-500 hover:text-white"
+                  }`}
+                >
+                  {group.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleDownloadCategoryPdf}
+              disabled={categoryPdfGenerating || categoryListLoading || !categoryListData?.rows?.length}
+              className="bg-amber-500 hover:bg-amber-400 disabled:opacity-50 disabled:cursor-not-allowed text-slate-950 font-semibold py-2.5 px-5 rounded-lg transition-colors"
+            >
+              {categoryPdfGenerating ? "Generating PDF..." : "Download PDF"}
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-slate-900/50 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-4 sm:px-6 py-4 border-b border-slate-800">
+            <h3 className="text-lg font-bold text-white">
+              {categoryListData?.groupLabel || "Category orders"}
+            </h3>
+            <p className="text-sm text-slate-400">
+              {categoryListDate}
+              {categoryListData?.stats
+                ? ` · ${categoryListData.stats.orderCount} order${categoryListData.stats.orderCount === 1 ? "" : "s"} · ${categoryListData.stats.itemCount} line item${categoryListData.stats.itemCount === 1 ? "" : "s"}`
+                : ""}
+              {categoryRows.length > 0 && filteredCategoryRows.length !== categoryRows.length
+                ? ` · ${filteredCategoryRows.length} shown after filter`
+                : ""}
+            </p>
+          </div>
+
+          {!categoryListLoading && categoryListData?.rows?.length > 0 && (
+            <div className="flex flex-col md:flex-row gap-4 px-4 sm:px-6 pb-4 border-b border-slate-800 items-start md:items-center justify-between">
+              <input
+                type="text"
+                placeholder="Search order, customer, phone, product, partner, status..."
+                className="w-full md:w-96 bg-slate-950 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-teal-500 text-sm"
+                value={categorySearch}
+                onChange={(e) => setCategorySearch(e.target.value)}
+              />
+              <div className="flex gap-3 items-center w-full md:w-auto">
+                <span className="text-slate-400 text-sm shrink-0">Sort by:</span>
+                <select
+                  className="flex-1 md:flex-none bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white outline-none focus:border-teal-500 text-sm"
+                  value={`${categorySortConfig.key}-${categorySortConfig.direction}`}
+                  onChange={(e) => {
+                    const [key, direction] = e.target.value.split("-");
+                    setCategorySortConfig({ key, direction });
+                  }}
+                >
+                  <option value="deliveryTime-asc">Delivery slot (early)</option>
+                  <option value="deliveryTime-desc">Delivery slot (late)</option>
+                  <option value="customer-asc">Customer (A–Z)</option>
+                  <option value="customer-desc">Customer (Z–A)</option>
+                  <option value="product-asc">Product (A–Z)</option>
+                  <option value="product-desc">Product (Z–A)</option>
+                  <option value="order-asc">Order ID</option>
+                  <option value="order-desc">Order ID (reverse)</option>
+                  <option value="partner-asc">Partner (A–Z)</option>
+                  <option value="partner-desc">Partner (Z–A)</option>
+                  <option value="status-asc">Status</option>
+                  <option value="status-desc">Status (reverse)</option>
+                  <option value="total-desc">Total (high to low)</option>
+                  <option value="total-asc">Total (low to high)</option>
+                  <option value="category-asc">Product category</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {categoryListLoading ? (
+            <div className="p-8 text-center text-slate-400">Loading category orders...</div>
+          ) : !categoryListData?.rows?.length ? (
+            <div className="p-8 text-center text-slate-400">
+              No orders for this category on the selected date.
+            </div>
+          ) : filteredCategoryRows.length === 0 ? (
+            <div className="p-8 text-center text-slate-400">
+              No matching rows. Try a different search.
+            </div>
+          ) : (
+            <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300 min-w-[1200px]">
+                <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
+                  <tr>
+                    <th className="px-3 py-3 font-medium">#</th>
+                    <th className="px-3 py-3 font-medium">Order</th>
+                    <th className="px-3 py-3 font-medium">Source</th>
+                    <th className="px-3 py-3 font-medium">Customer</th>
+                    <th className="px-3 py-3 font-medium">Phone</th>
+                    <th className="px-3 py-3 font-medium">Address</th>
+                    <th className="px-3 py-3 font-medium">Slot</th>
+                    <th className="px-3 py-3 font-medium">Category</th>
+                    <th className="px-3 py-3 font-medium">Product</th>
+                    <th className="px-3 py-3 font-medium">Cut</th>
+                    <th className="px-3 py-3 font-medium">Qty</th>
+                    <th className="px-3 py-3 font-medium">Notes</th>
+                    <th className="px-3 py-3 font-medium">Status</th>
+                    <th className="px-3 py-3 font-medium">Partner</th>
+                    <th className="px-3 py-3 font-medium">Total</th>
+                    <th className="px-3 py-3 font-medium">Map</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/50">
+                  {categoryPageRows.map((row: any, idx: number) => (
+                    <tr key={`${row.orderId}-${idx}`} className="hover:bg-slate-800/20">
+                      <td className="px-3 py-3 text-slate-500">
+                        {(safeCategoryPage - 1) * itemsPerPage + idx + 1}
+                      </td>
+                      <td className="px-3 py-3 font-mono text-white">
+                        #{String(row.orderId).slice(-6).toUpperCase()}
+                      </td>
+                      <td className="px-3 py-3">
+                        <BookingSourceBadge source={row.bookingSource} />
+                      </td>
+                      <td className="px-3 py-3 text-white font-medium">{row.customerName}</td>
+                      <td className="px-3 py-3">{row.phone || "-"}</td>
+                      <td className="px-3 py-3 text-xs max-w-[200px]">{row.address || "-"}</td>
+                      <td className="px-3 py-3 text-xs">{row.deliveryTime || "-"}</td>
+                      <td className="px-3 py-3">
+                        <span
+                          className={`inline-block px-2 py-0.5 text-[10px] uppercase font-bold rounded border ${getCategoryColor(row.productCategory)}`}
+                        >
+                          {row.productCategory}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-white">{row.productName}</td>
+                      <td className="px-3 py-3">{row.cutName || "-"}</td>
+                      <td className="px-3 py-3 font-semibold text-white">
+                        {formatQuantityLabel(row.quantity, row.unit)}
+                      </td>
+                      <td className="px-3 py-3 text-xs text-amber-300 max-w-[160px]">
+                        {row.itemNotes || row.customerNotes || "-"}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-slate-800 border border-slate-700">
+                          {String(row.status || "").replace(/_/g, " ")}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-xs">{row.partnerName || "Unassigned"}</td>
+                      <td className="px-3 py-3 font-semibold text-teal-400">
+                        ₹{Number(row.orderTotal || 0).toFixed(2)}
+                      </td>
+                      <td className="px-3 py-3 text-xs">
+                        {row.mapUrl ? (
+                          <a
+                            href={row.mapUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-teal-400 hover:text-teal-300 underline"
+                          >
+                            Open
+                          </a>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-t border-slate-800">
+              <div className="text-sm text-slate-400">
+                Showing {(safeCategoryPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(safeCategoryPage * itemsPerPage, filteredCategoryRows.length)} of{" "}
+                {filteredCategoryRows.length} line item
+                {filteredCategoryRows.length === 1 ? "" : "s"}
+              </div>
+              <div className="flex gap-2 items-center">
+                <button
+                  disabled={safeCategoryPage === 1}
+                  onClick={() => setCategoryPage((p) => p - 1)}
+                  className="px-3 py-1.5 bg-slate-800 text-white rounded text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
+                >
+                  Prev
+                </button>
+                <span className="px-3 py-1 text-sm text-slate-300">
+                  Page {safeCategoryPage} of {categoryTotalPages}
+                </span>
+                <button
+                  disabled={safeCategoryPage === categoryTotalPages}
+                  onClick={() => setCategoryPage((p) => p + 1)}
+                  className="px-3 py-1.5 bg-slate-800 text-white rounded text-sm disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+            </>
+          )}
+        </div>
+      </div>
+
       {(() => {
         const filteredOrders = orders.filter((o) => {
           if (!ordersSearch) return true;
@@ -922,13 +1402,28 @@ export default function AdminDeliveryTracking() {
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, postalCode: e.target.value } })}
                 className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
               />
-              <input
-                type="number"
-                placeholder="Delivery fee"
-                value={editingOrder.deliveryFee}
-                onChange={(e) => setEditingOrder({ ...editingOrder, deliveryFee: Number(e.target.value) })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-              />
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">Google Maps location link</label>
+                <input
+                  type="url"
+                  placeholder="https://maps.google.com/..."
+                  value={editingOrder.mapUrl || ""}
+                  onChange={(e) => setEditingOrder({ ...editingOrder, mapUrl: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Delivery fee (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="e.g. 0 for free delivery"
+                  value={editingOrder.deliveryFee}
+                  onChange={(e) => setEditingOrder({ ...editingOrder, deliveryFee: Number(e.target.value) })}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                />
+              </div>
             </div>
 
             <h4 className="text-sm font-semibold text-white mb-2">Items</h4>

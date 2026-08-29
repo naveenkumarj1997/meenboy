@@ -391,6 +391,64 @@ export const getVendorPrepPreview = async (
     headers: { Authorization: `Bearer ${token}` }
   });
 
+export const CATEGORY_ORDER_GROUPS = [
+  { id: "fish_seafood", label: "Fish & Seafood" },
+  { id: "chicken_country_chicken", label: "Chicken & Country Chicken" },
+  { id: "mutton", label: "Mutton" }
+] as const;
+
+export const getCategoryOrdersReport = async (
+  token: string,
+  params: { date: string; group: string }
+) =>
+  request<{
+    groups: Array<{ id: string; label: string }>;
+    groupId: string;
+    groupLabel: string;
+    date: string;
+    stats: { orderCount: number; itemCount: number };
+    rows: Array<{
+      orderId: string;
+      customerName: string;
+      phone: string;
+      email?: string;
+      address: string;
+      deliveryTime: string;
+      deliveryDate: string;
+      status: string;
+      bookingSource: string;
+      partnerName: string;
+      mapUrl?: string;
+      customerNotes?: string;
+      orderTotal: number;
+      paymentStatus?: string;
+      productName: string;
+      cutName?: string;
+      quantity: number;
+      unit?: string;
+      itemNotes?: string;
+      productCategory: string;
+    }>;
+  }>(
+    `/orders/reports/category-orders?date=${encodeURIComponent(params.date)}&group=${encodeURIComponent(params.group)}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+export const downloadCategoryOrdersReport = async (
+  token: string,
+  params: { date: string; group: string }
+) => {
+  const qs = new URLSearchParams({ date: params.date, group: params.group });
+  const response = await fetch(`${API_BASE}/orders/reports/category-orders/pdf?${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || "Failed to generate category orders PDF");
+  }
+  return response.blob();
+};
+
 export const getAdminOrders = async (token: string) =>
   request<{ orders: any[] }>("/orders/admin", {
     headers: { Authorization: `Bearer ${token}` }
