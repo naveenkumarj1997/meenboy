@@ -351,11 +351,11 @@ export default function AdminAllOrders() {
                           <span className="text-slate-300">Total</span>
                           <span className="text-teal-400">₹{Number(order.total || 0).toFixed(2)}</span>
                         </div>
-                        {order.paymentCollected > 0 && (
+                        {Number(order.paymentCollected || 0) > 0 && (
                           <div className="flex justify-between gap-4 text-xs pt-1">
                             <span className="text-slate-500">Collected</span>
                             <span className="text-emerald-400">
-                              ₹{Number(order.paymentCollected).toFixed(2)} (
+                              ₹{Number(order.paymentCollected || 0).toFixed(2)} (
                               {formatPaymentMethod(order.paymentMethod)})
                             </span>
                           </div>
