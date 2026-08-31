@@ -27,6 +27,7 @@ import {
   Tooltip as RechartsTooltip,
   ResponsiveContainer
 } from "recharts";
+import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 
 /** Items + cutting/cleaning notes for admin / partner prep */
 function OrderItemsAndNotes({
@@ -81,32 +82,6 @@ function OrderItemsAndNotes({
     </div>
   );
 }
-const ADMIN_NAV_LINKS = [
-  { label: "Overview", href: "/dashboard/admin" },
-  { label: "Profile", href: "/dashboard/admin/profile" },
-  { label: "New Customers", href: "/dashboard/admin/new-customers" },
-  { label: "New Delivery Partners", href: "/dashboard/admin/partner-approvals" },
-  { label: "Products", href: "/dashboard/admin/products" },
-  { label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
-  { label: "Invoices", href: "/dashboard/admin/invoices" },
-  { label: "Order Management", href: "/dashboard/admin/deliveries" },
-  { label: "Today Delivery Status", href: "/dashboard/admin/today-delivery-status" },
-  { label: "Partner Report", href: "/dashboard/admin/partner-report" },
-  { label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
-  { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
-  { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
-  { label: "Delivery Amount Collection", href: "/dashboard/admin/delivery-amount-collection" },
-  { label: "Purchases", href: "/dashboard/admin/purchases" },
-  { label: "Settlements", href: "/dashboard/admin/settlements" },
-  { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
-  { label: "Admin Earnings", href: "/dashboard/admin/earnings" },
-  { label: "Users", href: "/dashboard/admin/users" },
-  { label: "Money Management", href: "/dashboard/admin/money-management" },
-  { label: "Manual Ledger", href: "/dashboard/admin/finance" },
-  { label: "Availability", href: "/dashboard/admin/availability" },
-  { label: "Walk-in", href: "/dashboard/admin/walk-in" },
-  { label: "Manual Booking", href: "/dashboard/admin/manual-booking" }
-];
 
 const COLORS = ["#14b8a6", "#f59e0b", "#f43f5e", "#6366f1", "#8b5cf6"];
 
