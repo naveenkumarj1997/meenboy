@@ -74,14 +74,32 @@ export default function AdminDailyPrices() {
         const key = `${p.productId}-${p.cutName || "default"}`;
         return {
           productId: p.productId,
-          cutName: p.cutName,
+          productName: p.productName,
+          cutName: p.cutName || "",
           newPrice: priceUpdates[key]
         };
       });
 
       const res = await updateDailyPrices(token!, { deliveryDate, priceUpdates: updates });
-      setSuccessMsg(res.message);
-      await fetchProducts();
+      setSuccessMsg(
+        res.updatedCount === 0
+          ? `${res.message} Prices are saved for this date. If an order total did not change, the order may already be delivered or the delivery date may not match.`
+          : res.message
+      );
+
+      if (res.products?.length) {
+        setProducts(res.products);
+        setChanges(res.changes || []);
+        setDailyPriceUpdated(true);
+        const initialUpdates: Record<string, number> = {};
+        res.products.forEach((p: any) => {
+          const key = `${p.productId}-${p.cutName || "default"}`;
+          initialUpdates[key] = p.currentUnitPrice;
+        });
+        setPriceUpdates(initialUpdates);
+      } else {
+        await fetchProducts();
+      }
     } catch (err: any) {
       setError(err.message || "Failed to update prices.");
     } finally {

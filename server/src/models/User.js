@@ -100,6 +100,13 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0
     },
+    /** Default discount/addon for manual bookings (bulk / shop customers) */
+    bookingAdjustments: {
+      discountAmount: { type: Number, default: 0, min: 0 },
+      discountNote: { type: String, trim: true, maxlength: 500, default: "" },
+      addonAmount: { type: Number, default: 0, min: 0 },
+      addonNote: { type: String, trim: true, maxlength: 500, default: "" }
+    },
     adminPreferences: {
       usersAccountFilter: {
         type: String,

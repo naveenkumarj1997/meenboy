@@ -81,6 +81,28 @@ const orderSchema = new mongoose.Schema(
       min: 0,
       default: 0
     },
+    discountAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    discountNote: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: ""
+    },
+    addonAmount: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    addonNote: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: ""
+    },
     total: {
       type: Number,
       required: true,

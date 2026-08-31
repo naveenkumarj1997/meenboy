@@ -158,12 +158,17 @@ const generateInvoice = (order, user) => {
       // --- Bill To ---
       const billToLines = buildBillToLines(order, user);
       let billY = 170;
+      const billToWidth = 280;
+      const billLineGap = 2;
+
       doc.font("InvoiceBold").fontSize(12).text("Bill To:", 50, billY);
       billY += 18;
       doc.font("InvoiceRegular").fontSize(10);
+
       billToLines.forEach((line) => {
-        doc.text(line, 50, billY, { width: 280 });
-        billY += 14;
+        const lineHeight = doc.heightOfString(line, { width: billToWidth, lineGap: billLineGap });
+        doc.text(line, 50, billY, { width: billToWidth, lineGap: billLineGap });
+        billY += lineHeight + 4;
       });
 
       const perItemNotes = (order.items || []).map((item) => String(item.notes || "").trim()).filter(Boolean);
@@ -177,8 +182,9 @@ const generateInvoice = (order, user) => {
         doc.font("InvoiceBold").fontSize(10).fillColor("#000000").text("Cutting / cleaning notes:", 50, billY);
         billY += 14;
         doc.font("InvoiceRegular").fontSize(9).fillColor("#333333");
-        const notesHeight = doc.heightOfString(String(order.customerNotes).trim(), { width: 280 });
-        doc.text(String(order.customerNotes).trim(), 50, billY, { width: 280 });
+        const notesText = String(order.customerNotes).trim();
+        const notesHeight = doc.heightOfString(notesText, { width: billToWidth, lineGap: billLineGap });
+        doc.text(notesText, 50, billY, { width: billToWidth, lineGap: billLineGap });
         billY += notesHeight + 4;
         doc.fillColor("#000000");
       }
@@ -288,6 +294,49 @@ const generateInvoice = (order, user) => {
         .text(`Rs. ${Number(order.deliveryFee).toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
 
       yPosition += 20;
+
+      const addonAmount = Number(order.addonAmount || 0);
+      const discountAmount = Number(order.discountAmount || 0);
+
+      if (addonAmount > 0) {
+        doc
+          .font("InvoiceBold")
+          .text("Addon:", 370, yPosition, { width: 90, align: "right" })
+          .font("InvoiceRegular")
+          .text(`Rs. ${addonAmount.toFixed(2)}`, 470, yPosition, { width: 70, align: "right" });
+        yPosition += 14;
+        if (order.addonNote && String(order.addonNote).trim()) {
+          doc.font("InvoiceRegular").fontSize(8).fillColor("#374151");
+          const addonNote = sanitizePdfText(order.addonNote);
+          const noteHeight = doc.heightOfString(addonNote, { width: 500, lineGap: 1 });
+          doc.text(`Addon note: ${addonNote}`, 50, yPosition, { width: 500, lineGap: 1 });
+          yPosition += noteHeight + 6;
+          doc.fontSize(10).fillColor("#000000");
+        } else {
+          yPosition += 6;
+        }
+      }
+
+      if (discountAmount > 0) {
+        doc
+          .font("InvoiceBold")
+          .text("Discount:", 370, yPosition, { width: 90, align: "right" })
+          .font("InvoiceRegular")
+          .fillColor("#047857")
+          .text(`- Rs. ${discountAmount.toFixed(2)}`, 470, yPosition, { width: 70, align: "right" })
+          .fillColor("#000000");
+        yPosition += 14;
+        if (order.discountNote && String(order.discountNote).trim()) {
+          doc.font("InvoiceRegular").fontSize(8).fillColor("#374151");
+          const discountNote = sanitizePdfText(order.discountNote);
+          const noteHeight = doc.heightOfString(discountNote, { width: 500, lineGap: 1 });
+          doc.text(`Discount note: ${discountNote}`, 50, yPosition, { width: 500, lineGap: 1 });
+          yPosition += noteHeight + 6;
+          doc.fontSize(10).fillColor("#000000");
+        } else {
+          yPosition += 6;
+        }
+      }
 
       doc
         .moveTo(370, yPosition)

@@ -237,6 +237,10 @@ export interface AdminOrderPayload extends OrderPayload {
   customerId?: string;
   customerNotes?: string;
   deliveryFee?: number;
+  discountAmount?: number;
+  discountNote?: string;
+  addonAmount?: number;
+  addonNote?: string;
   newCustomer?: {
     name: string;
     email: string;
@@ -286,7 +290,12 @@ export const getDailyPriceProducts = async (token: string, deliveryDate: string)
   });
 
 export const updateDailyPrices = async (token: string, payload: { deliveryDate: string; priceUpdates: any[] }) =>
-  request<{ message: string; updatedCount: number }>("/orders/daily-prices", {
+  request<{
+    message: string;
+    updatedCount: number;
+    changes?: any[];
+    products?: any[];
+  }>("/orders/daily-prices", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
@@ -652,6 +661,24 @@ export const updateDeliveryStatus = async (
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
   });
+
+export const adminUpdateDeliveryPayment = async (
+  token: string,
+  assignmentId: string,
+  payload: {
+    paymentMethod: string;
+    paymentCollected?: number;
+    adminNote?: string;
+  }
+) =>
+  request<{ assignment: any; message: string }>(
+    `/orders/assignments/${assignmentId}/admin-payment`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }
+  );
 
 export const reorderAssignments = async (token: string, assignments: { id: string; sequence: number }[]) =>
   request<{ message: string }>("/orders/assignments/reorder", {

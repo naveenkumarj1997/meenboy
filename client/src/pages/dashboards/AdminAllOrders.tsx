@@ -347,6 +347,28 @@ export default function AdminAllOrders() {
                           <span className="text-slate-400">Delivery fee</span>
                           <span className="text-white">₹{Number(order.deliveryFee || 0).toFixed(2)}</span>
                         </div>
+                        {Number(order.addonAmount || 0) > 0 && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-amber-300/90">
+                              Addon
+                              {order.addonNote ? (
+                                <span className="block text-[10px] text-amber-200/70">{order.addonNote}</span>
+                              ) : null}
+                            </span>
+                            <span className="text-amber-300">+₹{Number(order.addonAmount).toFixed(2)}</span>
+                          </div>
+                        )}
+                        {Number(order.discountAmount || 0) > 0 && (
+                          <div className="flex justify-between gap-4">
+                            <span className="text-emerald-300/90">
+                              Discount
+                              {order.discountNote ? (
+                                <span className="block text-[10px] text-emerald-200/70">{order.discountNote}</span>
+                              ) : null}
+                            </span>
+                            <span className="text-emerald-300">−₹{Number(order.discountAmount).toFixed(2)}</span>
+                          </div>
+                        )}
                         <div className="flex justify-between gap-4 font-bold">
                           <span className="text-slate-300">Total</span>
                           <span className="text-teal-400">₹{Number(order.total || 0).toFixed(2)}</span>

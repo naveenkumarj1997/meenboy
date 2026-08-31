@@ -7,6 +7,7 @@ import { formatQuantityLabel } from "../../lib/weightOptions";
 import DashboardShell from "./DashboardShell";
 import OrderChangeHelp from "../../components/OrderChangeHelp";
 import OrderPriceNotice from "../../components/OrderPriceNotice";
+import OrderAdjustmentsBreakdown from "../../components/OrderAdjustmentsBreakdown";
 
 const CustomerDashboard = () => {
   const { token, user } = useAuth();
@@ -335,6 +336,7 @@ const CUSTOMER_NAV_LINKS = [
                     </div>
                   </div>
                 ))}
+                <OrderAdjustmentsBreakdown order={order} />
               </div>
             </div>
           ))}

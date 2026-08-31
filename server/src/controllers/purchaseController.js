@@ -1,4 +1,19 @@
 const DailyPurchase = require("../models/DailyPurchase");
+const { getBusinessStartDate } = require("../utils/moneyManagement");
+
+const emptyPurchaseTemplate = (date) => ({
+  date,
+  chickenShop: 0,
+  muttonShop: 0,
+  fishCompany: 0,
+  localFishShop: 0,
+  chickenShopSettled: 0,
+  muttonShopSettled: 0,
+  fishCompanySettled: 0,
+  localFishShopSettled: 0,
+  total: 0,
+  totalSettled: 0
+});
 
 // @desc    Get purchase data for a specific date
 // @route   GET /api/purchases/:date
@@ -6,27 +21,23 @@ const DailyPurchase = require("../models/DailyPurchase");
 const getPurchaseByDate = async (req, res, next) => {
   try {
     const { date } = req.params; // Expects YYYY-MM-DD
-    
-    let purchase = await DailyPurchase.findOne({ date }).populate("updatedBy", "name email");
-    
-    if (!purchase) {
-      // Return a blank template if not found
-      purchase = {
-        date,
-        chickenShop: 0,
-        muttonShop: 0,
-        fishCompany: 0,
-        localFishShop: 0,
-        chickenShopSettled: 0,
-        muttonShopSettled: 0,
-        fishCompanySettled: 0,
-        localFishShopSettled: 0,
-        total: 0,
-        totalSettled: 0
-      };
+    const businessStart = getBusinessStartDate();
+
+    if (date < businessStart) {
+      return res.json({
+        purchase: emptyPurchaseTemplate(date),
+        businessStartDate: businessStart,
+        beforeBusinessStart: true
+      });
     }
-    
-    res.json({ purchase });
+
+    let purchase = await DailyPurchase.findOne({ date }).populate("updatedBy", "name email");
+
+    if (!purchase) {
+      purchase = emptyPurchaseTemplate(date);
+    }
+
+    res.json({ purchase, businessStartDate: businessStart });
   } catch (error) {
     next(error);
   }
@@ -47,24 +58,40 @@ const savePurchase = async (req, res, next) => {
       return res.status(400).json({ message: "Date is required" });
     }
 
-    // Upsert the purchase entry
+    const businessStart = getBusinessStartDate();
+    if (date < businessStart) {
+      return res.status(400).json({
+        message: `Purchases are tracked from ${businessStart} (real business start). Pick a date on or after that day.`
+      });
+    }
+
+    const update = { updatedBy: req.user._id };
+    const assignAmount = (key, val) => {
+      if (val !== undefined && val !== null && val !== "") {
+        update[key] = Number(val) || 0;
+      }
+    };
+
+    assignAmount("chickenShop", chickenShop);
+    assignAmount("muttonShop", muttonShop);
+    assignAmount("fishCompany", fishCompany);
+    assignAmount("localFishShop", localFishShop);
+    assignAmount("chickenShopSettled", chickenShopSettled);
+    assignAmount("muttonShopSettled", muttonShopSettled);
+    assignAmount("fishCompanySettled", fishCompanySettled);
+    assignAmount("localFishShopSettled", localFishShopSettled);
+
     const purchase = await DailyPurchase.findOneAndUpdate(
       { date },
-      {
-        chickenShop: chickenShop || 0,
-        muttonShop: muttonShop || 0,
-        fishCompany: fishCompany || 0,
-        localFishShop: localFishShop || 0,
-        chickenShopSettled: chickenShopSettled || 0,
-        muttonShopSettled: muttonShopSettled || 0,
-        fishCompanySettled: fishCompanySettled || 0,
-        localFishShopSettled: localFishShopSettled || 0,
-        updatedBy: req.user._id
-      },
+      update,
       { new: true, upsert: true, setDefaultsOnInsert: true }
     ).populate("updatedBy", "name email");
 
-    res.json({ purchase, message: "Purchase saved successfully" });
+    res.json({
+      purchase,
+      message: "Purchase saved successfully",
+      businessStartDate: businessStart
+    });
   } catch (error) {
     next(error);
   }
@@ -75,7 +102,9 @@ const savePurchase = async (req, res, next) => {
 // @access  Private/Admin
 const getOverallPending = async (req, res, next) => {
   try {
+    const businessStart = getBusinessStartDate();
     const result = await DailyPurchase.aggregate([
+      { $match: { date: { $gte: businessStart } } },
       {
         $group: {
           _id: null,
@@ -109,7 +138,7 @@ const getOverallPending = async (req, res, next) => {
       overall.totalPending = overall.chickenPending + overall.muttonPending + overall.fishCoPending + overall.localFishPending;
     }
 
-    res.json(overall);
+    res.json({ ...overall, businessStartDate: businessStart });
   } catch (error) {
     next(error);
   }
@@ -127,8 +156,8 @@ const getAdminEarnings = async (req, res, next) => {
     // 1. Fetch all delivered orders grouped by deliveryDate
     const orders = await Order.find({ status: "delivered" }).select("deliveryDate total");
     
-    // 2. Fetch all daily purchases
-    const purchases = await DailyPurchase.find({});
+    // 2. Fetch daily purchases (real business only)
+    const purchases = await DailyPurchase.find({ date: { $gte: getBusinessStartDate() } });
 
     // 3. Fetch all partner salaries
     const salaries = await PartnerSalary.find({});
@@ -200,9 +229,27 @@ const getAdminEarnings = async (req, res, next) => {
   }
 };
 
+// @desc    Delete test vendor purchase/settlement rows before business start
+// @route   DELETE /api/purchases/test-data
+// @access  Private/Admin
+const deleteTestPurchaseData = async (req, res, next) => {
+  try {
+    const businessStart = getBusinessStartDate();
+    const result = await DailyPurchase.deleteMany({ date: { $lt: businessStart } });
+    res.json({
+      message: `Removed ${result.deletedCount} test purchase/settlement record(s) before ${businessStart}.`,
+      deletedCount: result.deletedCount,
+      businessStartDate: businessStart
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getPurchaseByDate,
   savePurchase,
   getOverallPending,
-  getAdminEarnings
+  getAdminEarnings,
+  deleteTestPurchaseData
 };

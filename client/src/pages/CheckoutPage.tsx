@@ -15,6 +15,7 @@ import {
 } from "../lib/maduraiDelivery";
 import OrderPriceNotice from "../components/OrderPriceNotice";
 import { SHOP_PHONE_DISPLAY, SHOP_PHONE_TEL, shopWhatsAppUrl } from "../lib/shopContact";
+import { DELIVERY_TIMES, DEFAULT_DELIVERY_TIME } from "../lib/deliveryTimes";
 
 const CART_CHECK_DATE_KEY = "meenboy_cart_check_date";
 
@@ -30,14 +31,6 @@ const getLocalDateString = (date = new Date()) => {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 };
-
-const DELIVERY_TIMES = [
-  "06:00 AM - 07:00 AM",
-  "07:00 AM - 08:00 AM",
-  "08:00 AM - 09:00 AM",
-  "09:00 AM - 10:00 AM",
-  "10:00 AM - 11:00 AM",
-];
 
 interface CheckoutForm {
   name: string;
@@ -120,7 +113,7 @@ const CheckoutPage = () => {
     pincode: "",
     mapUrl: "",
     deliveryDate: initialDeliveryDate,
-    deliveryTime: DELIVERY_TIMES[0],
+    deliveryTime: DEFAULT_DELIVERY_TIME,
   });
 
   const [paymentMethod, setPaymentMethod] = useState<"cash_on_delivery" | "upi">("cash_on_delivery");

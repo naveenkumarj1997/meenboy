@@ -17,6 +17,8 @@ import {
 import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption, formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
+import { DELIVERY_TIMES, DEFAULT_DELIVERY_TIME } from "../../lib/deliveryTimes";
+import { computeOrderTotal, parseNonNegativeAmount } from "../../lib/orderTotals";
 import {
   PieChart,
   Pie,
@@ -84,14 +86,6 @@ function OrderItemsAndNotes({
 }
 
 const COLORS = ["#14b8a6", "#f59e0b", "#f43f5e", "#6366f1", "#8b5cf6"];
-
-const DELIVERY_TIMES = [
-  "06:00 AM - 07:00 AM",
-  "07:00 AM - 08:00 AM",
-  "08:00 AM - 09:00 AM",
-  "09:00 AM - 10:00 AM",
-  "10:00 AM - 11:00 AM"
-];
 
 const isKgUnit = (unit?: string) => !unit || unit.toLowerCase() === "kg";
 
@@ -299,9 +293,13 @@ export default function AdminDeliveryTracking() {
       _id: order._id,
       status: order.status,
       deliveryDate: order.deliveryDate || "",
-      deliveryTime: order.deliveryTime || DELIVERY_TIMES[0],
+      deliveryTime: order.deliveryTime || DEFAULT_DELIVERY_TIME,
       mapUrl: order.mapUrl || "",
       deliveryFee: order.deliveryFee || 0,
+      discountAmount: order.discountAmount || 0,
+      discountNote: order.discountNote || "",
+      addonAmount: order.addonAmount || 0,
+      addonNote: order.addonNote || "",
       deliveryPartnerId: assignedPartnerId,
       address: {
         line1: order.address?.line1 || "",
@@ -366,7 +364,11 @@ export default function AdminDeliveryTracking() {
         deliveryDate: editingOrder.deliveryDate,
         deliveryTime: editingOrder.deliveryTime,
         mapUrl: editingOrder.mapUrl,
-        deliveryFee: editingOrder.deliveryFee
+        deliveryFee: editingOrder.deliveryFee,
+        discountAmount: editingOrder.discountAmount,
+        discountNote: editingOrder.discountNote,
+        addonAmount: editingOrder.addonAmount,
+        addonNote: editingOrder.addonNote
       });
       const currentPartnerId = partnerIdFromAssignment(assignments, editingOrder._id);
       if (editingOrder.deliveryPartnerId && editingOrder.deliveryPartnerId !== currentPartnerId) {
@@ -1398,6 +1400,77 @@ export default function AdminDeliveryTracking() {
                   onChange={(e) => setEditingOrder({ ...editingOrder, deliveryFee: Number(e.target.value) })}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
                 />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Discount (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editingOrder.discountAmount || ""}
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      discountAmount: parseNonNegativeAmount(e.target.value)
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">Discount note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bulk order / frying shop discount"
+                  value={editingOrder.discountNote || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, discountNote: e.target.value })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Addon (₹)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={editingOrder.addonAmount || ""}
+                  onChange={(e) =>
+                    setEditingOrder({
+                      ...editingOrder,
+                      addonAmount: parseNonNegativeAmount(e.target.value)
+                    })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-slate-400 mb-1">Addon note</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Extra packaging"
+                  value={editingOrder.addonNote || ""}
+                  onChange={(e) =>
+                    setEditingOrder({ ...editingOrder, addonNote: e.target.value })
+                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                />
+              </div>
+              <div className="sm:col-span-2 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 flex justify-between items-center">
+                <span className="text-sm text-teal-200 font-semibold">Order total</span>
+                <span className="text-lg font-black text-teal-300">
+                  ₹
+                  {computeOrderTotal(
+                    (editingOrder.items || []).reduce(
+                      (sum: number, item: any) => sum + Number(item.totalPrice || 0),
+                      0
+                    ),
+                    editingOrder.deliveryFee,
+                    editingOrder.discountAmount,
+                    editingOrder.addonAmount
+                  ).toFixed(2)}
+                </span>
               </div>
             </div>
 

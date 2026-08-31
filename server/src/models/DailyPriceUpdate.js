@@ -22,6 +22,14 @@ const dailyPriceUpdateSchema = new mongoose.Schema(
         dailyUnitPrice: Number,
         amountDifference: Number
       }
+    ],
+    savedRates: [
+      {
+        productId: String,
+        productName: String,
+        cutName: String,
+        unitPrice: Number
+      }
     ]
   },
   { timestamps: true }

@@ -4,11 +4,23 @@ import { useAuth } from "../../context/AuthContext";
 import { getPartnerAssignments, updateDeliveryStatus, reorderAssignments, uploadPartnerDocument } from "../../lib/api";
 import { formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
+import OrderAdjustmentsBreakdown from "../../components/OrderAdjustmentsBreakdown";
 
 const NAV_LINKS = [
   { label: "Deliveries", href: "/dashboard/delivery" },
   { label: "Earnings", href: "/dashboard/delivery/earnings" }
 ];
+
+const formatMoney = (value: unknown) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+};
+
+const formatUnitPriceLabel = (item: { unitPrice?: number; unit?: string }) => {
+  const unit = String(item.unit || "kg").toLowerCase();
+  const label = unit === "piece" ? "piece" : unit;
+  return `₹${formatMoney(item.unitPrice)}/${label}`;
+};
 
 function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: () => void }) {
   const [file, setFile] = useState<File | null>(null);
@@ -500,11 +512,35 @@ export default function DeliveryDashboard() {
                       )}
                       
                       <div className="text-white text-sm bg-slate-800/50 p-3 rounded-lg border border-slate-800 space-y-2">
-                        <div className="font-medium">
-                          To Collect:{" "}
-                          <span className="text-emerald-400 font-bold">
-                            ₹{order.total?.toFixed(2)}
-                          </span>
+                        <div className="space-y-1">
+                          <div className="font-medium">
+                            To Collect:{" "}
+                            <span className="text-emerald-400 font-bold">
+                              ₹{formatMoney(order.total)}
+                            </span>
+                          </div>
+                          {(Number(order.subtotal) > 0 || Number(order.deliveryFee) > 0) && (
+                            <div className="text-xs text-slate-400 space-y-0.5">
+                              {Number(order.subtotal) > 0 && (
+                                <div>Items subtotal: ₹{formatMoney(order.subtotal)}</div>
+                              )}
+                              {Number(order.deliveryFee) > 0 && (
+                                <div>Delivery fee: ₹{formatMoney(order.deliveryFee)}</div>
+                              )}
+                              {Number(order.addonAmount) > 0 && (
+                                <div className="text-amber-300">
+                                  Addon: +₹{formatMoney(order.addonAmount)}
+                                  {order.addonNote ? ` (${order.addonNote})` : ""}
+                                </div>
+                              )}
+                              {Number(order.discountAmount) > 0 && (
+                                <div className="text-emerald-300">
+                                  Discount: −₹{formatMoney(order.discountAmount)}
+                                  {order.discountNote ? ` (${order.discountNote})` : ""}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="space-y-1.5">
                           <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">
@@ -518,14 +554,21 @@ export default function DeliveryDashboard() {
                                 key={idx}
                                 className="text-sm text-slate-200 bg-slate-900/60 border border-slate-700/60 rounded-lg px-2.5 py-2"
                               >
-                                <div className="font-semibold text-white">
-                                  {idx + 1}. {item.productName}
-                                  {item.cutName ? (
-                                    <span className="text-teal-300 font-medium"> · {item.cutName}</span>
-                                  ) : null}
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="font-semibold text-white min-w-0">
+                                    {idx + 1}. {item.productName}
+                                    {item.cutName ? (
+                                      <span className="text-teal-300 font-medium"> · {item.cutName}</span>
+                                    ) : null}
+                                  </div>
+                                  <span className="text-teal-300 font-bold text-sm shrink-0">
+                                    ₹{formatMoney(item.totalPrice)}
+                                  </span>
                                 </div>
                                 <div className="text-xs text-slate-400 mt-0.5">
                                   Qty: {formatQuantityLabel(item.quantity, item.unit)}
+                                  {" · "}
+                                  {formatUnitPriceLabel(item)}
                                 </div>
                                 {item.notes?.trim() && (
                                   <div className="text-xs text-amber-300 mt-1">

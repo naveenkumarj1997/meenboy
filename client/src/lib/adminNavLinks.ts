@@ -14,6 +14,7 @@ export const ADMIN_NAV_LINKS = [
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
   { label: "Collected Payments", href: "/dashboard/admin/collected-payments" },
   { label: "Delivery Amount Collection", href: "/dashboard/admin/delivery-amount-collection" },
+  { label: "Delivery Status Change", href: "/dashboard/admin/delivery-status-change" },
   { label: "Purchases", href: "/dashboard/admin/purchases" },
   { label: "Settlements", href: "/dashboard/admin/settlements" },
   { label: "Partner Salary", href: "/dashboard/admin/partner-salary" },

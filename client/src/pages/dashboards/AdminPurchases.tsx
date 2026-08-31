@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
+import { BUSINESS_START_DATE } from "../../lib/businessDates";
 
 export default function AdminPurchases() {
   const { token } = useAuth();
@@ -104,6 +105,14 @@ export default function AdminPurchases() {
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
       {success && <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">{success}</div>}
 
+      <div className="mb-6 bg-slate-900 border border-teal-500/25 rounded-2xl p-5">
+        <h3 className="text-sm font-bold text-white mb-1">Real purchases from {BUSINESS_START_DATE}</h3>
+        <p className="text-sm text-slate-400">
+          Test purchase data before this date was cleared. Enter vendor purchases from{" "}
+          <strong className="text-slate-200">{BUSINESS_START_DATE}</strong> onward only.
+        </p>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Left Col - Input Form */}
@@ -112,7 +121,9 @@ export default function AdminPurchases() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4 border-b border-slate-800 pb-6">
             <div>
               <h3 className="text-xl font-bold text-white">Purchase Entry</h3>
-              <p className="text-sm text-slate-400 mt-1">Select a date to view or edit.</p>
+              <p className="text-sm text-slate-400 mt-1">
+                Select a date from {BUSINESS_START_DATE} to enter purchases.
+              </p>
             </div>
             <div>
               <label className="block text-xs uppercase tracking-wider text-slate-400 font-bold mb-1">Select Date</label>
@@ -120,6 +131,7 @@ export default function AdminPurchases() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
+                min={BUSINESS_START_DATE}
                 max={today} // prevent future dates if desired
                 className="bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg outline-none focus:border-teal-500 transition-colors"
               />

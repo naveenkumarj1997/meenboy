@@ -4,6 +4,7 @@ import { getMyOrders } from "../../lib/api";
 import DashboardShell from "./DashboardShell";
 import OrderChangeHelp from "../../components/OrderChangeHelp";
 import OrderPriceNotice from "../../components/OrderPriceNotice";
+import OrderAdjustmentsBreakdown from "../../components/OrderAdjustmentsBreakdown";
 
 const CUSTOMER_NAV_LINKS = [
   { label: "Orders", href: "/dashboard" },
@@ -145,6 +146,10 @@ export default function CustomerDeliveryStatus() {
                            total={order.total}
                            items={order.items}
                          />
+                       </div>
+
+                       <div className="mb-4">
+                         <OrderAdjustmentsBreakdown order={order} compact />
                        </div>
                        
                        {order.deliveryPartner && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
+import { BUSINESS_START_DATE } from "../../lib/businessDates";
 
 export default function AdminSettlements() {
   const { token } = useAuth();
@@ -153,6 +154,12 @@ export default function AdminSettlements() {
             LIFETIME DEBT
           </div>
           <h3 className="text-lg font-bold text-white mb-4">Total Outstanding Pending to Vendors</h3>
+          {overallPending.businessStartDate && (
+            <p className="text-xs text-slate-400 mb-4">
+              Counts from real business start: <strong className="text-slate-300">{overallPending.businessStartDate}</strong>
+              (test data before this date is excluded).
+            </p>
+          )}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
               <div className="text-xs text-slate-500 uppercase font-bold mb-1">🍗 Chicken Shop</div>
@@ -190,6 +197,7 @@ export default function AdminSettlements() {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
+                min={overallPending?.businessStartDate || BUSINESS_START_DATE}
                 max={today}
                 className="bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg outline-none focus:border-blue-500 transition-colors"
               />

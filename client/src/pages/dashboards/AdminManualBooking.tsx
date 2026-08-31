@@ -19,14 +19,14 @@ import {
 } from "../../lib/maduraiDelivery";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG } from "../../lib/weightOptions";
-
-const DELIVERY_TIMES = [
-  "06:00 AM - 07:00 AM",
-  "07:00 AM - 08:00 AM",
-  "08:00 AM - 09:00 AM",
-  "09:00 AM - 10:00 AM",
-  "10:00 AM - 11:00 AM"
-];
+import { DELIVERY_TIMES, DEFAULT_DELIVERY_TIME } from "../../lib/deliveryTimes";
+import {
+  computeOrderTotal,
+  emptyBookingAdjustments,
+  bookingAdjustmentsFromUser,
+  parseNonNegativeAmount,
+  type BookingAdjustments
+} from "../../lib/orderTotals";
 
 const formatPrice = (price: number) => {
   if (isNaN(price) || price === null || price === undefined) return "0";
@@ -77,9 +77,10 @@ export default function AdminManualBooking() {
   const [cart, setCart] = useState<any[]>([]);
 
   const [deliveryDate, setDeliveryDate] = useState("");
-  const [deliveryTime, setDeliveryTime] = useState(DELIVERY_TIMES[0]);
+  const [deliveryTime, setDeliveryTime] = useState(DEFAULT_DELIVERY_TIME);
   const [addressForm, setAddressForm] = useState(emptyAddressForm());
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
+  const [adjustments, setAdjustments] = useState<BookingAdjustments>(emptyBookingAdjustments());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -116,6 +117,7 @@ export default function AdminManualBooking() {
           phone: user.address?.phone || user.phone || "",
           mapUrl: user.mapUrl || ""
         });
+        setAdjustments(bookingAdjustmentsFromUser(user));
       }
     }
   }, [customerType, selectedUserId, users]);
@@ -125,6 +127,7 @@ export default function AdminManualBooking() {
       setSelectedUserId("");
       setNewCustomer({ name: "", email: "", phone: "" });
       setAddressForm(emptyAddressForm());
+      setAdjustments(emptyBookingAdjustments());
     }
   }, [customerType]);
 
@@ -160,6 +163,12 @@ export default function AdminManualBooking() {
 
   const cartTotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
   const deliveryFee = 0;
+  const orderTotal = computeOrderTotal(
+    cartTotal,
+    deliveryFee,
+    adjustments.discountAmount,
+    adjustments.addonAmount
+  );
 
   const handleDownloadInvoice = async (orderId: string) => {
     if (!token) return;
@@ -239,7 +248,11 @@ export default function AdminManualBooking() {
         deliveryFee,
         deliveryDate,
         deliveryTime,
-        mapUrl: addressForm.mapUrl.trim() || undefined
+        mapUrl: addressForm.mapUrl.trim() || undefined,
+        discountAmount: adjustments.discountAmount,
+        discountNote: adjustments.discountNote,
+        addonAmount: adjustments.addonAmount,
+        addonNote: adjustments.addonNote
       };
 
       if (customerType === "existing") {
@@ -262,6 +275,7 @@ export default function AdminManualBooking() {
       setNewCustomer({ name: "", email: "", phone: "" });
       setAddressForm(emptyAddressForm());
       setSelectedUserId("");
+      setAdjustments(emptyBookingAdjustments());
       if (orderId) {
         // Offer invoice immediately
         try {
@@ -613,11 +627,81 @@ export default function AdminManualBooking() {
                   <span>Delivery fee</span>
                   <span className="text-teal-400 font-medium">Free</span>
                 </div>
+
+                <div className="border border-white/10 rounded-xl p-4 mb-4 space-y-3 bg-black/20">
+                  <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">
+                    Discount / Addon (saved for future bookings)
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-white/60 mb-1">Discount (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={adjustments.discountAmount || ""}
+                        onChange={(e) =>
+                          setAdjustments({
+                            ...adjustments,
+                            discountAmount: parseNonNegativeAmount(e.target.value)
+                          })
+                        }
+                        placeholder="e.g. 50 or 100"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-white/60 mb-1">Addon (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={adjustments.addonAmount || ""}
+                        onChange={(e) =>
+                          setAdjustments({
+                            ...adjustments,
+                            addonAmount: parseNonNegativeAmount(e.target.value)
+                          })
+                        }
+                        placeholder="e.g. extra charge"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-1">Discount note (why)</label>
+                    <input
+                      type="text"
+                      value={adjustments.discountNote || ""}
+                      onChange={(e) =>
+                        setAdjustments({ ...adjustments, discountNote: e.target.value })
+                      }
+                      placeholder="e.g. Bulk order customer, frying shop discount"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-white/60 mb-1">Addon note (why)</label>
+                    <input
+                      type="text"
+                      value={adjustments.addonNote || ""}
+                      onChange={(e) =>
+                        setAdjustments({ ...adjustments, addonNote: e.target.value })
+                      }
+                      placeholder="e.g. Extra packaging charge"
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                  </div>
+                  {(Number(adjustments.discountAmount) > 0 || Number(adjustments.addonAmount) > 0) && (
+                    <p className="text-[11px] text-amber-300/80">
+                      These amounts apply to this order and auto-fill for this customer&apos;s next manual booking.
+                    </p>
+                  )}
+                </div>
+
                 <div className="flex justify-between text-base font-bold text-white mb-4">
                   <span>Approx. total</span>
-                  <span className="text-teal-400">
-                    ₹{formatPrice(cartTotal + deliveryFee)}
-                  </span>
+                  <span className="text-teal-400">₹{formatPrice(orderTotal)}</span>
                 </div>
 
                 <button

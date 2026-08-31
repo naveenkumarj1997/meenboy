@@ -26,6 +26,51 @@ const { buildCategoryOrdersForDate } = require("../utils/buildCategoryOrdersRepo
 const { buildAllOrdersForDate } = require("../utils/buildAllOrdersReport");
 const { generateCategoryOrdersReport } = require("../utils/pdfCategoryOrdersReport");
 const { generateAllOrdersReport } = require("../utils/pdfAllOrdersReport");
+const { computeOrderTotal, parseNonNegativeAmount } = require("../utils/orderTotals");
+
+const syncCustomerBookingAdjustments = async (customerId, adjustments = {}) => {
+  if (!customerId) return;
+  await User.findByIdAndUpdate(customerId, {
+    bookingAdjustments: {
+      discountAmount: parseNonNegativeAmount(adjustments.discountAmount),
+      discountNote: String(adjustments.discountNote || "").trim(),
+      addonAmount: parseNonNegativeAmount(adjustments.addonAmount),
+      addonNote: String(adjustments.addonNote || "").trim()
+    }
+  });
+};
+
+const applyOrderAdjustments = (order, body = {}) => {
+  if (body.discountAmount != null && body.discountAmount !== "") {
+    order.discountAmount = parseNonNegativeAmount(body.discountAmount);
+  }
+  if (body.discountNote !== undefined) {
+    order.discountNote = String(body.discountNote || "").trim();
+  }
+  if (body.addonAmount != null && body.addonAmount !== "") {
+    order.addonAmount = parseNonNegativeAmount(body.addonAmount);
+  }
+  if (body.addonNote !== undefined) {
+    order.addonNote = String(body.addonNote || "").trim();
+  }
+};
+
+const recalculateOrderTotal = (order) => {
+  order.total = computeOrderTotal(
+    order.subtotal,
+    order.deliveryFee,
+    order.discountAmount,
+    order.addonAmount
+  );
+};
+
+const regenerateOrderInvoice = async (order) => {
+  const customer = await User.findById(order.customer).lean();
+  if (!customer) return;
+  const relativePath = await generateInvoice(order, customer);
+  order.invoicePath = relativePath;
+  await order.save();
+};
 
 const applyDailyPriceFlags = async (orders) => {
   if (!orders.length) return orders;
@@ -110,7 +155,7 @@ const createOrder = async (req, res, next) => {
     }
 
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
-    const total = subtotal + deliveryFee;
+    const total = computeOrderTotal(subtotal, deliveryFee);
     const dailyUpdate = deliveryDate
       ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
       : null;
@@ -250,6 +295,12 @@ const updateAdminOrder = async (req, res, next) => {
   try {
     const { orderId } = req.params;
     const { items, address, deliveryDate, deliveryTime, mapUrl, deliveryFee } = req.body;
+    const adjustmentFields = {
+      discountAmount: req.body.discountAmount,
+      discountNote: req.body.discountNote,
+      addonAmount: req.body.addonAmount,
+      addonNote: req.body.addonNote
+    };
 
     const order = await Order.findById(orderId);
     if (!order) return res.status(404).json({ message: "Order not found" });
@@ -280,9 +331,10 @@ const updateAdminOrder = async (req, res, next) => {
     }
 
     if (deliveryFee != null && deliveryFee !== "") {
-      order.deliveryFee = Number(deliveryFee) || 0;
+      order.deliveryFee = parseNonNegativeAmount(deliveryFee);
     }
-    order.total = Number(order.subtotal || 0) + Number(order.deliveryFee || 0);
+    applyOrderAdjustments(order, adjustmentFields);
+    recalculateOrderTotal(order);
 
     if (address) {
       order.address = order.address || {};
@@ -299,6 +351,19 @@ const updateAdminOrder = async (req, res, next) => {
     if (mapUrl !== undefined) order.mapUrl = mapUrl;
 
     await order.save();
+
+    await syncCustomerBookingAdjustments(order.customer, {
+      discountAmount: order.discountAmount,
+      discountNote: order.discountNote,
+      addonAmount: order.addonAmount,
+      addonNote: order.addonNote
+    });
+
+    try {
+      await regenerateOrderInvoice(order);
+    } catch (pdfErr) {
+      console.error("Invoice regenerate after admin edit:", pdfErr.message);
+    }
 
     await createNotification({
       user: order.customer,
@@ -455,7 +520,7 @@ const buildDailyPriceSummary = (orders) => {
       if (!productMap.has(key)) {
         const booked = item.estimatedUnitPrice != null ? Number(item.estimatedUnitPrice) : Number(item.unitPrice);
         productMap.set(key, {
-          productId: item.product,
+          productId: normalizeProductId(item.product),
           productName: item.productName,
           cutName: item.cutName,
           unit: item.unit || "kg",
@@ -464,7 +529,9 @@ const buildDailyPriceSummary = (orders) => {
           totalQuantity: 0
         });
       }
-      productMap.get(key).totalQuantity += Number(item.quantity) || 0;
+      const entry = productMap.get(key);
+      entry.totalQuantity += Number(item.quantity) || 0;
+      entry.currentUnitPrice = Number(item.unitPrice);
     });
   });
 
@@ -494,6 +561,60 @@ const buildDailyPriceSummary = (orders) => {
   return { products, changes };
 };
 
+const normalizeCutName = (cut) => String(cut || "").trim();
+
+const normalizeProductId = (id) => String(id || "").trim();
+
+const matchPriceUpdate = (item, priceUpdates) =>
+  (priceUpdates || []).find((pu) => {
+    const cutMatch =
+      normalizeCutName(pu.cutName) === normalizeCutName(item.cutName);
+    const idMatch = normalizeProductId(pu.productId) === normalizeProductId(item.product);
+    if (idMatch && cutMatch) return true;
+    if (pu.productName && cutMatch) {
+      return (
+        String(pu.productName).trim().toLowerCase() ===
+        String(item.productName || "").trim().toLowerCase()
+      );
+    }
+    return false;
+  });
+
+const applySavedRatesToProducts = (products, savedRates) => {
+  if (!savedRates?.length) return products;
+
+  return products.map((p) => {
+    const rate = savedRates.find(
+      (r) =>
+        normalizeProductId(r.productId) === normalizeProductId(p.productId) &&
+        normalizeCutName(r.cutName) === normalizeCutName(p.cutName)
+    );
+    if (!rate || !Number.isFinite(Number(rate.unitPrice))) return p;
+
+    const daily = Number(rate.unitPrice);
+    const booked = Number(p.estimatedUnitPrice);
+    const qty = Number(p.totalQuantity) || 0;
+    return {
+      ...p,
+      currentUnitPrice: daily,
+      amountDifference: Math.round((daily - booked) * qty * 100) / 100
+    };
+  });
+};
+
+const buildChangesFromProducts = (products) =>
+  (products || [])
+    .filter((p) => Math.abs(Number(p.amountDifference)) > 0.01)
+    .map((p) => ({
+      productName: p.productName,
+      cutName: p.cutName,
+      unit: p.unit,
+      quantity: p.totalQuantity,
+      bookedUnitPrice: p.estimatedUnitPrice,
+      dailyUnitPrice: p.currentUnitPrice,
+      amountDifference: p.amountDifference
+    }));
+
 const getProductsForDailyPrice = async (req, res, next) => {
   try {
     const { deliveryDate } = req.query;
@@ -506,15 +627,20 @@ const getProductsForDailyPrice = async (req, res, next) => {
       status: { $nin: ["cancelled"] }
     }).lean();
 
-    const { products, changes } = buildDailyPriceSummary(orders);
+    let { products, changes } = buildDailyPriceSummary(orders);
     const lock = await DailyPriceUpdate.findOne({ deliveryDate }).populate("updatedBy", "name").lean();
+
+    if (lock?.savedRates?.length) {
+      products = applySavedRatesToProducts(products, lock.savedRates);
+      changes = buildChangesFromProducts(products);
+    }
 
     res.json({
       products,
       dailyPriceUpdated: Boolean(lock),
       updatedAt: lock?.updatedAt || null,
       updatedByName: lock?.updatedBy?.name || null,
-      changes: lock?.items?.length ? lock.items : changes
+      changes
     });
   } catch (error) {
     next(error);
@@ -527,8 +653,15 @@ const updateDailyPrices = async (req, res, next) => {
 
     const orders = await Order.find({
       deliveryDate,
-      status: { $in: ["pending", "confirmed", "preparing"] }
+      status: { $in: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"] }
     });
+
+    const savedRates = (priceUpdates || []).map((pu) => ({
+      productId: normalizeProductId(pu.productId),
+      productName: String(pu.productName || "").trim(),
+      cutName: normalizeCutName(pu.cutName),
+      unitPrice: Number(pu.newPrice)
+    }));
 
     let updatedCount = 0;
     const now = new Date();
@@ -546,25 +679,42 @@ const updateDailyPrices = async (req, res, next) => {
       }
 
       let orderChanged = false;
+      const newItems = order.items.map((item) => {
+        const plain =
+          typeof item.toObject === "function" ? item.toObject() : { ...item };
 
-      for (const item of order.items) {
-        if (item.estimatedUnitPrice == null) item.estimatedUnitPrice = item.unitPrice;
-        if (item.estimatedTotalPrice == null) item.estimatedTotalPrice = item.totalPrice;
+        if (plain.estimatedUnitPrice == null) plain.estimatedUnitPrice = plain.unitPrice;
+        if (plain.estimatedTotalPrice == null) plain.estimatedTotalPrice = plain.totalPrice;
 
-        const update = priceUpdates.find(
-          (pu) => String(pu.productId) === String(item.product) && (pu.cutName ? pu.cutName === item.cutName : !item.cutName)
-        );
+        const update = matchPriceUpdate(item, priceUpdates);
 
         if (update && update.newPrice != null && update.newPrice !== "") {
-          item.unitPrice = update.newPrice;
-          item.totalPrice = update.newPrice * item.quantity;
-          orderChanged = true;
+          const newPrice = Number(update.newPrice);
+          if (!Number.isFinite(newPrice) || newPrice < 0) return plain;
+
+          const qty = Number(item.quantity) || 0;
+          const newLineTotal = Math.round(newPrice * qty * 100) / 100;
+          const priceDiff = Math.abs(Number(item.unitPrice) - newPrice);
+          const lineDiff = Math.abs(Number(item.totalPrice) - newLineTotal);
+
+          if (priceDiff > 0.001 || lineDiff > 0.01) {
+            orderChanged = true;
+            return {
+              ...plain,
+              unitPrice: newPrice,
+              totalPrice: newLineTotal
+            };
+          }
         }
-      }
+
+        return plain;
+      });
 
       if (orderChanged) {
-        order.subtotal = order.items.reduce((sum, item) => sum + item.totalPrice, 0);
-        order.total = order.subtotal + order.deliveryFee;
+        order.items = newItems;
+        order.subtotal = newItems.reduce((sum, item) => sum + Number(item.totalPrice || 0), 0);
+        recalculateOrderTotal(order);
+        order.markModified("items");
         updatedCount++;
       }
 
@@ -577,6 +727,17 @@ const updateDailyPrices = async (req, res, next) => {
           { order: order._id, status: { $in: ["pending", "authorized", "failed"] } },
           { amount: order.total }
         );
+
+        try {
+          const customer = await User.findById(order.customer).lean();
+          if (customer) {
+            const relativePath = await generateInvoice(order, customer);
+            order.invoicePath = relativePath;
+            await order.save();
+          }
+        } catch (pdfErr) {
+          console.error("Invoice regenerate after daily price update:", pdfErr.message);
+        }
       }
 
       if (!alreadyConfirmed || orderChanged) {
@@ -596,10 +757,13 @@ const updateDailyPrices = async (req, res, next) => {
       deliveryDate,
       status: { $nin: ["cancelled"] }
     }).lean();
-    const { changes } = buildDailyPriceSummary(refreshed);
+    let { products, changes } = buildDailyPriceSummary(refreshed);
+    products = applySavedRatesToProducts(products, savedRates);
+    changes = buildChangesFromProducts(products);
+
     await DailyPriceUpdate.findOneAndUpdate(
       { deliveryDate },
-      { items: changes, updatedBy: req.user._id },
+      { items: changes, savedRates, updatedBy: req.user._id },
       { upsert: true, new: true }
     );
 
@@ -607,7 +771,8 @@ const updateDailyPrices = async (req, res, next) => {
       message: `Daily prices saved for ${deliveryDate}. ${updatedCount} order(s) recalculated.`,
       updatedCount,
       dailyPriceUpdated: true,
-      changes
+      changes,
+      products
     });
   } catch (error) {
     next(error);
@@ -1161,7 +1326,11 @@ const createAdminOrder = async (req, res, next) => {
       mapUrl,
       customerNotes = "",
       customerId,
-      newCustomer
+      newCustomer,
+      discountAmount = 0,
+      discountNote = "",
+      addonAmount = 0,
+      addonNote = ""
     } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
@@ -1281,8 +1450,13 @@ const createAdminOrder = async (req, res, next) => {
       .filter(Boolean)
       .join(" | ");
 
+    const parsedDiscount = parseNonNegativeAmount(discountAmount);
+    const parsedAddon = parseNonNegativeAmount(addonAmount);
+    const parsedDiscountNote = String(discountNote || "").trim();
+    const parsedAddonNote = String(addonNote || "").trim();
+
     const subtotal = itemsWithNotes.reduce((sum, item) => sum + item.totalPrice, 0);
-    const total = subtotal + Number(deliveryFee || 0);
+    const total = computeOrderTotal(subtotal, deliveryFee, parsedDiscount, parsedAddon);
     const dailyUpdate = deliveryDate
       ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
       : null;
@@ -1292,6 +1466,10 @@ const createAdminOrder = async (req, res, next) => {
       items: snapshotOrderItems(itemsWithNotes),
       subtotal,
       deliveryFee: Number(deliveryFee || 0),
+      discountAmount: parsedDiscount,
+      discountNote: parsedDiscountNote,
+      addonAmount: parsedAddon,
+      addonNote: parsedAddonNote,
       total,
       estimatedTotal: total,
       dailyPriceUpdated: Boolean(dailyUpdate),
@@ -1310,6 +1488,13 @@ const createAdminOrder = async (req, res, next) => {
       mapUrl: mapUrl || "",
       customerNotes: itemNotesSummary || notesText,
       bookingSource: "manual"
+    });
+
+    await syncCustomerBookingAdjustments(finalCustomerId, {
+      discountAmount: parsedDiscount,
+      discountNote: parsedDiscountNote,
+      addonAmount: parsedAddon,
+      addonNote: parsedAddonNote
     });
 
     // Generate invoice immediately (same as online order invoice flow)
@@ -1476,6 +1661,105 @@ const getTodayDeliveryStatus = async (req, res, next) => {
   }
 };
 
+const adminUpdateDeliveryPayment = async (req, res, next) => {
+  try {
+    const { assignmentId } = req.params;
+    const { paymentMethod, paymentCollected, adminNote } = req.body;
+
+    const assignment = await DeliveryAssignment.findById(assignmentId).populate("order");
+    if (!assignment) {
+      return res.status(404).json({ message: "Delivery assignment not found" });
+    }
+    if (assignment.status !== "delivered") {
+      return res.status(400).json({
+        message: "Payment can only be corrected for deliveries already marked as delivered."
+      });
+    }
+
+    const order = assignment.order;
+    if (!order) {
+      return res.status(404).json({ message: "Order not found for this delivery" });
+    }
+
+    const orderTotal = Number(order.total) || 0;
+    const oldCollected = Number(assignment.paymentCollected || 0);
+    const oldUnpaid = Math.round(Math.max(0, orderTotal - oldCollected) * 100) / 100;
+
+    let collected = Number(paymentCollected) || 0;
+
+    if (paymentMethod === "cash" || paymentMethod === "upi") {
+      collected = orderTotal;
+    } else if (paymentMethod === "pay_later" || paymentMethod === "none") {
+      collected = 0;
+    } else if (paymentMethod === "partial_cash" || paymentMethod === "partial_upi") {
+      if (collected <= 0) {
+        return res.status(400).json({ message: "Enter the partial amount collected." });
+      }
+      if (collected >= orderTotal) {
+        return res.status(400).json({
+          message: "Partial amount must be less than the full order total."
+        });
+      }
+    } else {
+      return res.status(400).json({ message: "Valid payment method is required." });
+    }
+
+    const newUnpaid = Math.round(Math.max(0, orderTotal - collected) * 100) / 100;
+    const pendingDelta = Math.round((newUnpaid - oldUnpaid) * 100) / 100;
+
+    if (pendingDelta > 0) {
+      await User.findByIdAndUpdate(order.customer, { $inc: { pendingBalance: pendingDelta } });
+    } else if (pendingDelta < 0) {
+      const reduceBy = Math.round(Math.abs(pendingDelta) * 100) / 100;
+      const customer = await User.findById(order.customer);
+      if (customer) {
+        const currentPending = Math.round((Number(customer.pendingBalance) || 0) * 100) / 100;
+        const actualReduce = Math.min(currentPending, reduceBy);
+        if (actualReduce > 0) {
+          await User.findByIdAndUpdate(order.customer, { $inc: { pendingBalance: -actualReduce } });
+          const updated = await User.findById(order.customer);
+          if (updated) {
+            const remaining = Math.max(
+              0,
+              Math.round((Number(updated.pendingBalance) || 0) * 100) / 100
+            );
+            if (remaining !== updated.pendingBalance) {
+              updated.pendingBalance = remaining;
+              await updated.save();
+            }
+          }
+        }
+      }
+    }
+
+    let notes = String(assignment.notes || "").trim();
+    const noteText = String(adminNote || "").trim();
+    if (noteText) {
+      const tag = `[Admin payment fix] ${noteText}`;
+      notes = notes ? `${notes} | ${tag}` : tag;
+    }
+
+    assignment.paymentCollected = collected;
+    assignment.paymentMethod = paymentMethod;
+    assignment.notes = notes.slice(0, 500);
+    await assignment.save();
+
+    const populated = await DeliveryAssignment.findById(assignment._id)
+      .populate({
+        path: "order",
+        populate: { path: "customer", select: "name phone email" }
+      })
+      .populate("deliveryPartner", "name phone email");
+
+    res.json({
+      assignment: populated,
+      message: "Delivery payment status updated successfully."
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
@@ -1501,6 +1785,7 @@ module.exports = {
   getDeliveryStats,
   getTodayDeliveryStatus,
   reorderAssignments,
-  createAdminOrder
+  createAdminOrder,
+  adminUpdateDeliveryPayment
 };
 
