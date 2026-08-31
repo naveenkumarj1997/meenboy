@@ -473,6 +473,10 @@ export interface AllOrdersReportOrder {
   customerNotes?: string;
   subtotal: number;
   deliveryFee: number;
+  discountAmount?: number;
+  discountNote?: string;
+  addonAmount?: number;
+  addonNote?: string;
   total: number;
   paymentStatus?: string;
   items: AllOrdersReportItem[];
