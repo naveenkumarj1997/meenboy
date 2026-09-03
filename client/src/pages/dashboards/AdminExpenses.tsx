@@ -482,7 +482,9 @@ export default function AdminExpenses() {
                 onChange={(e) =>
                   setForm({
                     ...form,
-                    paymentMethod: e.target.value as ExpensePayload["paymentMethod"]
+                    paymentMethod: e.target.value as NonNullable<
+                      ExpensePayload["paymentMethod"]
+                    >
                   })
                 }
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm"
