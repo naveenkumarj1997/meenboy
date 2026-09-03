@@ -501,11 +501,20 @@ export default function DeliveryDashboard() {
                       <div className="text-slate-300 text-sm mb-3">
                         <div className="font-medium text-white mb-1">{order.address?.line1}, {order.address?.line2}</div>
                         <div>{order.address?.city}, {order.address?.postalCode}</div>
-                        {order.address?.phone && <div className="text-teal-400 mt-1 flex items-center gap-1">📞 {order.address.phone}</div>}
+                      {(order.address?.phone || order.customer?.phone) && (
+                        <div className="text-teal-400 mt-1 flex items-center gap-1">
+                          📞 {order.address?.phone || order.customer?.phone}
+                        </div>
+                      )}
+                      {(order.address?.alternatePhone || order.customer?.alternatePhone) && (
+                        <div className="text-amber-300 mt-1 flex items-center gap-1">
+                          📞 Alt: {order.address?.alternatePhone || order.customer?.alternatePhone}
+                        </div>
+                      )}
                       </div>
 
-                      {order.mapUrl && (
-                        <a href={order.mapUrl} target="_blank" rel="noreferrer" className="text-teal-400 text-sm flex items-center gap-1 hover:underline mb-3 inline-flex">
+                      {(order.mapUrl || order.customer?.mapUrl) && (
+                        <a href={order.mapUrl || order.customer?.mapUrl} target="_blank" rel="noreferrer" className="text-teal-400 text-sm flex items-center gap-1 hover:underline mb-3 inline-flex">
                           📍 Open in Google Maps
                         </a>
                       )}
@@ -667,7 +676,16 @@ export default function DeliveryDashboard() {
                       <div className="font-medium text-white mb-1">{a.order?.customer?.name || 'Guest'}</div>
                       <div>{a.order?.address?.line1}, {a.order?.address?.line2}</div>
                       <div>{a.order?.address?.city}, {a.order?.address?.postalCode}</div>
-                      {a.order?.address?.phone && <div className="text-teal-400 mt-1 flex items-center gap-1">📞 {a.order.address.phone}</div>}
+                      {(a.order?.address?.phone || a.order?.customer?.phone) && (
+                        <div className="text-teal-400 mt-1 flex items-center gap-1">
+                          📞 {a.order?.address?.phone || a.order?.customer?.phone}
+                        </div>
+                      )}
+                      {(a.order?.address?.alternatePhone || a.order?.customer?.alternatePhone) && (
+                        <div className="text-amber-300 mt-1 flex items-center gap-1">
+                          📞 Alt: {a.order?.address?.alternatePhone || a.order?.customer?.alternatePhone}
+                        </div>
+                      )}
                     </div>
                   </div>
                   

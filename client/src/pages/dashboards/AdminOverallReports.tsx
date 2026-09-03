@@ -379,7 +379,14 @@ export default function AdminOverallReports() {
                                 .join(", ")}
                             </div>
                           </td>
-                          <td className="px-4 py-3">{address.phone || customer.phone || "-"}</td>
+                          <td className="px-4 py-3">
+                            {address.phone || customer.phone || "-"}
+                            {(address.alternatePhone || customer.alternatePhone) ? (
+                              <div className="text-xs text-amber-300 mt-0.5">
+                                Alt: {address.alternatePhone || customer.alternatePhone}
+                              </div>
+                            ) : null}
+                          </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col gap-1 max-w-[240px]">
                               {(order.items || []).map((item: any, i: number) => (

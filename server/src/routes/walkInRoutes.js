@@ -1,5 +1,5 @@
 const express = require("express");
-const { protect, authorizeRoles } = require("../middleware/auth");
+const { protect, authorizeRoles, authorizeAdminSections } = require("../middleware/auth");
 const {
   createWalkInSale,
   listWalkInSales,
@@ -10,7 +10,7 @@ const {
 
 const router = express.Router();
 
-router.use(protect, authorizeRoles("admin"));
+router.use(protect, authorizeRoles("admin"), authorizeAdminSections("walk_in"));
 
 router.get("/stats", getWalkInStats);
 router.get("/", listWalkInSales);

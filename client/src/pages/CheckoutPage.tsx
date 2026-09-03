@@ -35,6 +35,7 @@ const getLocalDateString = (date = new Date()) => {
 interface CheckoutForm {
   name: string;
   phone: string;
+  alternatePhone: string;
   doorNo: string;
   streetName: string;
   area: string;
@@ -106,6 +107,7 @@ const CheckoutPage = () => {
   const [form, setForm] = useState<CheckoutForm>({
     name: "",
     phone: "",
+    alternatePhone: "",
     doorNo: "",
     streetName: "",
     area: "",
@@ -158,6 +160,7 @@ const CheckoutPage = () => {
           if (res.orders && res.orders.length > 0) {
             const lastOrder = res.orders[0];
             const hasPhone = !!lastOrder.address?.phone;
+            const hasAlternate = !!lastOrder.address?.alternatePhone;
             const hasMapUrl = !!lastOrder.mapUrl;
             const addr = lastOrder.address || {};
             const parsed = parseSavedAddress(addr);
@@ -166,6 +169,9 @@ const CheckoutPage = () => {
             setForm((prev) => ({
               ...prev,
               phone: hasPhone ? lastOrder.address.phone : prev.phone,
+              alternatePhone: hasAlternate
+                ? lastOrder.address.alternatePhone
+                : prev.alternatePhone,
               mapUrl: hasMapUrl ? lastOrder.mapUrl : prev.mapUrl,
               doorNo: parsed.doorNo || prev.doorNo,
               streetName: parsed.streetName || prev.streetName,
@@ -333,7 +339,8 @@ const CheckoutPage = () => {
           city: MADURAI_CITY,
           state: MADURAI_STATE,
           postalCode: form.pincode.trim(),
-          phone: form.phone
+          phone: form.phone,
+          alternatePhone: form.alternatePhone.trim() || undefined
         },
         deliveryDate: form.deliveryDate,
         deliveryTime: form.deliveryTime,
@@ -441,6 +448,18 @@ const CheckoutPage = () => {
                     placeholder="+91 98765 43210"
                   />
                   {errors.phone && <p className="text-red-400 text-xs mt-1.5">{errors.phone}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-white/60 mb-1.5">
+                    Alternate number <span className="text-white/40 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={form.alternatePhone}
+                    onChange={(e) => setForm({ ...form, alternatePhone: e.target.value })}
+                    className="w-full bg-cyan-950/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors"
+                    placeholder="If primary number is not reachable"
+                  />
                 </div>
               </div>
             </section>

@@ -220,6 +220,7 @@ export interface OrderPayload {
     postalCode: string;
     country?: string;
     phone?: string;
+    alternatePhone?: string;
   };
   deliveryDate: string;
   deliveryTime: string;
@@ -245,6 +246,7 @@ export interface AdminOrderPayload extends OrderPayload {
     name: string;
     email: string;
     phone: string;
+    alternatePhone?: string;
   };
 }
 
@@ -458,6 +460,7 @@ export interface AllOrdersReportOrder {
   orderId: string;
   customerName: string;
   phone: string;
+  alternatePhone?: string;
   email?: string;
   address: string;
   deliveryTime: string;
@@ -719,6 +722,68 @@ export const deleteUser = async (token: string, userId: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
+// ─── Manage Admins API ───────────────────────────────────────────────────────
+
+export interface ManagedAdmin {
+  id: string;
+  _id?: string;
+  name: string;
+  email: string;
+  phone?: string;
+  status: string;
+  role: string;
+  adminSections: string[];
+  isFullAdmin: boolean;
+  createdAt?: string;
+}
+
+export const listManagedAdmins = async (token: string) =>
+  request<{ admins: ManagedAdmin[] }>("/users/admins", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createManagedAdmin = async (
+  token: string,
+  payload: {
+    name: string;
+    email: string;
+    password: string;
+    phone?: string;
+    isFullAdmin?: boolean;
+    adminSections?: string[];
+  }
+) =>
+  request<{ admin: ManagedAdmin; message: string }>("/users/admins", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const updateManagedAdmin = async (
+  token: string,
+  adminId: string,
+  payload: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    password?: string;
+    status?: string;
+    isFullAdmin?: boolean;
+    adminSections?: string[];
+  }
+) =>
+  request<{ admin: ManagedAdmin; message: string }>(`/users/admins/${adminId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const deleteManagedAdmin = async (token: string, adminId: string) =>
+  request<{ message: string }>(`/users/admins/${adminId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
 // ─── Finance Management API ─────────────────────────────────────────────────────────────
 
 export interface TransactionPayload {
@@ -772,6 +837,94 @@ export const updateTransactionStatus = async (token: string, id: string, status:
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify({ status })
+  });
+
+// ─── Expenses API ─────────────────────────────────────────────────────────────
+
+export type ExpenseCategory =
+  | "travel"
+  | "shop_supplies"
+  | "rent"
+  | "shop_advance"
+  | "domain"
+  | "utilities"
+  | "packaging"
+  | "marketing"
+  | "fuel"
+  | "salary_misc"
+  | "maintenance"
+  | "other";
+
+export interface ExpensePayload {
+  date: string;
+  category: ExpenseCategory | string;
+  amount: number;
+  title?: string;
+  notes?: string;
+  paymentMethod?: "cash" | "upi" | "bank" | "card" | "other";
+}
+
+export const getExpenses = async (
+  token: string,
+  params?: { from?: string; to?: string; category?: string; search?: string }
+) => {
+  const qs = new URLSearchParams();
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
+  if (params?.category) qs.set("category", params.category);
+  if (params?.search) qs.set("search", params.search);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  return request<{
+    expenses: any[];
+    summary: {
+      total: number;
+      count: number;
+      byCategory: Array<{ category: string; label: string; total: number; count: number }>;
+    };
+    categories: Array<{ id: string; label: string; isBuiltin?: boolean; _id?: string }>;
+  }>(`/expenses${query}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const createExpenseCategory = async (token: string, label: string) =>
+  request<{
+    category: { id: string; label: string; isBuiltin?: boolean };
+    categories: Array<{ id: string; label: string; isBuiltin?: boolean }>;
+    message: string;
+  }>("/expenses/categories", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ label })
+  });
+
+export const deleteExpenseCategory = async (token: string, categoryId: string) =>
+  request<{
+    message: string;
+    categories: Array<{ id: string; label: string; isBuiltin?: boolean }>;
+  }>(`/expenses/categories/${encodeURIComponent(categoryId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createExpense = async (token: string, payload: ExpensePayload) =>
+  request<{ expense: any; message: string }>("/expenses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const updateExpense = async (token: string, id: string, payload: Partial<ExpensePayload>) =>
+  request<{ expense: any; message: string }>(`/expenses/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const deleteExpense = async (token: string, id: string) =>
+  request<{ message: string }>(`/expenses/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
   });
 
 // ─── Availability API ─────────────────────────────────────────────────────────

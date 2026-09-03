@@ -1,7 +1,8 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getAdminNavLinksForUser } from "../../lib/adminSections";
 
 interface NavLink {
   label: string;
@@ -15,33 +16,23 @@ interface DashboardShellProps {
   children?: React.ReactNode;
 }
 
-const DashboardShell = ({ title, description, navLinks, children }: DashboardShellProps) => {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
+/** Stable component (not nested) so Framer Motion / HMR cannot keep a stale menu. */
+const SidebarContent = ({
+  links,
+  userName,
+  userRole,
+  onLogout,
+  onNavigate
+}: {
+  links: NavLink[];
+  userName?: string;
+  userRole?: string;
+  onLogout: () => void;
+  onNavigate: () => void;
+}) => {
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Close mobile menu on route change
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [location.pathname]);
-
-  // Lock body scroll while mobile sidebar is open
-  useEffect(() => {
-    if (!isMobileMenuOpen) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [isMobileMenuOpen]);
-
-  const onLogout = () => {
-    logout();
-    navigate("/login");
-  };
-
-  const SidebarContent = () => (
+  return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 p-5 sm:p-6 flex flex-col items-start gap-1 border-b border-slate-800">
         <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-500 tracking-wider">
@@ -50,16 +41,15 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
         <span className="text-xs text-slate-500 font-medium uppercase tracking-widest">Workspace</span>
       </div>
 
-      {/* Scrollable nav links — min-h-0 is required for mobile overflow */}
       <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-1.5">
-        {navLinks?.map((link) => {
+        {links.map((link) => {
           const isActive = location.pathname === link.href;
           return (
             <Link
               key={link.href}
               to={link.href}
               className="block relative"
-              onClick={() => setIsMobileMenuOpen(false)}
+              onClick={onNavigate}
             >
               <div
                 className={`relative px-4 py-3 rounded-xl text-sm font-medium transition-colors z-10 flex items-center gap-3 ${
@@ -78,12 +68,14 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
       <div className="shrink-0 p-4 border-t border-slate-800 bg-slate-900/30">
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
           <div className="min-w-0">
-            <div className="text-sm font-bold text-slate-200 truncate">{user?.name}</div>
-            <div className="text-xs text-teal-500 capitalize font-medium">{user?.role?.replace("_", " ")}</div>
+            <div className="text-sm font-bold text-slate-200 truncate">{userName}</div>
+            <div className="text-xs text-teal-500 capitalize font-medium">
+              {userRole?.replace("_", " ")}
+            </div>
           </div>
 
           <div className="flex gap-2">
-            {user?.role === "customer" && (
+            {userRole === "customer" && (
               <Link
                 to="/"
                 className="flex-1 flex justify-center items-center rounded-lg border border-teal-500/30 py-2 text-xs text-teal-400 hover:bg-teal-500/10 transition-colors"
@@ -92,6 +84,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
               </Link>
             )}
             <button
+              type="button"
               onClick={onLogout}
               className="flex-1 rounded-lg border border-slate-700 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
             >
@@ -102,10 +95,50 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
       </div>
     </div>
   );
+};
+
+const DashboardShell = ({ title, description, navLinks, children }: DashboardShellProps) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const resolvedNavLinks = useMemo(() => {
+    if (user?.role === "admin") {
+      // Always derive from permissions — ignore full ADMIN_NAV_LINKS prop for admins
+      return getAdminNavLinksForUser(user);
+    }
+    return navLinks || [];
+  }, [user, navLinks]);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isMobileMenuOpen]);
+
+  const onLogout = () => {
+    logout();
+    navigate("/login");
+  };
+
+  const sidebarProps = {
+    links: resolvedNavLinks,
+    userName: user?.name,
+    userRole: user?.role,
+    onLogout,
+    onNavigate: () => setIsMobileMenuOpen(false)
+  };
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row font-sans">
-      {/* Mobile Top Header */}
       <div className="md:hidden flex items-center justify-between border-b border-slate-800 bg-slate-900/95 backdrop-blur px-4 py-3 sticky top-0 z-50">
         <h1 className="text-lg font-bold text-teal-400 tracking-wider truncate">FISHFRIENDLY</h1>
         <button
@@ -125,7 +158,6 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
         </button>
       </div>
 
-      {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -138,7 +170,6 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
         )}
       </AnimatePresence>
 
-      {/* Mobile Sidebar */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.aside
@@ -148,17 +179,15 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
             transition={{ type: "tween", duration: 0.25 }}
             className="fixed top-0 left-0 z-50 flex h-dvh max-h-dvh w-[min(18rem,85vw)] flex-col overflow-hidden bg-slate-900 border-r border-slate-800 shadow-2xl md:hidden"
           >
-            <SidebarContent />
+            <SidebarContent {...sidebarProps} />
           </motion.aside>
         )}
       </AnimatePresence>
 
-      {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-72 shrink-0 sticky top-0 h-screen max-h-screen overflow-hidden bg-slate-900/50 border-r border-slate-800">
-        <SidebarContent />
+        <SidebarContent {...sidebarProps} />
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 w-full min-w-0 flex flex-col min-h-screen overflow-x-hidden">
         <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-7xl mx-auto w-full">
           <motion.div

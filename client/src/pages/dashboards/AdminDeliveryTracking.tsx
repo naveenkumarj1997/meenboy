@@ -307,7 +307,8 @@ export default function AdminDeliveryTracking() {
         city: order.address?.city || "Madurai",
         state: order.address?.state || "Tamil Nadu",
         postalCode: order.address?.postalCode || "",
-        phone: order.address?.phone || ""
+        phone: order.address?.phone || "",
+        alternatePhone: order.address?.alternatePhone || ""
       },
       items: (order.items || []).map((item: any) => {
         const catalog = catalogProducts.find((p) => String(p._id) === String(item.product));
@@ -1118,7 +1119,12 @@ export default function AdminDeliveryTracking() {
                         <BookingSourceBadge source={row.bookingSource} />
                       </td>
                       <td className="px-3 py-3 text-white font-medium">{row.customerName}</td>
-                      <td className="px-3 py-3">{row.phone || "-"}</td>
+                      <td className="px-3 py-3">
+                        <div>{row.phone || "-"}</div>
+                        {row.alternatePhone ? (
+                          <div className="text-[10px] text-amber-300 mt-0.5">Alt: {row.alternatePhone}</div>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-3 text-xs max-w-[200px]">{row.address || "-"}</td>
                       <td className="px-3 py-3 text-xs">{row.deliveryTime || "-"}</td>
                       <td className="px-3 py-3">
@@ -1365,6 +1371,17 @@ export default function AdminDeliveryTracking() {
                 placeholder="Phone"
                 value={editingOrder.address.phone}
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, phone: e.target.value } })}
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+              />
+              <input
+                placeholder="Alternate number (optional)"
+                value={editingOrder.address.alternatePhone || ""}
+                onChange={(e) =>
+                  setEditingOrder({
+                    ...editingOrder,
+                    address: { ...editingOrder.address, alternatePhone: e.target.value }
+                  })
+                }
                 className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
               />
               <input

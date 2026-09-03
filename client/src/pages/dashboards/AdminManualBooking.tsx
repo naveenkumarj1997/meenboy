@@ -42,6 +42,7 @@ const emptyAddressForm = () => ({
   state: MADURAI_STATE,
   postalCode: "",
   phone: "",
+  alternatePhone: "",
   mapUrl: ""
 });
 
@@ -71,7 +72,12 @@ export default function AdminManualBooking() {
 
   const [customerType, setCustomerType] = useState<"existing" | "new">("new");
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [newCustomer, setNewCustomer] = useState({ name: "", email: "", phone: "" });
+  const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    alternatePhone: ""
+  });
 
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<any[]>([]);
@@ -115,6 +121,7 @@ export default function AdminManualBooking() {
           state: user.address?.state || MADURAI_STATE,
           postalCode: user.address?.postalCode || "",
           phone: user.address?.phone || user.phone || "",
+          alternatePhone: user.alternatePhone || "",
           mapUrl: user.mapUrl || ""
         });
         setAdjustments(bookingAdjustmentsFromUser(user));
@@ -125,7 +132,7 @@ export default function AdminManualBooking() {
   useEffect(() => {
     if (customerType === "new") {
       setSelectedUserId("");
-      setNewCustomer({ name: "", email: "", phone: "" });
+      setNewCustomer({ name: "", email: "", phone: "", alternatePhone: "" });
       setAddressForm(emptyAddressForm());
       setAdjustments(emptyBookingAdjustments());
     }
@@ -243,7 +250,8 @@ export default function AdminManualBooking() {
           state: addressForm.state || MADURAI_STATE,
           postalCode,
           country: "India",
-          phone
+          phone,
+          alternatePhone: addressForm.alternatePhone.trim() || undefined
         },
         deliveryFee,
         deliveryDate,
@@ -261,7 +269,8 @@ export default function AdminManualBooking() {
         payload.newCustomer = {
           name: newCustomer.name.trim(),
           email: newCustomer.email.trim(),
-          phone: newCustomer.phone.trim()
+          phone: newCustomer.phone.trim(),
+          alternatePhone: (newCustomer.alternatePhone || addressForm.alternatePhone).trim() || undefined
         };
       }
 
@@ -272,7 +281,7 @@ export default function AdminManualBooking() {
       );
       setLastOrderId(orderId || null);
       setCart([]);
-      setNewCustomer({ name: "", email: "", phone: "" });
+      setNewCustomer({ name: "", email: "", phone: "", alternatePhone: "" });
       setAddressForm(emptyAddressForm());
       setSelectedUserId("");
       setAdjustments(emptyBookingAdjustments());
@@ -395,6 +404,24 @@ export default function AdminManualBooking() {
                         setAddressForm((prev) => ({
                           ...prev,
                           phone: !prev.phone || prev.phone === previousPhone ? phone : prev.phone
+                        }));
+                      }}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Alternate number (optional)"
+                      value={newCustomer.alternatePhone}
+                      onChange={(e) => {
+                        const alternatePhone = e.target.value;
+                        const previousAlt = newCustomer.alternatePhone;
+                        setNewCustomer({ ...newCustomer, alternatePhone });
+                        setAddressForm((prev) => ({
+                          ...prev,
+                          alternatePhone:
+                            !prev.alternatePhone || prev.alternatePhone === previousAlt
+                              ? alternatePhone
+                              : prev.alternatePhone
                         }));
                       }}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
@@ -603,6 +630,15 @@ export default function AdminManualBooking() {
                     value={addressForm.phone}
                     onChange={(e) =>
                       setAddressForm({ ...addressForm, phone: e.target.value })
+                    }
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Alternate number (optional)"
+                    value={addressForm.alternatePhone}
+                    onChange={(e) =>
+                      setAddressForm({ ...addressForm, alternatePhone: e.target.value })
                     }
                     className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
                   />

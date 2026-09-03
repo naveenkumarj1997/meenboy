@@ -1,17 +1,38 @@
 const express = require("express");
-const { protect, authorizeRoles } = require("../middleware/auth");
-const { getPurchaseByDate, savePurchase, getOverallPending, getAdminEarnings, deleteTestPurchaseData } = require("../controllers/purchaseController");
+const { protect, authorizeRoles, authorizeAdminSections } = require("../middleware/auth");
+const {
+  getPurchaseByDate,
+  savePurchase,
+  getOverallPending,
+  getAdminEarnings,
+  deleteTestPurchaseData
+} = require("../controllers/purchaseController");
 
 const router = express.Router();
 
-// All purchase routes are admin only
 router.use(protect);
 router.use(authorizeRoles("admin"));
 
-router.delete("/test-data", deleteTestPurchaseData);
-router.get("/overall-pending", getOverallPending);
-router.get("/admin-earnings", getAdminEarnings);
-router.get("/:date", getPurchaseByDate);
-router.post("/", savePurchase);
+router.delete(
+  "/test-data",
+  authorizeAdminSections("purchases"),
+  deleteTestPurchaseData
+);
+router.get(
+  "/overall-pending",
+  authorizeAdminSections("settlements", "purchases", "money_management"),
+  getOverallPending
+);
+router.get(
+  "/admin-earnings",
+  authorizeAdminSections("earnings", "money_management"),
+  getAdminEarnings
+);
+router.get(
+  "/:date",
+  authorizeAdminSections("purchases", "settlements", "money_management"),
+  getPurchaseByDate
+);
+router.post("/", authorizeAdminSections("purchases", "settlements"), savePurchase);
 
 module.exports = router;

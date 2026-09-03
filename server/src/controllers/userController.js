@@ -1,4 +1,6 @@
 const User = require("../models/User");
+const Order = require("../models/Order");
+const { isFullAdmin } = require("../utils/adminSections");
 
 const DOC_TYPE_LABELS = {
   aadhaar: "Aadhaar",
@@ -44,7 +46,7 @@ const getAllUsers = async (req, res, next) => {
 const updateUser = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, email, role, status, phone, mapUrl, address, password, isNoticed } = req.body;
+    const { name, email, role, status, phone, alternatePhone, mapUrl, address, password, isNoticed } = req.body;
 
     const user = await User.findById(id);
 
@@ -52,12 +54,32 @@ const updateUser = async (req, res, next) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    // Only full admins can create/promote admins or edit other admins
+    const promotingToAdmin = role === "admin" && user.role !== "admin";
+    const editingAdmin = user.role === "admin";
+    const changingAdminSections = req.body.adminSections !== undefined;
+    if ((promotingToAdmin || editingAdmin || changingAdminSections) && !isFullAdmin(req.user)) {
+      return res.status(403).json({
+        message: "Only full admins can manage admin accounts. Use Manage Admins."
+      });
+    }
+    if (promotingToAdmin) {
+      return res.status(400).json({
+        message: "Create admins from Manage Admins so you can set section access"
+      });
+    }
+
     if (name) user.name = name;
     if (email) user.email = email;
     if (role) user.role = role;
     if (status) user.status = status;
     if (phone !== undefined) user.phone = phone;
-    if (mapUrl !== undefined) user.mapUrl = mapUrl;
+    if (alternatePhone !== undefined) {
+      user.alternatePhone = String(alternatePhone || "").trim();
+    }
+    if (mapUrl !== undefined) {
+      user.mapUrl = String(mapUrl || "").trim();
+    }
     if (address !== undefined) user.address = address;
     if (password) user.password = password;
     if (isNoticed !== undefined) user.isNoticed = isNoticed;
@@ -68,7 +90,24 @@ const updateUser = async (req, res, next) => {
     }
 
     const updatedUser = await user.save();
-    
+
+    // Keep delivery partner / reports in sync: orders store their own mapUrl + alternate phone
+    if (updatedUser.role === "customer") {
+      const orderSync = {};
+      if (mapUrl !== undefined) {
+        orderSync.mapUrl = updatedUser.mapUrl || "";
+      }
+      if (alternatePhone !== undefined) {
+        orderSync["address.alternatePhone"] = updatedUser.alternatePhone || "";
+      }
+      if (Object.keys(orderSync).length > 0) {
+        await Order.updateMany(
+          { customer: updatedUser._id, status: { $ne: "cancelled" } },
+          { $set: orderSync }
+        );
+      }
+    }
+
     // Remove password from response
     updatedUser.password = undefined;
 

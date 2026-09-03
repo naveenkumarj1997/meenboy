@@ -2,6 +2,29 @@ const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 
+const publicUser = (user) => {
+  const u = user.toObject ? user.toObject() : user;
+  delete u.password;
+  delete u.documentData;
+  const adminSections = Array.isArray(u.adminSections) ? u.adminSections : [];
+  const full =
+    u.role === "admin"
+      ? u.isFullAdmin === false
+        ? false
+        : u.isFullAdmin === true
+          ? true
+          : adminSections.length === 0
+      : undefined;
+  return {
+    ...u,
+    id: u._id || u.id,
+    hasDocument: Boolean(u.documentUploadedAt || u.documentUrl),
+    documentType: u.documentType || "",
+    adminSections: u.role === "admin" ? adminSections : undefined,
+    isFullAdmin: u.role === "admin" ? full : undefined
+  };
+};
+
 const register = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -10,6 +33,13 @@ const register = async (req, res, next) => {
     }
 
     const { name, email, password, role, phone } = req.body;
+
+    // Admins must be created from Manage Admins (not public register)
+    if (role === "admin") {
+      return res.status(403).json({
+        message: "Admin accounts can only be created by a full admin"
+      });
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -30,17 +60,7 @@ const register = async (req, res, next) => {
 
     return res.status(201).json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        phone: user.phone,
-        documentUrl: user.documentUrl,
-        hasDocument: Boolean(user.documentUploadedAt || user.documentUrl),
-        documentType: user.documentType || ""
-      }
+      user: publicUser(user)
     });
   } catch (error) {
     return next(error);
@@ -78,17 +98,7 @@ const login = async (req, res, next) => {
 
     return res.status(200).json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        phone: user.phone,
-        documentUrl: user.documentUrl,
-        hasDocument: Boolean(user.documentUploadedAt || user.documentUrl),
-        documentType: user.documentType || ""
-      }
+      user: publicUser(user)
     });
   } catch (error) {
     return next(error);
@@ -97,15 +107,8 @@ const login = async (req, res, next) => {
 
 const me = async (req, res) => {
   res.set("Cache-Control", "no-store, no-cache, must-revalidate");
-  const u = req.user.toObject ? req.user.toObject() : req.user;
-  delete u.documentData;
   res.status(200).json({
-    user: {
-      ...u,
-      id: u._id || u.id,
-      hasDocument: Boolean(u.documentUploadedAt || u.documentUrl),
-      documentType: u.documentType || ""
-    }
+    user: publicUser(req.user)
   });
 };
 

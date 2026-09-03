@@ -132,6 +132,9 @@ export default function AdminInvoices() {
           <div className="rounded-xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-300 space-y-1">
             <p><span className="text-slate-500">Customer:</span> <span className="text-white font-semibold">{selected.customerName}</span></p>
             <p><span className="text-slate-500">Phone:</span> {selected.customerPhone || "Not saved"}</p>
+            {selected.customerAlternatePhone ? (
+              <p><span className="text-slate-500">Alternate:</span> {selected.customerAlternatePhone}</p>
+            ) : null}
             <p><span className="text-slate-500">Total:</span> ₹{Number(selected.total || 0).toFixed(2)}</p>
             <p><span className="text-slate-500">Status:</span> {String(selected.status || "").replace(/_/g, " ")}</p>
           </div>

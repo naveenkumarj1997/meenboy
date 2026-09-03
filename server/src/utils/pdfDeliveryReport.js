@@ -206,6 +206,8 @@ const generatePartnerDayReport = ({ partner, date, assignments, allPartners = fa
 
         const payLabel = (order.paymentStatus || "pending").replace(/_/g, " ");
         const phone = address.phone || customer.phone || "-";
+        const alternatePhone = address.alternatePhone || customer.alternatePhone || "";
+        const phoneDisplay = alternatePhone ? `${phone}\nAlt: ${alternatePhone}` : String(phone);
         const partnerName =
           assignment.deliveryPartner?.name ||
           assignment.partnerName ||
@@ -222,7 +224,7 @@ const generatePartnerDayReport = ({ partner, date, assignments, allPartners = fa
               `#${String(order._id || "").slice(-6).toUpperCase()}`,
               partnerName,
               customerBlock,
-              String(phone),
+              String(phoneDisplay),
               itemsText,
               String(order.deliveryTime || "-"),
               `Rs ${amount.toFixed(2)}`,
@@ -233,7 +235,7 @@ const generatePartnerDayReport = ({ partner, date, assignments, allPartners = fa
               String(index + 1),
               `#${String(order._id || "").slice(-6).toUpperCase()}`,
               customerBlock,
-              String(phone),
+              String(phoneDisplay),
               itemsText,
               String(order.deliveryTime || "-"),
               `Rs ${amount.toFixed(2)}`,

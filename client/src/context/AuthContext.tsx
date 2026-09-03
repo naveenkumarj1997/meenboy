@@ -23,18 +23,37 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY = "fishfriendly_auth_token";
 const USER_KEY = "fishfriendly_auth_user";
 
+const persistSession = (token: string, user: User) => {
+  const normalized = normalizeUser(user);
+  localStorage.setItem(STORAGE_KEY, token);
+  localStorage.setItem(USER_KEY, JSON.stringify(normalized));
+};
+
+const normalizeUser = (user: User): User => {
+  if (user.role !== "admin") return user;
+  const adminSections = Array.isArray(user.adminSections)
+    ? user.adminSections.map(String)
+    : [];
+  const isFull =
+    user.isFullAdmin === false
+      ? false
+      : user.isFullAdmin === true
+        ? true
+        : adminSections.length === 0;
+  return {
+    ...user,
+    adminSections,
+    isFullAdmin: isFull
+  };
+};
+
 const readStoredUser = (): User | null => {
   try {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? (JSON.parse(raw) as User) : null;
+    return raw ? normalizeUser(JSON.parse(raw) as User) : null;
   } catch {
     return null;
   }
-};
-
-const persistSession = (token: string, user: User) => {
-  localStorage.setItem(STORAGE_KEY, token);
-  localStorage.setItem(USER_KEY, JSON.stringify(user));
 };
 
 const clearSession = () => {
@@ -64,8 +83,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         try {
           const response = await getCurrentUser(token);
           if (cancelled) return;
-          setUser(response.user);
-          localStorage.setItem(USER_KEY, JSON.stringify(response.user));
+          const nextUser = normalizeUser(response.user);
+          setUser(nextUser);
+          localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
           setIsLoading(false);
           return;
         } catch (err) {
@@ -97,16 +117,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     const data = await loginUser({ email, password });
-    persistSession(data.token, data.user);
+    const nextUser = normalizeUser(data.user);
+    persistSession(data.token, nextUser);
     setToken(data.token);
-    setUser(data.user);
+    setUser(nextUser);
   };
 
   const register = async (payload: RegisterInput) => {
     const data = await registerUser(payload);
-    persistSession(data.token, data.user);
+    const nextUser = normalizeUser(data.user);
+    persistSession(data.token, nextUser);
     setToken(data.token);
-    setUser(data.user);
+    setUser(nextUser);
   };
 
   const logout = () => {

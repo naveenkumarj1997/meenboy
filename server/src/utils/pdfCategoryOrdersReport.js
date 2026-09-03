@@ -135,7 +135,11 @@ const generateCategoryOrdersReport = ({ date, groupLabel, rows, stats }) => {
             String(index + 1),
             `#${String(row.orderId).slice(-6).toUpperCase()}`,
             String(row.customerName || "-"),
-            String(row.phone || "-"),
+            String(
+              row.alternatePhone
+                ? `${row.phone || "-"}\nAlt: ${row.alternatePhone}`
+                : row.phone || "-"
+            ),
             String(row.address || "-"),
             String(row.deliveryTime || "-"),
             String(row.productName || "-"),

@@ -564,6 +564,9 @@ export default function AdminDeliveryAmountCollection() {
                             <div className="text-xs text-slate-500 mt-1">
                               {order.deliveryTime || "—"}
                               {order.address?.phone ? ` · ${order.address.phone}` : ""}
+                              {order.address?.alternatePhone
+                                ? ` · Alt ${order.address.alternatePhone}`
+                                : ""}
                             </div>
                           </td>
                           <td className="px-4 py-4">

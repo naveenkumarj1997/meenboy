@@ -1,5 +1,5 @@
 const express = require("express");
-const { protect, authorizeRoles } = require("../middleware/auth");
+const { protect, authorizeRoles, authorizeAdminSections } = require("../middleware/auth");
 const {
   addTransaction,
   getTransactions,
@@ -10,17 +10,14 @@ const {
 
 const router = express.Router();
 
-// All finance routes are admin only
 router.use(protect);
 router.use(authorizeRoles("admin"));
 
-router.route("/")
-  .post(addTransaction)
-  .get(getTransactions);
+router.get("/money-management", authorizeAdminSections("money_management"), getMoneyManagement);
 
-router.get("/summary", getFinanceSummary);
-router.get("/money-management", getMoneyManagement);
-
-router.put("/:id/status", updateTransactionStatus);
+router.post("/", authorizeAdminSections("finance"), addTransaction);
+router.get("/", authorizeAdminSections("finance"), getTransactions);
+router.get("/summary", authorizeAdminSections("finance"), getFinanceSummary);
+router.put("/:id/status", authorizeAdminSections("finance"), updateTransactionStatus);
 
 module.exports = router;

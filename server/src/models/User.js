@@ -56,6 +56,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    alternatePhone: {
+      type: String,
+      trim: true,
+      default: ""
+    },
     mapUrl: {
       type: String,
       trim: true
@@ -113,6 +118,19 @@ const userSchema = new mongoose.Schema(
         enum: ["real", "test"],
         default: "real"
       }
+    },
+    /**
+     * Admin panel section access.
+     * Prefer isFullAdmin flag. Empty adminSections alone is legacy full-admin.
+     */
+    adminSections: {
+      type: [String],
+      default: undefined
+    },
+    /** false = limited sub-admin; true/undefined = full admin (legacy compatible) */
+    isFullAdmin: {
+      type: Boolean,
+      default: undefined
     }
   },
   {

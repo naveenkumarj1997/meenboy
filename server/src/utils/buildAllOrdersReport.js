@@ -7,7 +7,7 @@ const { formatAddress } = require("./buildCategoryOrdersReport");
 
 const buildAllOrdersForDate = async (date) => {
   const orders = await Order.find({ deliveryDate: date })
-    .populate("customer", "name phone email")
+    .populate("customer", "name phone email mapUrl alternatePhone")
     .sort({ deliveryTime: 1, createdAt: 1 })
     .lean();
 
@@ -64,6 +64,8 @@ const buildAllOrdersForDate = async (date) => {
       orderId: order._id,
       customerName: order.customer?.name || "Guest",
       phone: order.address?.phone || order.customer?.phone || "",
+      alternatePhone:
+        order.address?.alternatePhone || order.customer?.alternatePhone || "",
       email: order.customer?.email || "",
       address: formatAddress(order.address),
       deliveryTime: order.deliveryTime || "",
@@ -75,7 +77,7 @@ const buildAllOrdersForDate = async (date) => {
       assignmentStatus: assignment?.status || "",
       paymentCollected: assignment?.paymentCollected || 0,
       paymentMethod: assignment?.paymentMethod || "",
-      mapUrl: order.mapUrl || "",
+      mapUrl: order.mapUrl || order.customer?.mapUrl || "",
       customerNotes: order.customerNotes || "",
       subtotal: order.subtotal,
       deliveryFee: order.deliveryFee,

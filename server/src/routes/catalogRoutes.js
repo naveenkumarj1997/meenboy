@@ -1,6 +1,6 @@
 const express = require("express");
 const { body, param, query } = require("express-validator");
-const { authorizeRoles, protect } = require("../middleware/auth");
+const { authorizeRoles, protect, authorizeAdminSections } = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
 const {
   listCategories,
@@ -15,6 +15,14 @@ const {
 } = require("../controllers/catalogController");
 
 const router = express.Router();
+
+const catalogAdminAccess = authorizeAdminSections(
+  "products",
+  "daily_prices",
+  "manual_booking",
+  "walk_in",
+  "availability"
+);
 
 // Valid category values (must stay in sync with Product model)
 const VALID_CATEGORIES = [
@@ -42,7 +50,7 @@ router.get("/categories", listCategories);
 router.post(
   "/categories",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), catalogAdminAccess,
   [
     body("name")
       .isLength({ min: 2, max: 80 })
@@ -88,7 +96,7 @@ router.get(
 router.get(
   "/admin/products",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), catalogAdminAccess,
   [
     query("category")
       .optional()
@@ -114,7 +122,7 @@ router.get("/products/:id", getProduct);
 router.patch(
   "/products/:id/visibility",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), catalogAdminAccess,
   [
     param("id").isMongoId().withMessage("Invalid product ID"),
     body("isActive").isBoolean().withMessage("isActive must be true or false")
@@ -144,7 +152,7 @@ router.patch(
 router.post(
   "/products",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), catalogAdminAccess,
   [
     body("name")
       .isLength({ min: 2, max: 160 })
@@ -190,7 +198,7 @@ router.post(
 router.put(
   "/products/:id",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), catalogAdminAccess,
   [
     param("id").isMongoId().withMessage("Invalid product ID"),
     body("name")
@@ -237,7 +245,7 @@ router.put(
 router.delete(
   "/products/:id",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), catalogAdminAccess,
   [param("id").isMongoId().withMessage("Invalid product ID")],
   validateRequest,
   deleteProduct

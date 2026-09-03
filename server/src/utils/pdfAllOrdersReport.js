@@ -230,7 +230,11 @@ const generateAllOrdersReport = ({ date, orders, stats }) => {
             `#${String(order.orderId).slice(-6).toUpperCase()}`,
             sourceLabel,
             String(order.customerName || "-"),
-            String(order.phone || "-"),
+            String(
+              order.alternatePhone
+                ? `${order.phone || "-"}\nAlt: ${order.alternatePhone}`
+                : order.phone || "-"
+            ),
             String(order.address || "-"),
             mapBlock,
             String(order.deliveryTime || "-"),

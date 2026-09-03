@@ -5,7 +5,7 @@ const { protect, authorizeRoles } = require("../middleware/auth");
 
 const router = express.Router();
 
-const roleEnum = ["customer", "admin", "delivery_partner"];
+const roleEnum = ["customer", "delivery_partner"];
 
 router.post(
   "/register",

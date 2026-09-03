@@ -1,6 +1,6 @@
 const express = require("express");
 const { body } = require("express-validator");
-const { protect, authorizeRoles } = require("../middleware/auth");
+const { protect, authorizeRoles, authorizeAdminSections } = require("../middleware/auth");
 const validateRequest = require("../middleware/validateRequest");
 const {
   createOrder,
@@ -33,6 +33,23 @@ const {
 
 const router = express.Router();
 
+/** Any of these sections may call order admin APIs used by those pages. */
+const orderAdminAccess = authorizeAdminSections(
+  "deliveries",
+  "all_orders",
+  "today_delivery_status",
+  "partner_report",
+  "overall_reports",
+  "pending_payments",
+  "delivery_amount_collection",
+  "delivery_status_change",
+  "invoices",
+  "manual_booking",
+  "new_customers",
+  "daily_prices",
+  "walk_in"
+);
+
 router.post(
   "/",
   protect,
@@ -53,7 +70,7 @@ router.post(
 router.post(
   "/admin-booking",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   [
     body("items").isArray({ min: 1 }).withMessage("Items are required"),
     body("address.line1").notEmpty().withMessage("Address line1 is required"),
@@ -68,74 +85,74 @@ router.post(
 );
 
 router.get("/me", protect, authorizeRoles("customer"), getMyOrders);
-router.get("/admin", protect, authorizeRoles("admin"), listOrdersForAdmin);
+router.get("/admin", protect, authorizeRoles("admin"), orderAdminAccess, listOrdersForAdmin);
 router.get("/assignments", protect, authorizeRoles("delivery_partner"), listAssignmentsForPartner);
-router.get("/assignments/all", protect, authorizeRoles("admin"), listAllAssignments);
-router.get("/delivery-stats", protect, authorizeRoles("admin"), getDeliveryStats);
+router.get("/assignments/all", protect, authorizeRoles("admin"), orderAdminAccess, listAllAssignments);
+router.get("/delivery-stats", protect, authorizeRoles("admin"), orderAdminAccess, getDeliveryStats);
 router.get(
   "/admin/today-delivery-status",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   getTodayDeliveryStatus
 );
 router.get(
   "/reports/partner-day",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   downloadPartnerDayReport
 );
 router.get(
   "/reports/partner-collection",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   downloadPartnerCollectionReport
 );
 router.get(
   "/reports/category-orders",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   getCategoryOrdersReport
 );
 router.get(
   "/reports/all-orders",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   getAllOrdersReport
 );
 router.get(
   "/reports/all-orders/pdf",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   downloadAllOrdersReport
 );
 router.get(
   "/reports/category-orders/pdf",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   downloadCategoryOrdersReport
 );
 router.get(
   "/reports/vendor-prep",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   getVendorPrepPreview
 );
 router.get(
   "/reports/vendor-category",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   downloadVendorCategoryReport
 );
 
-router.get("/daily-prices/products", protect, authorizeRoles("admin"), getProductsForDailyPrice);
-router.get("/admin/invoices", protect, authorizeRoles("admin"), listInvoicesForAdmin);
+router.get("/daily-prices/products", protect, authorizeRoles("admin"), orderAdminAccess, getProductsForDailyPrice);
+router.get("/admin/invoices", protect, authorizeRoles("admin"), orderAdminAccess, listInvoicesForAdmin);
 
 router.get("/:orderId/invoice", protect, downloadInvoice);
 
 router.post(
   "/daily-prices",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   [
     body("deliveryDate").notEmpty().withMessage("Delivery date is required"),
     body("priceUpdates").isArray({ min: 1 }).withMessage("Price updates are required")
@@ -147,7 +164,7 @@ router.post(
 router.patch(
   "/:orderId/status",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   [body("status").notEmpty().withMessage("Status is required")],
   validateRequest,
   updateOrderStatus
@@ -156,14 +173,14 @@ router.patch(
 router.patch(
   "/:orderId/admin-edit",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   updateAdminOrder
 );
 
 router.post(
   "/:orderId/assign-delivery",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   [body("deliveryPartnerId").isMongoId().withMessage("Valid delivery partner id is required")],
   validateRequest,
   assignDeliveryPartner
@@ -181,7 +198,7 @@ router.patch(
 router.patch(
   "/assignments/:assignmentId/admin-payment",
   protect,
-  authorizeRoles("admin"),
+  authorizeRoles("admin"), orderAdminAccess,
   [body("paymentMethod").notEmpty().withMessage("Payment method is required")],
   validateRequest,
   adminUpdateDeliveryPayment

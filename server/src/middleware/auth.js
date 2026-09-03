@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { isFullAdmin, hasAdminSection } = require("../utils/adminSections");
 
 const protect = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -35,4 +36,33 @@ const authorizeRoles = (...allowedRoles) => (req, res, next) => {
   return next();
 };
 
-module.exports = { protect, authorizeRoles };
+/** Admin with full access, or limited admin who has at least one of the given sections. */
+const authorizeAdminSections = (...sectionIds) => (req, res, next) => {
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(403).json({ message: "Forbidden: insufficient permissions" });
+  }
+  if (sectionIds.length === 0 || hasAdminSection(req.user, ...sectionIds)) {
+    return next();
+  }
+  return res.status(403).json({
+    message: "Forbidden: you do not have access to this section"
+  });
+};
+
+const requireFullAdmin = (req, res, next) => {
+  if (!req.user || req.user.role !== "admin" || !isFullAdmin(req.user)) {
+    return res.status(403).json({
+      message: "Forbidden: only full admins can manage admin accounts"
+    });
+  }
+  return next();
+};
+
+module.exports = {
+  protect,
+  authorizeRoles,
+  authorizeAdminSections,
+  requireFullAdmin,
+  isFullAdmin,
+  hasAdminSection
+};

@@ -85,6 +85,9 @@ const buildBillToLines = (order, user) => {
   const state = sanitizePdfText(order.address?.state || "");
   const postalCode = sanitizePdfText(order.address?.postalCode || "");
   const phone = sanitizePhoneForPdf(order.address?.phone || user?.phone);
+  const alternatePhone = sanitizePhoneForPdf(
+    order.address?.alternatePhone || user?.alternatePhone
+  );
 
   if (line1) lines.push(line1);
 
@@ -102,6 +105,7 @@ const buildBillToLines = (order, user) => {
   if (location) lines.push(location);
 
   if (phone) lines.push(`Phone: ${phone}`);
+  if (alternatePhone) lines.push(`Alternate: ${alternatePhone}`);
 
   return lines;
 };

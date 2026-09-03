@@ -7,6 +7,11 @@ export interface User {
   email: string;
   role: Role;
   status?: string;
+  phone?: string;
+  /** Empty / missing = full admin (legacy). Non-empty = limited sections. */
+  adminSections?: string[];
+  /** Explicit full vs limited; prefer this when present. */
+  isFullAdmin?: boolean;
   adminPreferences?: {
     usersAccountFilter?: "real" | "test";
   };

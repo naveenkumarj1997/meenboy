@@ -312,6 +312,7 @@ export default function AdminAllOrders() {
                       <div className="text-sm text-slate-400 mt-1">
                         {order.email ? `${order.email} · ` : ""}
                         {order.phone || "No phone"}
+                        {order.alternatePhone ? ` · Alt ${order.alternatePhone}` : ""}
                       </div>
                       <div className="text-sm text-slate-300 mt-2">{order.address}</div>
                       {order.mapUrl && (

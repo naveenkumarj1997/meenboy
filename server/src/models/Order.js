@@ -132,7 +132,8 @@ const orderSchema = new mongoose.Schema(
       state: { type: String, required: true, trim: true },
       postalCode: { type: String, required: true, trim: true },
       country: { type: String, required: true, trim: true, default: "India" },
-      phone: { type: String, trim: true }
+      phone: { type: String, trim: true },
+      alternatePhone: { type: String, trim: true, default: "" }
     },
     mapUrl: {
       type: String,

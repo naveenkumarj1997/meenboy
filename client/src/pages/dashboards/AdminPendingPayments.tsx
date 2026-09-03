@@ -406,6 +406,9 @@ export default function AdminPendingPayments() {
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-white truncate">{user.name}</div>
                       <div className="text-xs text-slate-400 mt-0.5 break-all">{user.phone || "-"}</div>
+                      {user.alternatePhone ? (
+                        <div className="text-xs text-amber-300 mt-0.5 break-all">Alt: {user.alternatePhone}</div>
+                      ) : null}
                       {user.email && (
                         <div className="text-xs text-slate-500 mt-0.5 truncate">{user.email}</div>
                       )}
@@ -457,7 +460,12 @@ export default function AdminPendingPayments() {
                     <Fragment key={user._id}>
                       <tr className="hover:bg-slate-800/50 transition-colors">
                         <td className="px-6 py-4 font-medium text-white">{user.name}</td>
-                        <td className="px-6 py-4">{user.phone || "-"}</td>
+                        <td className="px-6 py-4">
+                          <div>{user.phone || "-"}</div>
+                          {user.alternatePhone ? (
+                            <div className="text-xs text-amber-300 mt-0.5">Alt: {user.alternatePhone}</div>
+                          ) : null}
+                        </td>
                         <td className="px-6 py-4">{user.email}</td>
                         <td className="px-6 py-4 text-rose-400 font-bold">₹{user.pendingBalance?.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right">

@@ -160,6 +160,20 @@ const createOrder = async (req, res, next) => {
       ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
       : null;
 
+    const customer = await User.findById(req.user._id).select("alternatePhone phone").lean();
+    const orderAlternate =
+      String(address?.alternatePhone || "").trim() ||
+      String(customer?.alternatePhone || "").trim() ||
+      "";
+    const orderAddress = {
+      ...address,
+      alternatePhone: orderAlternate
+    };
+
+    if (orderAlternate && orderAlternate !== String(customer?.alternatePhone || "").trim()) {
+      await User.findByIdAndUpdate(req.user._id, { alternatePhone: orderAlternate });
+    }
+
     const order = await Order.create({
       customer: req.user._id,
       items: snapshotOrderItems(items),
@@ -169,7 +183,7 @@ const createOrder = async (req, res, next) => {
       estimatedTotal: total,
       dailyPriceUpdated: Boolean(dailyUpdate),
       dailyPriceUpdatedAt: dailyUpdate ? dailyUpdate.updatedAt : undefined,
-      address,
+      address: orderAddress,
       deliveryDate,
       deliveryTime,
       mapUrl,
@@ -238,12 +252,32 @@ const listAssignmentsForPartner = async (req, res, next) => {
         path: "order",
         populate: {
           path: "customer",
-          select: "name phone"
+          select: "name phone mapUrl alternatePhone"
         }
       })
       .sort({ sequence: 1, createdAt: -1 })
       .lean();
-    res.json({ assignments });
+
+    const assignmentsWithMap = assignments.map((assignment) => {
+      if (!assignment.order) return assignment;
+      const orderMap = String(assignment.order.mapUrl || "").trim();
+      const customerMap = String(assignment.order.customer?.mapUrl || "").trim();
+      const orderAlt = String(assignment.order.address?.alternatePhone || "").trim();
+      const customerAlt = String(assignment.order.customer?.alternatePhone || "").trim();
+      return {
+        ...assignment,
+        order: {
+          ...assignment.order,
+          mapUrl: orderMap || customerMap,
+          address: {
+            ...(assignment.order.address || {}),
+            alternatePhone: orderAlt || customerAlt
+          }
+        }
+      };
+    });
+
+    res.json({ assignments: assignmentsWithMap });
   } catch (error) {
     next(error);
   }
@@ -344,6 +378,9 @@ const updateAdminOrder = async (req, res, next) => {
       if (address.state) order.address.state = address.state;
       if (address.postalCode) order.address.postalCode = address.postalCode;
       if (address.phone !== undefined) order.address.phone = address.phone;
+      if (address.alternatePhone !== undefined) {
+        order.address.alternatePhone = String(address.alternatePhone || "").trim();
+      }
     }
 
     if (deliveryDate) order.deliveryDate = deliveryDate;
@@ -790,7 +827,7 @@ const listInvoicesForAdmin = async (req, res, next) => {
       deliveryDate,
       status: { $ne: "cancelled" }
     })
-      .populate("customer", "name phone")
+      .populate("customer", "name phone alternatePhone")
       .sort({ createdAt: 1 })
       .lean();
 
@@ -798,6 +835,8 @@ const listInvoicesForAdmin = async (req, res, next) => {
       orderId: order._id,
       customerName: order.customer?.name || "Customer",
       customerPhone: order.customer?.phone || order.address?.phone || "",
+      customerAlternatePhone:
+        order.address?.alternatePhone || order.customer?.alternatePhone || "",
       total: order.total,
       status: order.status,
       deliveryTime: order.deliveryTime,
@@ -1351,7 +1390,7 @@ const createAdminOrder = async (req, res, next) => {
 
     // Create new user if provided
     if (newCustomer && !finalCustomerId) {
-      const { name, email, phone } = newCustomer;
+      const { name, email, phone, alternatePhone } = newCustomer;
       if (!name?.trim() || !email?.trim() || !phone?.trim()) {
         return res.status(400).json({ message: "New customer name, email and phone are required" });
       }
@@ -1359,6 +1398,7 @@ const createAdminOrder = async (req, res, next) => {
       if (cleanPhone.length < 10) {
         return res.status(400).json({ message: "Valid 10-digit phone number is required" });
       }
+      const cleanAlternate = normalizePhoneDigits(alternatePhone || address.alternatePhone);
       // Generate a random password of 12 chars
       const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
       const addressPhone = normalizePhoneDigits(address.phone) || cleanPhone;
@@ -1367,6 +1407,7 @@ const createAdminOrder = async (req, res, next) => {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         phone: cleanPhone,
+        alternatePhone: cleanAlternate || "",
         password: randomPassword,
         role: "customer",
         customerSource: "manual",
@@ -1481,7 +1522,11 @@ const createAdminOrder = async (req, res, next) => {
         state: address.state || "Tamil Nadu",
         postalCode: address.postalCode,
         country: address.country || "India",
-        phone: normalizePhoneDigits(address.phone || customerDoc.phone || "")
+        phone: normalizePhoneDigits(address.phone || customerDoc.phone || ""),
+        alternatePhone:
+          normalizePhoneDigits(address.alternatePhone) ||
+          normalizePhoneDigits(customerDoc.alternatePhone) ||
+          ""
       },
       deliveryDate,
       deliveryTime,
@@ -1489,6 +1534,11 @@ const createAdminOrder = async (req, res, next) => {
       customerNotes: itemNotesSummary || notesText,
       bookingSource: "manual"
     });
+
+    const orderAlternate = String(order.address?.alternatePhone || "").trim();
+    if (orderAlternate && orderAlternate !== String(customerDoc.alternatePhone || "").trim()) {
+      await User.findByIdAndUpdate(finalCustomerId, { alternatePhone: orderAlternate });
+    }
 
     await syncCustomerBookingAdjustments(finalCustomerId, {
       discountAmount: parsedDiscount,

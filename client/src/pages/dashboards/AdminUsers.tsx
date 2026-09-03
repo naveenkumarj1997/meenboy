@@ -27,6 +27,7 @@ export default function AdminUsers() {
     role: "",
     status: "",
     phone: "",
+    alternatePhone: "",
     mapUrl: "",
     address: { line1: "", city: "", state: "", postalCode: "" }
   });
@@ -110,6 +111,7 @@ export default function AdminUsers() {
       role: user.role || "",
       status: user.status || "active",
       phone: user.phone || "",
+      alternatePhone: user.alternatePhone || "",
       mapUrl: user.mapUrl || "",
       address: {
         line1: user.address?.line1 || "",
@@ -293,6 +295,11 @@ export default function AdminUsers() {
                       <div className="text-xs text-teal-400 flex items-center gap-1">
                         📞 {user.phone || <span className="text-slate-500 italic">No Phone</span>}
                       </div>
+                      {user.alternatePhone ? (
+                        <div className="text-xs text-amber-300/90 flex items-center gap-1 mt-0.5">
+                          📞 Alt: {user.alternatePhone}
+                        </div>
+                      ) : null}
                       <div className="text-xs text-slate-400 mt-1 flex items-start gap-1">
                         <span>📍</span>
                         <span>
@@ -428,8 +435,10 @@ export default function AdminUsers() {
                 >
                   <option value="customer">Customer</option>
                   <option value="delivery_partner">Delivery Partner</option>
-                  <option value="admin">Admin</option>
                 </select>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  Create admins from Manage Admins (with section access).
+                </p>
               </div>
               <div>
                 <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Phone</label>
@@ -438,6 +447,18 @@ export default function AdminUsers() {
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white outline-none focus:border-teal-500"
                   value={editForm.phone}
                   onChange={e => setEditForm({...editForm, phone: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+                  Alternate number <span className="normal-case text-slate-500">(optional)</span>
+                </label>
+                <input 
+                  type="text" 
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white outline-none focus:border-teal-500"
+                  value={editForm.alternatePhone}
+                  onChange={e => setEditForm({...editForm, alternatePhone: e.target.value})}
+                  placeholder="If primary number is not reachable"
                 />
               </div>
               <div className="md:col-span-2">

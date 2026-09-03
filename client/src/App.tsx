@@ -21,12 +21,14 @@ import AdminEarnings from "./pages/dashboards/AdminEarnings";
 import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
 import AdminMoneyManagement from "./pages/dashboards/AdminMoneyManagement";
+import AdminExpenses from "./pages/dashboards/AdminExpenses";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
 import AdminWalkIn from "./pages/dashboards/AdminWalkIn";
 import AdminProfile from "./pages/dashboards/AdminProfile";
 import AdminPartnerApprovals from "./pages/dashboards/AdminPartnerApprovals";
 import AdminNewCustomers from "./pages/dashboards/AdminNewCustomers";
+import AdminManageAdmins from "./pages/dashboards/AdminManageAdmins";
 import CustomerDashboard from "./pages/dashboards/CustomerDashboard";
 import DeliveryDashboard from "./pages/dashboards/DeliveryDashboard";
 import CustomerDeliveryStatus from "./pages/dashboards/CustomerDeliveryStatus";
@@ -123,9 +125,11 @@ function App() {
           <Route path="/dashboard/admin/users" element={<AdminUsers />} />
           <Route path="/dashboard/admin/finance" element={<AdminFinancePage />} />
           <Route path="/dashboard/admin/money-management" element={<AdminMoneyManagement />} />
+          <Route path="/dashboard/admin/expenses" element={<AdminExpenses />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
           <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />
           <Route path="/dashboard/admin/manual-booking" element={<AdminManualBooking />} />
+          <Route path="/dashboard/admin/manage-admins" element={<AdminManageAdmins />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
           <Route path="/dashboard/customer" element={<CustomerDashboard />} />

@@ -82,6 +82,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/finance", financeRoutes);
+app.use("/api/expenses", require("./routes/expenseRoutes"));
 app.use("/api/availability", availabilityRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/walk-in", require("./routes/walkInRoutes"));

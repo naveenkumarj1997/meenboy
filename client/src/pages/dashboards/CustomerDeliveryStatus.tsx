@@ -129,6 +129,9 @@ export default function CustomerDeliveryStatus() {
                          <div className="truncate">{order.address?.line1}, {order.address?.line2}</div>
                          <div className="truncate">{order.address?.city}, {order.address?.postalCode}</div>
                          {order.address?.phone && <div className="text-teal-400 mt-1">📞 {order.address.phone}</div>}
+                         {order.address?.alternatePhone && (
+                           <div className="text-amber-300 mt-1">📞 Alt: {order.address.alternatePhone}</div>
+                         )}
                        </div>
 
                        <div className="text-sm bg-slate-900/50 p-3 rounded-lg border border-slate-800 mb-4">

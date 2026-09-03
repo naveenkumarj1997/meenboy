@@ -27,7 +27,7 @@ const buildCategoryOrdersForDate = async (date, groupId) => {
     deliveryDate: date,
     status: { $ne: "cancelled" }
   })
-    .populate("customer", "name phone email")
+    .populate("customer", "name phone email mapUrl alternatePhone")
     .sort({ deliveryTime: 1, createdAt: 1 })
     .lean();
 
@@ -79,6 +79,8 @@ const buildCategoryOrdersForDate = async (date, groupId) => {
         orderId: order._id,
         customerName: order.customer?.name || "Guest",
         phone: order.address?.phone || order.customer?.phone || "",
+        alternatePhone:
+          order.address?.alternatePhone || order.customer?.alternatePhone || "",
         email: order.customer?.email || "",
         address: formatAddress(order.address),
         deliveryTime: order.deliveryTime || "",
@@ -86,7 +88,7 @@ const buildCategoryOrdersForDate = async (date, groupId) => {
         status: order.status,
         bookingSource: order.bookingSource || "website",
         partnerName: partnerByOrder[String(order._id)] || "Unassigned",
-        mapUrl: order.mapUrl || "",
+        mapUrl: order.mapUrl || order.customer?.mapUrl || "",
         customerNotes: order.customerNotes || "",
         orderTotal: order.total,
         paymentStatus: order.paymentStatus || "",
