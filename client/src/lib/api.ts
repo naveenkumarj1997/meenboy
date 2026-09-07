@@ -96,6 +96,52 @@ export const getAdminProducts = async (token: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
+// ─── Today's Catch (homepage board) ──────────────────────────────────────────
+
+export interface TodayCatchItem {
+  id?: string;
+  name: string;
+  price: number;
+  unit?: string;
+  note?: string;
+  /** Max qty customer can order (e.g. 4). Min on site is 0.5. */
+  availableQty?: number;
+  imageUrl?: string;
+  productId?: string | null;
+  sortOrder?: number;
+}
+
+export interface TodayCatchPayload {
+  enabled: boolean;
+  headline: string;
+  subheadline: string;
+  items: TodayCatchItem[];
+  updatedAt?: string;
+}
+
+export const getPublicTodayCatch = async () =>
+  request<{ todayCatch: TodayCatchPayload }>("/today-catch");
+
+export const getAdminTodayCatch = async (token: string) =>
+  request<{ todayCatch: TodayCatchPayload }>("/today-catch/admin", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const updateTodayCatch = async (
+  token: string,
+  payload: {
+    enabled?: boolean;
+    headline?: string;
+    subheadline?: string;
+    items?: TodayCatchItem[];
+  }
+) =>
+  request<{ todayCatch: TodayCatchPayload; message: string }>("/today-catch/admin", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
 export const getCatalog = async () =>
   request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/products?limit=100");
 

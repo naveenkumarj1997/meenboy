@@ -5,6 +5,8 @@ export type AdminSectionId =
   | "partner_approvals"
   | "products"
   | "daily_prices"
+  | "todays_catch"
+  | "whatsapp_broadcast"
   | "invoices"
   | "deliveries"
   | "all_orders"
@@ -48,6 +50,12 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   },
   { id: "products", label: "Products", href: "/dashboard/admin/products" },
   { id: "daily_prices", label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
+  { id: "todays_catch", label: "Today's Catch", href: "/dashboard/admin/todays-catch" },
+  {
+    id: "whatsapp_broadcast",
+    label: "Broadcast WhatsApp",
+    href: "/dashboard/admin/broadcast-whatsapp"
+  },
   { id: "invoices", label: "Invoices", href: "/dashboard/admin/invoices" },
   { id: "deliveries", label: "Order Management", href: "/dashboard/admin/deliveries" },
   { id: "all_orders", label: "ALL Orders", href: "/dashboard/admin/all-orders" },

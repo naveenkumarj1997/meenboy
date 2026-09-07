@@ -4,6 +4,8 @@ import { useAuth } from "./context/AuthContext";
 import AdminDashboard from "./pages/dashboards/AdminDashboard";
 import AdminProductsPage from "./pages/dashboards/AdminProductsPage";
 import AdminDailyPrices from "./pages/dashboards/AdminDailyPrices";
+import AdminTodaysCatch from "./pages/dashboards/AdminTodaysCatch";
+import AdminWhatsAppBroadcast from "./pages/dashboards/AdminWhatsAppBroadcast";
 import AdminInvoices from "./pages/dashboards/AdminInvoices";
 import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
 import AdminAllOrders from "./pages/dashboards/AdminAllOrders";
@@ -108,6 +110,8 @@ function App() {
           <Route path="/dashboard/admin/partner-approvals" element={<AdminPartnerApprovals />} />
           <Route path="/dashboard/admin/products" element={<AdminProductsPage />} />
           <Route path="/dashboard/admin/daily-prices" element={<AdminDailyPrices />} />
+          <Route path="/dashboard/admin/todays-catch" element={<AdminTodaysCatch />} />
+          <Route path="/dashboard/admin/broadcast-whatsapp" element={<AdminWhatsAppBroadcast />} />
           <Route path="/dashboard/admin/invoices" element={<AdminInvoices />} />
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
           <Route path="/dashboard/admin/all-orders" element={<AdminAllOrders />} />

@@ -103,7 +103,8 @@ router.get(
     "new_customers",
     "partner_approvals",
     "manual_booking",
-    "pending_payments"
+    "pending_payments",
+    "whatsapp_broadcast"
   ),
   getAllUsers
 );

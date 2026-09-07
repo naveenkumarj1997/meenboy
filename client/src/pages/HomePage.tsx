@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import AnimatedOceanScene from "../components/AnimatedOceanScene";
+import TodayCatchSection from "../components/TodayCatchSection";
+import { getPublicTodayCatch, type TodayCatchPayload } from "../lib/api";
 
 // SVG components for Sea Theme (used in benefits section)
 const FishIcon = ({ className }: { className?: string }) => (
@@ -18,6 +21,25 @@ const WaveDivider = () => (
 );
 
 const HomePage = () => {
+  const [todayCatch, setTodayCatch] = useState<TodayCatchPayload | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPublicTodayCatch()
+      .then((res) => {
+        if (!cancelled) setTodayCatch(res.todayCatch);
+      })
+      .catch(() => {
+        if (!cancelled) setTodayCatch(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const showTodayCatch =
+    Boolean(todayCatch?.enabled) && Array.isArray(todayCatch?.items) && todayCatch!.items.length > 0;
+
   return (
     <div className="flex flex-col items-center bg-white min-h-screen">
       {/* Premium Hero Section with Animated Ocean Scene */}
@@ -78,6 +100,9 @@ const HomePage = () => {
 
       {/* Wave Transition */}
       <WaveDivider />
+
+      {/* Today's Catch — only when admin toggle is ON */}
+      {showTodayCatch && todayCatch && <TodayCatchSection todayCatch={todayCatch} />}
 
       {/* Featured Categories Section */}
       <section className="w-full py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-white">

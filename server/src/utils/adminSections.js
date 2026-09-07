@@ -6,6 +6,8 @@ const ADMIN_SECTIONS = [
   { id: "partner_approvals", label: "New Delivery Partners" },
   { id: "products", label: "Products" },
   { id: "daily_prices", label: "Daily Prices" },
+  { id: "todays_catch", label: "Today's Catch" },
+  { id: "whatsapp_broadcast", label: "Broadcast WhatsApp" },
   { id: "invoices", label: "Invoices" },
   { id: "deliveries", label: "Order Management" },
   { id: "all_orders", label: "ALL Orders" },
