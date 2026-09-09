@@ -6,6 +6,7 @@ const {
   createOrder,
   getMyOrders,
   listOrdersForAdmin,
+  getCustomerLastDeliveryTime,
   listAssignmentsForPartner,
   updateOrderStatus,
   updateAdminOrder,
@@ -86,6 +87,13 @@ router.post(
 
 router.get("/me", protect, authorizeRoles("customer"), getMyOrders);
 router.get("/admin", protect, authorizeRoles("admin"), orderAdminAccess, listOrdersForAdmin);
+router.get(
+  "/admin/customer-last-delivery",
+  protect,
+  authorizeRoles("admin"),
+  orderAdminAccess,
+  getCustomerLastDeliveryTime
+);
 router.get("/assignments", protect, authorizeRoles("delivery_partner"), listAssignmentsForPartner);
 router.get("/assignments/all", protect, authorizeRoles("admin"), orderAdminAccess, listAllAssignments);
 router.get("/delivery-stats", protect, authorizeRoles("admin"), orderAdminAccess, getDeliveryStats);

@@ -243,6 +243,32 @@ const listOrdersForAdmin = async (req, res, next) => {
   }
 };
 
+/** Last non-cancelled order delivery time for Manual Booking prefill */
+const getCustomerLastDeliveryTime = async (req, res, next) => {
+  try {
+    const customerId = String(req.query.customerId || "").trim();
+    if (!customerId) {
+      return res.status(400).json({ message: "customerId is required" });
+    }
+
+    const order = await Order.findOne({
+      customer: customerId,
+      status: { $ne: "cancelled" },
+      deliveryTime: { $exists: true, $nin: [null, ""] }
+    })
+      .sort({ createdAt: -1 })
+      .select("deliveryTime deliveryDate")
+      .lean();
+
+    res.json({
+      deliveryTime: order?.deliveryTime || null,
+      deliveryDate: order?.deliveryDate || null
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const listAssignmentsForPartner = async (req, res, next) => {
   try {
     const assignments = await DeliveryAssignment.find({
@@ -456,10 +482,19 @@ const assignDeliveryPartner = async (req, res, next) => {
   }
 };
 
+const parseGpsLocation = (location) => {
+  if (!location || typeof location !== "object") return null;
+  const lat = Number(location.lat);
+  const lng = Number(location.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+  return { lat, lng, capturedAt: new Date() };
+};
+
 const updateDeliveryStatus = async (req, res, next) => {
   try {
     const { assignmentId } = req.params;
-    const { status, notes, actualArrival, paymentCollected, paymentMethod } = req.body;
+    const { status, notes, actualArrival, paymentCollected, paymentMethod, location } = req.body;
 
     const existing = await DeliveryAssignment.findOne({
       _id: assignmentId,
@@ -496,6 +531,13 @@ const updateDeliveryStatus = async (req, res, next) => {
     }
 
     const wasAlreadyDelivered = existing.status === "delivered";
+    const gps = parseGpsLocation(location);
+    const locationPatch =
+      gps && status === "en_route"
+        ? { enRouteLocation: gps }
+        : gps && status === "delivered"
+          ? { deliveredLocation: gps }
+          : {};
 
     const assignment = await DeliveryAssignment.findOneAndUpdate(
       { _id: assignmentId, deliveryPartner: req.user._id },
@@ -505,7 +547,8 @@ const updateDeliveryStatus = async (req, res, next) => {
         ...(actualArrival ? { actualArrival } : {}),
         ...(status === "delivered"
           ? { paymentCollected: collected, paymentMethod }
-          : {})
+          : {}),
+        ...locationPatch
       },
       { new: true, runValidators: true }
     ).populate("order");
@@ -1814,6 +1857,7 @@ module.exports = {
   createOrder,
   getMyOrders,
   listOrdersForAdmin,
+  getCustomerLastDeliveryTime,
   listAssignmentsForPartner,
   updateOrderStatus,
   updateAdminOrder,

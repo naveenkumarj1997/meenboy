@@ -21,6 +21,25 @@ const formatUnitPriceLabel = (item: { unitPrice?: number; unit?: string }) => {
   return `₹${formatMoney(item.unitPrice)}/${label}`;
 };
 
+/** Soft-fail GPS for petrol km tracking (en_route / delivered). */
+const capturePartnerGps = (): Promise<{ lat: number; lng: number } | undefined> =>
+  new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      resolve(undefined);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        resolve({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        });
+      },
+      () => resolve(undefined),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+
 function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [phone, setPhone] = useState("");
@@ -297,6 +316,10 @@ export default function DeliveryDashboard() {
       }
       if (statusForm.status === "delivered" || statusForm.status === "en_route") {
         payload.actualArrival = statusForm.status === "delivered" ? new Date().toISOString() : undefined;
+        const location = await capturePartnerGps();
+        if (location) {
+          payload.location = location;
+        }
       }
 
       await updateDeliveryStatus(token!, selectedAssignment._id, payload);

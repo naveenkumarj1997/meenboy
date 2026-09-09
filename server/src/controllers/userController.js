@@ -767,6 +767,139 @@ const savePartnerSalary = async (req, res, next) => {
   }
 };
 
+// @desc    Petrol allowance + route km by date
+// @route   GET /api/users/partner-petrol/:date
+// @access  Private/Admin
+const getPartnerPetrolByDate = async (req, res, next) => {
+  try {
+    const { date } = req.params;
+    const Order = require("../models/Order");
+    const DeliveryAssignment = require("../models/DeliveryAssignment");
+    const PartnerPetrolAllowance = require("../models/PartnerPetrolAllowance");
+    const { computeRouteKmFromAssignments } = require("../utils/geoDistance");
+
+    const ordersForDate = await Order.find({ deliveryDate: date }).select("_id");
+    const orderIds = ordersForDate.map((o) => o._id);
+
+    const assignments = await DeliveryAssignment.find({
+      order: { $in: orderIds },
+      status: "delivered"
+    })
+      .populate("deliveryPartner", "name phone email")
+      .populate({
+        path: "order",
+        select: "deliveryDate customer address",
+        populate: { path: "customer", select: "name phone" }
+      })
+      .lean();
+
+    const partnerMap = {};
+
+    for (const assignment of assignments) {
+      if (!assignment.deliveryPartner) continue;
+      const pId = assignment.deliveryPartner._id.toString();
+      if (!partnerMap[pId]) {
+        partnerMap[pId] = {
+          partnerId: pId,
+          name: assignment.deliveryPartner.name,
+          phone: assignment.deliveryPartner.phone,
+          deliveredCount: 0,
+          totalKm: 0,
+          amount: 0,
+          partnerConfirmed: false,
+          stops: [],
+          _assignments: []
+        };
+      }
+
+      const hasGps = Boolean(
+        (assignment.deliveredLocation &&
+          Number.isFinite(assignment.deliveredLocation.lat) &&
+          Number.isFinite(assignment.deliveredLocation.lng)) ||
+          (assignment.enRouteLocation &&
+            Number.isFinite(assignment.enRouteLocation.lat) &&
+            Number.isFinite(assignment.enRouteLocation.lng))
+      );
+
+      partnerMap[pId].deliveredCount += 1;
+      partnerMap[pId]._assignments.push(assignment);
+      partnerMap[pId].stops.push({
+        assignmentId: assignment._id,
+        sequence: assignment.sequence || 0,
+        customerName:
+          assignment.order?.customer?.name ||
+          assignment.order?.address?.phone ||
+          "Customer",
+        hasGps,
+        hasEnRouteGps: Boolean(
+          assignment.enRouteLocation &&
+            Number.isFinite(assignment.enRouteLocation.lat) &&
+            Number.isFinite(assignment.enRouteLocation.lng)
+        ),
+        hasDeliveredGps: Boolean(
+          assignment.deliveredLocation &&
+            Number.isFinite(assignment.deliveredLocation.lat) &&
+            Number.isFinite(assignment.deliveredLocation.lng)
+        )
+      });
+    }
+
+    for (const pId of Object.keys(partnerMap)) {
+      const row = partnerMap[pId];
+      row.stops.sort((a, b) => a.sequence - b.sequence);
+      row.totalKm = computeRouteKmFromAssignments(row._assignments);
+      row.missingGpsCount = row.stops.filter((s) => !s.hasGps).length;
+      delete row._assignments;
+    }
+
+    const partnerIds = Object.keys(partnerMap);
+    const allowances = await PartnerPetrolAllowance.find({
+      date,
+      deliveryPartner: { $in: partnerIds }
+    }).lean();
+
+    for (const doc of allowances) {
+      const pId = doc.deliveryPartner.toString();
+      if (partnerMap[pId]) {
+        partnerMap[pId].amount = Number(doc.amount || 0);
+        partnerMap[pId].partnerConfirmed = Boolean(doc.partnerConfirmed);
+      }
+    }
+
+    res.json({ stats: Object.values(partnerMap) });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Save petrol allowance amount for partner/date
+// @route   POST /api/users/partner-petrol
+// @access  Private/Admin
+const savePartnerPetrolAllowance = async (req, res, next) => {
+  try {
+    const { date, partnerId, amount } = req.body;
+
+    if (!date || !partnerId) {
+      return res.status(400).json({ message: "Date and Partner ID are required" });
+    }
+
+    const PartnerPetrolAllowance = require("../models/PartnerPetrolAllowance");
+
+    const allowance = await PartnerPetrolAllowance.findOneAndUpdate(
+      { date, deliveryPartner: partnerId },
+      {
+        amount: Number(amount) || 0,
+        updatedBy: req.user._id
+      },
+      { new: true, upsert: true, setDefaultsOnInsert: true }
+    );
+
+    res.json({ allowance, message: "Petrol allowance saved successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get current delivery partner's earnings
 // @route   GET /api/users/me/earnings
 // @access  Private/Delivery Partner
@@ -794,7 +927,10 @@ const getMyEarnings = async (req, res, next) => {
           codCollected: 0,
           upiCollected: 0,
           salaryEarned: 0,
-          partnerConfirmed: false
+          partnerConfirmed: false,
+          petrolAllowance: 0,
+          petrolConfirmed: false,
+          totalKm: 0
         };
       }
       
@@ -827,6 +963,34 @@ const getMyEarnings = async (req, res, next) => {
       }
     }
 
+    const PartnerPetrolAllowance = require("../models/PartnerPetrolAllowance");
+    const { computeRouteKmFromAssignments } = require("../utils/geoDistance");
+    const petrolDocs = await PartnerPetrolAllowance.find({
+      deliveryPartner: partnerId,
+      date: { $in: dates }
+    });
+
+    for (const petrol of petrolDocs) {
+      if (dailyStats[petrol.date]) {
+        dailyStats[petrol.date].petrolAllowance = Number(petrol.amount || 0);
+        dailyStats[petrol.date].petrolConfirmed = Boolean(petrol.partnerConfirmed);
+      }
+    }
+
+    // Route km per day from delivered assignments with GPS
+    const deliveredByDate = {};
+    for (const assignment of assignments) {
+      if (!assignment.order?.deliveryDate || assignment.status !== "delivered") continue;
+      const d = assignment.order.deliveryDate;
+      if (!deliveredByDate[d]) deliveredByDate[d] = [];
+      deliveredByDate[d].push(assignment);
+    }
+    for (const d of Object.keys(deliveredByDate)) {
+      if (dailyStats[d]) {
+        dailyStats[d].totalKm = computeRouteKmFromAssignments(deliveredByDate[d]);
+      }
+    }
+
     const results = Object.values(dailyStats).sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.json({ earnings: results });
@@ -854,6 +1018,34 @@ const confirmSalaryCollection = async (req, res, next) => {
     await salary.save();
 
     res.json({ message: "Salary collection confirmed successfully", salary });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Confirm petrol allowance collection
+// @route   POST /api/users/me/earnings/:date/confirm-petrol
+// @access  Private/Delivery Partner
+const confirmPetrolCollection = async (req, res, next) => {
+  try {
+    const { date } = req.params;
+    const partnerId = req.user._id;
+
+    const PartnerPetrolAllowance = require("../models/PartnerPetrolAllowance");
+    const petrol = await PartnerPetrolAllowance.findOne({ date, deliveryPartner: partnerId });
+
+    if (!petrol) {
+      return res.status(404).json({ message: "No petrol allowance found for this date" });
+    }
+
+    if (!(Number(petrol.amount) > 0)) {
+      return res.status(400).json({ message: "No petrol amount to confirm for this date" });
+    }
+
+    petrol.partnerConfirmed = true;
+    await petrol.save();
+
+    res.json({ message: "Petrol allowance confirmed successfully", allowance: petrol });
   } catch (error) {
     next(error);
   }
@@ -936,8 +1128,11 @@ module.exports = {
   getPartnerSalariesByDate,
   getPartnerCollectionHistory,
   savePartnerSalary,
+  getPartnerPetrolByDate,
+  savePartnerPetrolAllowance,
   getMyEarnings,
   confirmSalaryCollection,
+  confirmPetrolCollection,
   getMyOrderPaymentStatus,
   getPartnerDocument,
   deletePartnerDocument

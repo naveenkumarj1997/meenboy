@@ -21,6 +21,7 @@ const ADMIN_SECTIONS = [
   { id: "purchases", label: "Purchases" },
   { id: "settlements", label: "Settlements" },
   { id: "partner_salary", label: "Partner Salary" },
+  { id: "petrol_allowance", label: "Petrol Allowance" },
   { id: "earnings", label: "Admin Earnings" },
   { id: "users", label: "Users" },
   { id: "money_management", label: "Money Management" },

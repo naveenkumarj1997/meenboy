@@ -13,8 +13,11 @@ const {
   getPartnerSalariesByDate,
   getPartnerCollectionHistory,
   savePartnerSalary,
+  getPartnerPetrolByDate,
+  savePartnerPetrolAllowance,
   getMyEarnings,
   confirmSalaryCollection,
+  confirmPetrolCollection,
   getMyOrderPaymentStatus,
   getPartnerDocument,
   deletePartnerDocument
@@ -36,6 +39,7 @@ router.get("/me/pending-breakdown", getMyPendingBreakdown);
 router.get("/me/order-payment-status", getMyOrderPaymentStatus);
 router.get("/me/earnings", authorizeRoles("delivery_partner"), getMyEarnings);
 router.post("/me/earnings/:date/confirm", authorizeRoles("delivery_partner"), confirmSalaryCollection);
+router.post("/me/earnings/:date/confirm-petrol", authorizeRoles("delivery_partner"), confirmPetrolCollection);
 
 // Partner document view: admin or the partner themselves
 router.get("/:id/document", getPartnerDocument);
@@ -79,6 +83,16 @@ router.post(
   "/partner-salaries",
   authorizeAdminSections("partner_salary"),
   savePartnerSalary
+);
+router.get(
+  "/partner-petrol/:date",
+  authorizeAdminSections("petrol_allowance"),
+  getPartnerPetrolByDate
+);
+router.post(
+  "/partner-petrol",
+  authorizeAdminSections("petrol_allowance"),
+  savePartnerPetrolAllowance
 );
 router.get(
   "/:id/pending-breakdown",

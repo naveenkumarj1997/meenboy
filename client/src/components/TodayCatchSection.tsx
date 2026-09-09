@@ -69,6 +69,69 @@ const buildMessage = (
     .join("\n");
 };
 
+export function StockUnavailableSection() {
+  const preOrderMessage = [
+    "Hi Fish Friendly!",
+    "Currently I see no stock listed on the website.",
+    "I want to pre-order fish for Wednesday / Sunday delivery.",
+    "",
+    "Please share available items and guide me for WhatsApp / website order.",
+    "Thank you!"
+  ].join("\n");
+
+  return (
+    <section className="w-full py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-white">
+      <div className="text-center mb-8">
+        <p className="text-teal-600 text-sm font-semibold tracking-wider uppercase mb-2">
+          Stock status
+        </p>
+        <h2 className="text-3xl md:text-4xl font-bold text-cyan-950 mb-3">Stock Available</h2>
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="max-w-3xl mx-auto rounded-3xl border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-teal-50 p-6 sm:p-10 text-center shadow-sm"
+      >
+        <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold px-3 py-1 mb-4">
+          No live stock listed right now
+        </div>
+        <h3 className="text-xl sm:text-2xl font-bold text-cyan-950 mb-3">
+          Currently no today&apos;s catch stock available in the shop
+        </h3>
+        <p className="text-cyan-800 text-sm sm:text-base leading-relaxed mb-2">
+          When stock is available, you will see fish with price and quantity here — and you can
+          order quickly on WhatsApp or the website.
+        </p>
+        <p className="text-cyan-700 text-sm sm:text-base leading-relaxed mb-8">
+          You can still <strong>pre-order</strong> fishes for{" "}
+          <strong>Wednesday</strong> and <strong>Sunday</strong> delivery through WhatsApp order
+          or website order.
+        </p>
+
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <a
+            href={shopWhatsAppUrl(preOrderMessage)}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold px-6 py-3 text-sm"
+          >
+            <WhatsAppIcon className="w-4 h-4" />
+            Pre-order on WhatsApp
+          </a>
+          <Link
+            to="/products"
+            className="inline-flex items-center justify-center rounded-xl bg-cyan-950 hover:bg-cyan-900 text-white font-semibold px-6 py-3 text-sm"
+          >
+            Order on website
+          </Link>
+        </div>
+      </motion.div>
+    </section>
+  );
+}
+
 export default function TodayCatchSection({ todayCatch }: { todayCatch: TodayCatchPayload }) {
   const [qtyByKey, setQtyByKey] = useState<Record<string, number>>({});
   const [modalOpen, setModalOpen] = useState(false);

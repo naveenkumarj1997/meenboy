@@ -19,6 +19,7 @@ import AdminDeliveryStatusChange from "./pages/dashboards/AdminDeliveryStatusCha
 import AdminPurchases from "./pages/dashboards/AdminPurchases";
 import AdminSettlements from "./pages/dashboards/AdminSettlements";
 import AdminPartnerSalary from "./pages/dashboards/AdminPartnerSalary";
+import AdminPetrolAllowance from "./pages/dashboards/AdminPetrolAllowance";
 import AdminEarnings from "./pages/dashboards/AdminEarnings";
 import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
@@ -125,6 +126,7 @@ function App() {
           <Route path="/dashboard/admin/purchases" element={<AdminPurchases />} />
           <Route path="/dashboard/admin/settlements" element={<AdminSettlements />} />
           <Route path="/dashboard/admin/partner-salary" element={<AdminPartnerSalary />} />
+          <Route path="/dashboard/admin/petrol-allowance" element={<AdminPetrolAllowance />} />
           <Route path="/dashboard/admin/earnings" element={<AdminEarnings />} />
           <Route path="/dashboard/admin/users" element={<AdminUsers />} />
           <Route path="/dashboard/admin/finance" element={<AdminFinancePage />} />

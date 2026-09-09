@@ -142,6 +142,31 @@ export const updateTodayCatch = async (
     body: JSON.stringify(payload)
   });
 
+/** Homepage fish banner (pre-booking announcement). Toggle off anytime to hide safely. */
+export interface BookingBannerPayload {
+  enabled: boolean;
+  message: string;
+  updatedAt?: string;
+}
+
+export const getPublicBookingBanner = async () =>
+  request<{ banner: BookingBannerPayload }>("/booking-banner");
+
+export const getAdminBookingBanner = async (token: string) =>
+  request<{ banner: BookingBannerPayload }>("/booking-banner/admin", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const updateBookingBanner = async (
+  token: string,
+  payload: { enabled?: boolean; message?: string }
+) =>
+  request<{ banner: BookingBannerPayload; message: string }>("/booking-banner/admin", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
 export const getCatalog = async () =>
   request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/products?limit=100");
 
@@ -302,6 +327,15 @@ export const createAdminOrder = async (token: string, payload: AdminOrderPayload
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
   });
+
+/** Last non-cancelled order delivery time for Manual Booking prefill */
+export const getCustomerLastDelivery = async (token: string, customerId: string) =>
+  request<{ deliveryTime: string | null; deliveryDate: string | null }>(
+    `/orders/admin/customer-last-delivery?customerId=${encodeURIComponent(customerId)}`,
+    {
+      headers: { Authorization: `Bearer ${token}` }
+    }
+  );
 
 export const getMyOrders = async (token: string) =>
   request<{ orders: any[] }>("/orders/me", {
@@ -707,7 +741,14 @@ export const getPartnerAssignments = async (token: string) =>
 export const updateDeliveryStatus = async (
   token: string,
   assignmentId: string,
-  payload: { status: string; notes?: string; paymentCollected?: number; paymentMethod?: string }
+  payload: {
+    status: string;
+    notes?: string;
+    paymentCollected?: number;
+    paymentMethod?: string;
+    actualArrival?: string;
+    location?: { lat: number; lng: number };
+  }
 ) =>
   request<{ assignment: any }>(`/orders/assignments/${assignmentId}/status`, {
     method: "PATCH",

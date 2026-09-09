@@ -87,6 +87,7 @@ app.use("/api/availability", availabilityRoutes);
 app.use("/api/purchases", purchaseRoutes);
 app.use("/api/walk-in", require("./routes/walkInRoutes"));
 app.use("/api/today-catch", require("./routes/todayCatchRoutes"));
+app.use("/api/booking-banner", require("./routes/bookingBannerRoutes"));
 
 app.use(notFound);
 app.use(errorHandler);

@@ -43,6 +43,18 @@ const deliveryAssignmentSchema = new mongoose.Schema(
       type: String,
       enum: ["cash", "upi", "none", "partial_cash", "partial_upi", "pay_later"],
       default: "none"
+    },
+    /** GPS when partner marks En Route (On the way) */
+    enRouteLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+      capturedAt: { type: Date }
+    },
+    /** GPS when partner marks Delivered Successfully */
+    deliveredLocation: {
+      lat: { type: Number },
+      lng: { type: Number },
+      capturedAt: { type: Date }
     }
   },
   {

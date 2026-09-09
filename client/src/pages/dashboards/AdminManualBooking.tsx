@@ -5,6 +5,7 @@ import {
   getAllUsers,
   getAdminProducts,
   createAdminOrder,
+  getCustomerLastDelivery,
   downloadInvoice
 } from "../../lib/api";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
@@ -129,12 +130,36 @@ export default function AdminManualBooking() {
     }
   }, [customerType, selectedUserId, users]);
 
+  // Prefill delivery time from customer's last order (many keep the same slot)
+  useEffect(() => {
+    if (customerType !== "existing" || !selectedUserId || !token) {
+      return;
+    }
+
+    let cancelled = false;
+    getCustomerLastDelivery(token, selectedUserId)
+      .then((res) => {
+        if (cancelled) return;
+        const last = String(res.deliveryTime || "").trim();
+        if (!last) return;
+        setDeliveryTime(last);
+      })
+      .catch(() => {
+        /* keep current / default time if lookup fails */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [customerType, selectedUserId, token]);
+
   useEffect(() => {
     if (customerType === "new") {
       setSelectedUserId("");
       setNewCustomer({ name: "", email: "", phone: "", alternatePhone: "" });
       setAddressForm(emptyAddressForm());
       setAdjustments(emptyBookingAdjustments());
+      setDeliveryTime(DEFAULT_DELIVERY_TIME);
     }
   }, [customerType]);
 
@@ -534,12 +559,23 @@ export default function AdminManualBooking() {
                       onChange={(e) => setDeliveryTime(e.target.value)}
                       className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
                     >
+                      {/* Include last-order time if it is outside the current slot list */}
+                      {!DELIVERY_TIMES.includes(deliveryTime) && deliveryTime ? (
+                        <option value={deliveryTime} className="bg-cyan-950">
+                          {deliveryTime} (last order)
+                        </option>
+                      ) : null}
                       {DELIVERY_TIMES.map((t) => (
                         <option key={t} value={t} className="bg-cyan-950">
                           {t}
                         </option>
                       ))}
                     </select>
+                    {customerType === "existing" && selectedUserId ? (
+                      <p className="mt-1 text-xs text-white/40">
+                        Prefills from this customer&apos;s last order time (you can change it)
+                      </p>
+                    ) : null}
                   </div>
                 </div>
 

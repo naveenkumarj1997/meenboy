@@ -20,6 +20,7 @@ export type AdminSectionId =
   | "purchases"
   | "settlements"
   | "partner_salary"
+  | "petrol_allowance"
   | "earnings"
   | "users"
   | "money_management"
@@ -85,6 +86,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   { id: "purchases", label: "Purchases", href: "/dashboard/admin/purchases" },
   { id: "settlements", label: "Settlements", href: "/dashboard/admin/settlements" },
   { id: "partner_salary", label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
+  {
+    id: "petrol_allowance",
+    label: "Petrol Allowance",
+    href: "/dashboard/admin/petrol-allowance"
+  },
   { id: "earnings", label: "Admin Earnings", href: "/dashboard/admin/earnings" },
   { id: "users", label: "Users", href: "/dashboard/admin/users" },
   {

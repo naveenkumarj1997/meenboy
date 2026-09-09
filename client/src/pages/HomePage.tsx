@@ -2,8 +2,13 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import AnimatedOceanScene from "../components/AnimatedOceanScene";
-import TodayCatchSection from "../components/TodayCatchSection";
-import { getPublicTodayCatch, type TodayCatchPayload } from "../lib/api";
+import FishMessageBanner from "../components/FishMessageBanner";
+import TodayCatchSection, { StockUnavailableSection } from "../components/TodayCatchSection";
+import {
+  getPublicTodayCatch,
+  getPublicBookingBanner,
+  type TodayCatchPayload
+} from "../lib/api";
 
 // SVG components for Sea Theme (used in benefits section)
 const FishIcon = ({ className }: { className?: string }) => (
@@ -22,6 +27,9 @@ const WaveDivider = () => (
 
 const HomePage = () => {
   const [todayCatch, setTodayCatch] = useState<TodayCatchPayload | null>(null);
+  const [catchLoaded, setCatchLoaded] = useState(false);
+  const [bannerMessage, setBannerMessage] = useState("");
+  const [bannerEnabled, setBannerEnabled] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,14 +39,38 @@ const HomePage = () => {
       })
       .catch(() => {
         if (!cancelled) setTodayCatch(null);
+      })
+      .finally(() => {
+        if (!cancelled) setCatchLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const showTodayCatch =
-    Boolean(todayCatch?.enabled) && Array.isArray(todayCatch?.items) && todayCatch!.items.length > 0;
+  useEffect(() => {
+    let cancelled = false;
+    getPublicBookingBanner()
+      .then((res) => {
+        if (cancelled) return;
+        setBannerEnabled(Boolean(res.banner?.enabled));
+        setBannerMessage(String(res.banner?.message || "").trim());
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBannerEnabled(false);
+          setBannerMessage("");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const stockLive =
+    Boolean(todayCatch?.enabled) &&
+    Array.isArray(todayCatch?.items) &&
+    todayCatch!.items.length > 0;
 
   return (
     <div className="flex flex-col items-center bg-white min-h-screen">
@@ -46,6 +78,8 @@ const HomePage = () => {
       <section className="w-full relative min-h-[90vh] flex flex-col items-center justify-start text-center px-4 sm:px-6 lg:px-8 overflow-hidden bg-cyan-950">
         {/* Animated Ocean Background */}
         <AnimatedOceanScene />
+
+        {bannerEnabled && bannerMessage ? <FishMessageBanner message={bannerMessage} /> : null}
 
         <div className="relative z-10 max-w-5xl mx-auto pt-8">
           <motion.div 
@@ -101,8 +135,13 @@ const HomePage = () => {
       {/* Wave Transition */}
       <WaveDivider />
 
-      {/* Today's Catch — only when admin toggle is ON */}
-      {showTodayCatch && todayCatch && <TodayCatchSection todayCatch={todayCatch} />}
+      {/* Stock board: live items when ON, pre-order message when OFF */}
+      {catchLoaded &&
+        (stockLive && todayCatch ? (
+          <TodayCatchSection todayCatch={todayCatch} />
+        ) : (
+          <StockUnavailableSection />
+        ))}
 
       {/* Featured Categories Section */}
       <section className="w-full py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto bg-white">

@@ -209,8 +209,8 @@ export default function AdminTodaysCatch() {
             <div>
               <h3 className="text-white font-bold text-base">Show on homepage</h3>
               <p className="text-slate-400 text-xs mt-1">
-                Saves immediately when you switch. ON = customers see it on the home page
-                (under the ocean hero). OFF = hidden.
+                Saves immediately when you switch. ON = customers see live stock on the home
+                page. OFF = home page shows “no stock now — pre-order for Wednesday & Sunday”.
               </p>
               <p className="text-xs mt-2 font-semibold">
                 Status:{" "}
