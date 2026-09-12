@@ -96,7 +96,7 @@ function rankLabel(rank: number) {
   return `#${rank}`;
 }
 
-function formatMinutes(mins, live = false) {
+function formatMinutes(mins: number | null | undefined, live = false) {
   if (mins == null || !Number.isFinite(Number(mins))) return "—";
   const n = Number(mins);
   const label = n < 60 ? `${n}m` : `${Math.floor(n / 60)}h ${n % 60}m`;

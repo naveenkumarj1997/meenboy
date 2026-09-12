@@ -123,7 +123,7 @@ const AdminDashboard = () => {
 
   const attentionCards: AttentionCard[] = useMemo(() => {
     const a = data.attention;
-    return [
+    const cards: AttentionCard[] = [
       {
         label: "New customers",
         value: String(a.newCustomers),
@@ -164,7 +164,8 @@ const AdminDashboard = () => {
         section: "pending_payments",
         hot: a.pendingPaymentCustomers > 0
       }
-    ].filter((c) => can(c.section));
+    ];
+    return cards.filter((c) => can(c.section));
   }, [data, user]);
 
   const shortcuts = useMemo(
