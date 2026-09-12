@@ -40,6 +40,23 @@ const getAllUsers = async (req, res, next) => {
   }
 };
 
+// @desc    Count unnoticed real customers (New Customers sidebar badge)
+// @route   GET /api/users/new-customers/count
+// @access  Private/Admin
+const getNewCustomersCount = async (req, res, next) => {
+  try {
+    const count = await User.countDocuments({
+      role: "customer",
+      isRealUser: true,
+      status: { $ne: "blocked" },
+      isNoticed: false
+    });
+    res.json({ count });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Update user details
 // @route   PUT /api/users/:id
 // @access  Private/Admin
@@ -776,41 +793,61 @@ const getPartnerPetrolByDate = async (req, res, next) => {
     const Order = require("../models/Order");
     const DeliveryAssignment = require("../models/DeliveryAssignment");
     const PartnerPetrolAllowance = require("../models/PartnerPetrolAllowance");
+    const PartnerDeliveryTrip = require("../models/PartnerDeliveryTrip");
     const { computeRouteKmFromAssignments } = require("../utils/geoDistance");
+    const { finalizeTripsForDate } = require("./deliveryTripController");
+
+    await finalizeTripsForDate(date);
 
     const ordersForDate = await Order.find({ deliveryDate: date }).select("_id");
     const orderIds = ordersForDate.map((o) => o._id);
 
-    const assignments = await DeliveryAssignment.find({
-      order: { $in: orderIds },
-      status: "delivered"
-    })
-      .populate("deliveryPartner", "name phone email")
-      .populate({
-        path: "order",
-        select: "deliveryDate customer address",
-        populate: { path: "customer", select: "name phone" }
+    const [assignments, trips] = await Promise.all([
+      DeliveryAssignment.find({
+        order: { $in: orderIds },
+        status: "delivered"
       })
-      .lean();
+        .populate("deliveryPartner", "name phone email")
+        .populate({
+          path: "order",
+          select: "deliveryDate customer address",
+          populate: { path: "customer", select: "name phone" }
+        })
+        .lean(),
+      PartnerDeliveryTrip.find({ date })
+        .populate("deliveryPartner", "name phone email")
+        .lean()
+    ]);
 
     const partnerMap = {};
 
-    for (const assignment of assignments) {
-      if (!assignment.deliveryPartner) continue;
-      const pId = assignment.deliveryPartner._id.toString();
+    const ensurePartner = (partner) => {
+      if (!partner?._id) return null;
+      const pId = partner._id.toString();
       if (!partnerMap[pId]) {
         partnerMap[pId] = {
           partnerId: pId,
-          name: assignment.deliveryPartner.name,
-          phone: assignment.deliveryPartner.phone,
+          name: partner.name,
+          phone: partner.phone,
           deliveredCount: 0,
           totalKm: 0,
+          stopKm: 0,
+          tripKm: 0,
+          tripStatus: null,
+          tripPointCount: 0,
+          kmSource: "none",
           amount: 0,
           partnerConfirmed: false,
           stops: [],
           _assignments: []
         };
       }
+      return partnerMap[pId];
+    };
+
+    for (const assignment of assignments) {
+      const row = ensurePartner(assignment.deliveryPartner);
+      if (!row) continue;
 
       const hasGps = Boolean(
         (assignment.deliveredLocation &&
@@ -821,9 +858,9 @@ const getPartnerPetrolByDate = async (req, res, next) => {
             Number.isFinite(assignment.enRouteLocation.lng))
       );
 
-      partnerMap[pId].deliveredCount += 1;
-      partnerMap[pId]._assignments.push(assignment);
-      partnerMap[pId].stops.push({
+      row.deliveredCount += 1;
+      row._assignments.push(assignment);
+      row.stops.push({
         assignmentId: assignment._id,
         sequence: assignment.sequence || 0,
         customerName:
@@ -844,11 +881,29 @@ const getPartnerPetrolByDate = async (req, res, next) => {
       });
     }
 
+    for (const trip of trips) {
+      const row = ensurePartner(trip.deliveryPartner);
+      if (!row) continue;
+      row.tripKm = Number(trip.totalKm || 0);
+      row.tripStatus = trip.status;
+      row.tripPointCount = Array.isArray(trip.points) ? trip.points.length : 0;
+      row.tripStartedAt = trip.startedAt;
+      row.tripEndedAt = trip.endedAt;
+    }
+
     for (const pId of Object.keys(partnerMap)) {
       const row = partnerMap[pId];
       row.stops.sort((a, b) => a.sequence - b.sequence);
-      row.totalKm = computeRouteKmFromAssignments(row._assignments);
+      row.stopKm = computeRouteKmFromAssignments(row._assignments);
       row.missingGpsCount = row.stops.filter((s) => !s.hasGps).length;
+      // Prefer hub→hub GPS trail when available
+      if (row.tripKm > 0 || row.tripStatus) {
+        row.totalKm = row.tripKm;
+        row.kmSource = "trip_trail";
+      } else {
+        row.totalKm = row.stopKm;
+        row.kmSource = row.stopKm > 0 ? "stop_fallback" : "none";
+      }
       delete row._assignments;
     }
 
@@ -977,7 +1032,17 @@ const getMyEarnings = async (req, res, next) => {
       }
     }
 
-    // Route km per day from delivered assignments with GPS
+    // Route km: prefer hub→hub GPS trail, else stop-to-stop fallback
+    const PartnerDeliveryTrip = require("../models/PartnerDeliveryTrip");
+    const trips = await PartnerDeliveryTrip.find({
+      deliveryPartner: partnerId,
+      date: { $in: dates }
+    }).lean();
+    const tripKmByDate = {};
+    trips.forEach((t) => {
+      tripKmByDate[t.date] = Number(t.totalKm || 0);
+    });
+
     const deliveredByDate = {};
     for (const assignment of assignments) {
       if (!assignment.order?.deliveryDate || assignment.status !== "delivered") continue;
@@ -985,9 +1050,13 @@ const getMyEarnings = async (req, res, next) => {
       if (!deliveredByDate[d]) deliveredByDate[d] = [];
       deliveredByDate[d].push(assignment);
     }
-    for (const d of Object.keys(deliveredByDate)) {
-      if (dailyStats[d]) {
+    for (const d of Object.keys(dailyStats)) {
+      if (tripKmByDate[d] != null && (tripKmByDate[d] > 0 || trips.some((t) => t.date === d))) {
+        dailyStats[d].totalKm = tripKmByDate[d] || 0;
+        dailyStats[d].kmSource = "trip_trail";
+      } else if (deliveredByDate[d]) {
         dailyStats[d].totalKm = computeRouteKmFromAssignments(deliveredByDate[d]);
+        dailyStats[d].kmSource = "stop_fallback";
       }
     }
 
@@ -1117,6 +1186,7 @@ const deletePartnerDocument = async (req, res, next) => {
 
 module.exports = {
   getAllUsers,
+  getNewCustomersCount,
   updateUser,
   deleteUser,
   getPendingPayments,

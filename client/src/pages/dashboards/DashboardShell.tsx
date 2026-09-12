@@ -1,12 +1,14 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getAdminNavLinksForUser } from "../../lib/adminSections";
+import { getAdminNavLinksForUser, hasAdminSection } from "../../lib/adminSections";
+import { getNewCustomersCount } from "../../lib/api";
 
 interface NavLink {
   label: string;
   href: string;
+  badgeCount?: number;
 }
 
 interface DashboardShellProps {
@@ -15,6 +17,8 @@ interface DashboardShellProps {
   navLinks?: NavLink[];
   children?: React.ReactNode;
 }
+
+const formatBadgeCount = (n: number) => (n > 99 ? "99+" : String(n));
 
 /** Stable component (not nested) so Framer Motion / HMR cannot keep a stale menu. */
 const SidebarContent = ({
@@ -44,6 +48,7 @@ const SidebarContent = ({
       <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-1.5">
         {links.map((link) => {
           const isActive = location.pathname === link.href;
+          const badge = Number(link.badgeCount) || 0;
           return (
             <Link
               key={link.href}
@@ -52,13 +57,21 @@ const SidebarContent = ({
               onClick={onNavigate}
             >
               <div
-                className={`relative px-4 py-3 rounded-xl text-sm font-medium transition-colors z-10 flex items-center gap-3 ${
+                className={`relative px-4 py-3 rounded-xl text-sm font-medium transition-colors z-10 flex items-center justify-between gap-3 ${
                   isActive
                     ? "text-teal-300 bg-teal-500/10 border border-teal-500/20"
                     : "text-slate-400 hover:text-slate-200 hover:bg-white/5 border border-transparent"
                 }`}
               >
-                {link.label}
+                <span className="truncate">{link.label}</span>
+                {badge > 0 ? (
+                  <span
+                    className="shrink-0 min-w-[1.35rem] h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm shadow-rose-500/40"
+                    aria-label={`${badge} new`}
+                  >
+                    {formatBadgeCount(badge)}
+                  </span>
+                ) : null}
               </div>
             </Link>
           );
@@ -98,18 +111,61 @@ const SidebarContent = ({
 };
 
 const DashboardShell = ({ title, description, navLinks, children }: DashboardShellProps) => {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [newCustomersCount, setNewCustomersCount] = useState(0);
+
+  const canSeeNewCustomers =
+    user?.role === "admin" && hasAdminSection(user, "new_customers");
+
+  const refreshNewCustomersCount = useCallback(async () => {
+    if (!token || !canSeeNewCustomers) {
+      setNewCustomersCount(0);
+      return;
+    }
+    try {
+      const res = await getNewCustomersCount(token);
+      setNewCustomersCount(Number(res.count) || 0);
+    } catch {
+      /* keep last known count */
+    }
+  }, [token, canSeeNewCustomers]);
+
+  useEffect(() => {
+    refreshNewCustomersCount();
+  }, [refreshNewCustomersCount, location.pathname]);
+
+  useEffect(() => {
+    if (!canSeeNewCustomers) return;
+    const onRefresh = () => refreshNewCustomersCount();
+    window.addEventListener("ff:new-customers-count", onRefresh);
+    return () => window.removeEventListener("ff:new-customers-count", onRefresh);
+  }, [canSeeNewCustomers, refreshNewCustomersCount]);
+
+  useEffect(() => {
+    if (!canSeeNewCustomers) return;
+    const id = window.setInterval(refreshNewCustomersCount, 60000);
+    return () => window.clearInterval(id);
+  }, [canSeeNewCustomers, refreshNewCustomersCount]);
 
   const resolvedNavLinks = useMemo(() => {
-    if (user?.role === "admin") {
-      // Always derive from permissions — ignore full ADMIN_NAV_LINKS prop for admins
-      return getAdminNavLinksForUser(user);
+    let links: NavLink[] =
+      user?.role === "admin"
+        ? getAdminNavLinksForUser(user)
+        : navLinks || [];
+
+    if (canSeeNewCustomers && newCustomersCount > 0) {
+      links = links.map((link) =>
+        link.href === "/dashboard/admin/new-customers"
+          ? { ...link, badgeCount: newCustomersCount }
+          : link
+      );
     }
-    return navLinks || [];
-  }, [user, navLinks]);
+
+    return links;
+  }, [user, navLinks, canSeeNewCustomers, newCustomersCount]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -146,7 +202,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
           aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
           aria-expanded={isMobileMenuOpen}
           onClick={() => setIsMobileMenuOpen((open) => !open)}
-          className="text-slate-300 hover:text-white p-2 rounded-lg hover:bg-white/5"
+          className="relative text-slate-300 hover:text-white p-2 rounded-lg hover:bg-white/5"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             {isMobileMenuOpen ? (
@@ -155,6 +211,11 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
             )}
           </svg>
+          {!isMobileMenuOpen && newCustomersCount > 0 ? (
+            <span className="absolute top-1 right-1 min-w-[1.1rem] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
+              {formatBadgeCount(newCustomersCount)}
+            </span>
+          ) : null}
         </button>
       </div>
 

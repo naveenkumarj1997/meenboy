@@ -96,6 +96,26 @@ function rankLabel(rank: number) {
   return `#${rank}`;
 }
 
+function formatMinutes(mins, live = false) {
+  if (mins == null || !Number.isFinite(Number(mins))) return "—";
+  const n = Number(mins);
+  const label = n < 60 ? `${n}m` : `${Math.floor(n / 60)}h ${n % 60}m`;
+  return live ? `${label}…` : label;
+}
+
+function paceChip(pace?: string) {
+  if (pace === "quick") return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
+  if (pace === "slow") return "bg-rose-500/20 text-rose-300 border-rose-500/30";
+  return "bg-slate-700/40 text-slate-300 border-slate-600/40";
+}
+
+function paceLabel(pace?: string, live = false) {
+  if (live) return "In progress";
+  if (pace === "quick") return "Quick";
+  if (pace === "slow") return "Slow";
+  return "Normal";
+}
+
 type RaceLane = {
   partnerId: string;
   partner: any;
@@ -108,6 +128,7 @@ type RaceLane = {
   progress: number;
   currentStop: any | null;
   nextStop: any | null;
+  liveLocation: any | null;
   rank: number;
 };
 
@@ -220,6 +241,7 @@ export default function AdminTodayDeliveryStatus() {
         progress,
         currentStop: current,
         nextStop: next,
+        liveLocation: summary?.liveLocation || null,
         rank: 0
       };
     });
@@ -247,7 +269,7 @@ export default function AdminTodayDeliveryStatus() {
   return (
     <DashboardShell
       title="Today Delivery Race"
-      description="Compare partners side by side — who is 1st, 2nd, 3rd on today's route."
+      description="Live partner street/area, stop times for order 1 → 2 → 3, and who is ahead on today's route."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (
@@ -352,7 +374,7 @@ export default function AdminTodayDeliveryStatus() {
                 <div
                   key={lane.partnerId}
                   onClick={() => setFocusedPartnerId(lane.partnerId)}
-                  className={`snap-start shrink-0 w-[260px] sm:w-[280px] rounded-2xl border bg-slate-950/80 cursor-pointer transition-all ${
+                  className={`snap-start shrink-0 w-[280px] sm:w-[300px] rounded-2xl border bg-slate-950/80 cursor-pointer transition-all ${
                     isFocused
                       ? "border-teal-400 shadow-[0_0_24px_rgba(45,212,191,0.2)]"
                       : "border-slate-800 hover:border-slate-600"
@@ -382,6 +404,45 @@ export default function AdminTodayDeliveryStatus() {
                           {lane.delivered}/{lane.total}
                         </div>
                       </div>
+                    </div>
+
+                    {/* Live partner location */}
+                    <div className="mb-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 px-2 py-1.5">
+                      <div className="text-[9px] uppercase tracking-wider text-cyan-300 font-bold mb-0.5">
+                        Partner now
+                      </div>
+                      {lane.liveLocation ? (
+                        <>
+                          <div className="text-[11px] text-white font-semibold line-clamp-2">
+                            {lane.liveLocation.street || lane.liveLocation.label}
+                          </div>
+                          {lane.liveLocation.area ? (
+                            <div className="text-[10px] text-slate-400 truncate">
+                              {lane.liveLocation.area}
+                            </div>
+                          ) : null}
+                          <div className="mt-1 flex items-center justify-between gap-2">
+                            <span className="text-[9px] text-slate-500">
+                              {lane.liveLocation.capturedAt
+                                ? new Date(lane.liveLocation.capturedAt).toLocaleTimeString()
+                                : "GPS"}
+                            </span>
+                            <a
+                              href={lane.liveLocation.mapsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[10px] font-bold text-cyan-300 hover:text-cyan-200"
+                            >
+                              Map →
+                            </a>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-[10px] text-slate-500">
+                          No live GPS yet — partner must Start from hub / allow location
+                        </div>
+                      )}
                     </div>
 
                     {/* Progress race bar */}
@@ -479,8 +540,25 @@ export default function AdminTodayDeliveryStatus() {
                                 )}
                               </div>
                               <div className="text-[9px] text-slate-500 truncate">
-                                {order.deliveryTime || "-"} · #{String(order._id || "").slice(-4).toUpperCase()}
+                                Slot {order.deliveryTime || "-"} · #{String(order._id || "").slice(-4).toUpperCase()}
                               </div>
+                              {a.timing && (
+                                <div className="mt-0.5 flex flex-wrap items-center gap-1">
+                                  <span
+                                    className={`text-[8px] font-bold px-1 py-0.5 rounded border ${paceChip(
+                                      a.timing.pace
+                                    )}`}
+                                  >
+                                    {paceLabel(a.timing.pace, a.timing.stopLive)}{" "}
+                                    {formatMinutes(a.timing.stopMinutes, a.timing.stopLive)}
+                                  </span>
+                                  {a.timing.fromPrevMinutes != null && (
+                                    <span className="text-[8px] text-slate-500">
+                                      +{formatMinutes(a.timing.fromPrevMinutes)} from #{index}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${tone.chip}`}>
                               {tone.label}
@@ -524,7 +602,32 @@ export default function AdminTodayDeliveryStatus() {
                   Clear focus
                 </button>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                <div className="rounded-lg bg-slate-950/70 border border-cyan-500/20 p-2.5 sm:col-span-1">
+                  <div className="text-cyan-300 font-bold uppercase tracking-wider text-[10px] mb-1">
+                    Partner live location
+                  </div>
+                  {focusedLane.liveLocation ? (
+                    <>
+                      <div className="text-white font-semibold">
+                        {focusedLane.liveLocation.street || focusedLane.liveLocation.label}
+                      </div>
+                      {focusedLane.liveLocation.area ? (
+                        <div className="text-slate-400 mt-0.5">{focusedLane.liveLocation.area}</div>
+                      ) : null}
+                      <a
+                        href={focusedLane.liveLocation.mapsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block mt-2 text-cyan-300 font-bold hover:text-cyan-200"
+                      >
+                        Open in Google Maps →
+                      </a>
+                    </>
+                  ) : (
+                    <div className="text-slate-500">No GPS trail yet</div>
+                  )}
+                </div>
                 <div className="rounded-lg bg-slate-950/70 border border-slate-800 p-2.5">
                   <div className="text-blue-300 font-bold uppercase tracking-wider text-[10px] mb-1">Currently going to</div>
                   {focusedLane.currentStop ? (
@@ -535,6 +638,15 @@ export default function AdminTodayDeliveryStatus() {
                       <div className="text-slate-400 mt-0.5">
                         {formatAddress(focusedLane.currentStop.order?.address)}
                       </div>
+                      {focusedLane.currentStop.timing?.stopMinutes != null && (
+                        <div className="text-amber-300 mt-1 font-semibold">
+                          On this stop:{" "}
+                          {formatMinutes(
+                            focusedLane.currentStop.timing.stopMinutes,
+                            focusedLane.currentStop.timing.stopLive
+                          )}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="text-slate-500">Not marked en route right now</div>
@@ -554,6 +666,39 @@ export default function AdminTodayDeliveryStatus() {
                   ) : (
                     <div className="text-slate-500">No remaining stops — finish line</div>
                   )}
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-lg bg-slate-950/70 border border-slate-800 p-2.5">
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-bold mb-2">
+                  Time per order (1 → 2 → 3…)
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {focusedLane.deliveries.map((a, idx) => (
+                    <div
+                      key={a._id}
+                      className="rounded-lg border border-slate-800 bg-slate-900/60 px-2.5 py-1.5 min-w-[7rem]"
+                    >
+                      <div className="text-[10px] text-slate-400">
+                        #{idx + 1} {a.order?.customer?.name?.split(" ")[0] || "Stop"}
+                      </div>
+                      <div className="text-sm font-bold text-white">
+                        {formatMinutes(a.timing?.stopMinutes, a.timing?.stopLive)}
+                      </div>
+                      <div
+                        className={`text-[9px] font-bold mt-0.5 inline-block px-1 rounded border ${paceChip(
+                          a.timing?.pace
+                        )}`}
+                      >
+                        {paceLabel(a.timing?.pace, a.timing?.stopLive)}
+                      </div>
+                      {a.timing?.fromPrevMinutes != null && (
+                        <div className="text-[9px] text-slate-500 mt-0.5">
+                          Travel from prev: {formatMinutes(a.timing.fromPrevMinutes)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

@@ -1,6 +1,6 @@
 /** Assignable admin panel sections (one key per sidebar page). */
 const ADMIN_SECTIONS = [
-  { id: "overview", label: "Overview", always: true },
+  { id: "overview", label: "Overview" },
   { id: "profile", label: "Profile", always: true },
   { id: "new_customers", label: "New Customers" },
   { id: "partner_approvals", label: "New Delivery Partners" },
@@ -52,8 +52,7 @@ const hasAdminSection = (user, ...sectionIds) => {
   if (!user || user.role !== "admin") return false;
   if (isFullAdmin(user)) return true;
   const allowed = new Set(user.adminSections || []);
-  // Limited admins always keep overview + profile
-  allowed.add("overview");
+  // Limited admins always keep Profile; Overview is assignable via Manage Admins
   allowed.add("profile");
   return sectionIds.some((id) => allowed.has(id));
 };

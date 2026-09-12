@@ -2,6 +2,7 @@ const express = require("express");
 const { protect, authorizeRoles, authorizeAdminSections, requireFullAdmin } = require("../middleware/auth");
 const {
   getAllUsers,
+  getNewCustomersCount,
   updateUser,
   deleteUser,
   getPendingPayments,
@@ -46,6 +47,12 @@ router.get("/:id/document", getPartnerDocument);
 
 // Admin only routes below
 router.use(authorizeRoles("admin"));
+
+router.get(
+  "/new-customers/count",
+  authorizeAdminSections("new_customers"),
+  getNewCustomersCount
+);
 
 // Manage Admins (full admin only) — register before /:id routes
 router.get("/admin-sections", requireFullAdmin, listAdminSectionDefs);

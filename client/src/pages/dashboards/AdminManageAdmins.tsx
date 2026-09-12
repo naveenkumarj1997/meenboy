@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
-import { ASSIGNABLE_ADMIN_SECTIONS, isFullAdmin } from "../../lib/adminSections";
+import { ASSIGNABLE_ADMIN_SECTIONS, getAdminHomePath, isFullAdmin } from "../../lib/adminSections";
 import {
   createManagedAdmin,
   deleteManagedAdmin,
@@ -53,7 +53,7 @@ export default function AdminManageAdmins() {
   }, [token, allowed]);
 
   if (!allowed) {
-    return <Navigate to="/dashboard/admin" replace />;
+    return <Navigate to={getAdminHomePath(user)} replace />;
   }
 
   const resetForm = () => {
@@ -303,7 +303,7 @@ export default function AdminManageAdmins() {
                 })}
               </div>
               <p className="text-xs text-slate-500 mt-2">
-                Selected: {form.adminSections.length || 0} · Overview & Profile are always included
+                Selected: {form.adminSections.length || 0} · Profile is always included · Overview is optional
               </p>
             </div>
           )}

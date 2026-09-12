@@ -4,7 +4,7 @@ type FishMessageBannerProps = {
   message: string;
 };
 
-/** Slow sky helicopter towing a banner — homepage only when admin enables it. */
+/** Slow sky helicopter flying right→left, towing a banner behind. */
 export default function FishMessageBanner({ message }: FishMessageBannerProps) {
   const text = String(message || "").trim();
   const reduceMotion = useReducedMotion();
@@ -18,12 +18,12 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
     >
       <motion.div
         className="absolute top-3 flex items-center will-change-transform"
-        initial={reduceMotion ? { left: "4%" } : { left: "-75%" }}
+        initial={reduceMotion ? { left: "20%" } : { left: "112%" }}
         animate={
           reduceMotion
-            ? { left: "4%", y: 0 }
+            ? { left: "20%", y: 0 }
             : {
-                left: ["-75%", "112%"],
+                left: ["112%", "-75%"],
                 y: [0, -6, 4, -3, 0]
               }
         }
@@ -36,8 +36,8 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
               }
         }
       >
-        {/* Helicopter */}
-        <div className="relative z-10 shrink-0 drop-shadow-[0_10px_16px_rgba(0,0,0,0.45)]">
+        {/* Helicopter facing left (leading) */}
+        <div className="relative z-10 shrink-0 drop-shadow-[0_10px_16px_rgba(0,0,0,0.45)] -scale-x-100">
           <svg
             viewBox="0 0 160 90"
             className="w-24 h-14 sm:w-28 sm:h-16"
@@ -55,10 +55,8 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
               </linearGradient>
             </defs>
 
-            {/* Soft air shadow */}
             <ellipse cx="85" cy="82" rx="42" ry="4" fill="#000" opacity="0.2" />
 
-            {/* Main rotor disc (blurred spin feel) */}
             <motion.g
               animate={reduceMotion ? undefined : { rotate: 360 }}
               transition={
@@ -73,12 +71,7 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
             </motion.g>
             <circle cx="78" cy="22" r="4" fill="#334155" />
 
-            {/* Tail boom */}
-            <path
-              d="M55 48 L12 42 L10 46 L55 52 Z"
-              fill="#64748b"
-            />
-            {/* Tail rotor */}
+            <path d="M55 48 L12 42 L10 46 L55 52 Z" fill="#64748b" />
             <motion.g
               animate={reduceMotion ? undefined : { rotate: -360 }}
               transition={
@@ -92,14 +85,12 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
             </motion.g>
             <circle cx="12" cy="44" r="2.5" fill="#334155" />
 
-            {/* Cabin / body */}
             <ellipse cx="95" cy="50" rx="38" ry="18" fill="url(#heliBody)" />
             <path
               d="M108 38 Q128 36 138 48 Q128 58 108 56 Z"
               fill="url(#heliGlass)"
               opacity="0.95"
             />
-            {/* Skids */}
             <path
               d="M70 66 L70 72 M118 66 L118 72 M62 72 H126"
               stroke="#334155"
@@ -107,7 +98,6 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
               strokeLinecap="round"
               fill="none"
             />
-            {/* Accent stripe */}
             <path
               d="M70 52 H120"
               stroke="#14b8a6"
@@ -118,10 +108,10 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
           </svg>
         </div>
 
-        {/* Tow cable */}
+        {/* Tow rope — heli pulls banner from behind (right side) */}
         <svg
           viewBox="0 0 56 40"
-          className="w-12 h-9 sm:w-14 sm:h-10 -ml-2 shrink-0 overflow-visible"
+          className="w-12 h-9 sm:w-14 sm:h-10 -ml-1 shrink-0 overflow-visible"
           aria-hidden
         >
           <motion.path
@@ -151,15 +141,15 @@ export default function FishMessageBanner({ message }: FishMessageBannerProps) {
           <circle cx="54" cy="18" r="2" fill="#f59e0b" />
         </svg>
 
-        {/* Banner slowly trailing behind */}
+        {/* Banner trailing on the right (behind heli) */}
         <motion.div
           className="relative -ml-1 max-w-[min(72vw,22rem)] sm:max-w-md shrink-0"
           style={{ transformOrigin: "left center" }}
           animate={
             reduceMotion
-              ? { rotate: 1 }
+              ? { rotate: -1 }
               : {
-                  rotate: [2, -1.5, 2.5, 0, 2],
+                  rotate: [-2, 1.5, -2.5, 0, -2],
                   y: [0, 3, -2, 2, 0]
                 }
           }

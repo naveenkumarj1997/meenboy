@@ -41,7 +41,7 @@ export interface AdminSectionDef {
 
 /** One section per admin sidebar page. */
 export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
-  { id: "overview", label: "Overview", href: "/dashboard/admin", always: true },
+  { id: "overview", label: "Overview", href: "/dashboard/admin" },
   { id: "profile", label: "Profile", href: "/dashboard/admin/profile", always: true },
   { id: "new_customers", label: "New Customers", href: "/dashboard/admin/new-customers" },
   {
@@ -140,7 +140,7 @@ export const hasAdminSection = (
   const allowed = new Set(
     Array.isArray(user.adminSections) ? user.adminSections.map(String) : []
   );
-  allowed.add("overview");
+  // Limited admins always keep Profile only; Overview is assignable
   allowed.add("profile");
   return sectionIds.some((id) => allowed.has(id));
 };
@@ -160,6 +160,20 @@ export const getAdminNavLinksForUser = (user: {
   return ADMIN_SECTION_DEFS.filter(
     (s) => s.always || (!s.fullOnly && allowed.has(s.id))
   ).map(({ label, href }) => ({ label, href }));
+};
+
+/** First page a limited admin may open (Profile fallback). */
+export const getAdminHomePath = (user: {
+  role?: string;
+  adminSections?: string[] | null;
+  isFullAdmin?: boolean;
+} | null): string => {
+  if (!user || user.role !== "admin") return "/login";
+  if (isFullAdmin(user) || hasAdminSection(user, "overview")) {
+    return "/dashboard/admin";
+  }
+  const links = getAdminNavLinksForUser(user);
+  return links[0]?.href || "/dashboard/admin/profile";
 };
 
 export const sectionIdForPath = (pathname: string): AdminSectionId | null => {

@@ -18,6 +18,11 @@ type PetrolStat = {
   phone?: string;
   deliveredCount: number;
   totalKm: number;
+  stopKm?: number;
+  tripKm?: number;
+  tripStatus?: string | null;
+  tripPointCount?: number;
+  kmSource?: string;
   amount: number;
   partnerConfirmed?: boolean;
   missingGpsCount?: number;
@@ -119,7 +124,7 @@ export default function AdminPetrolAllowance() {
   return (
     <DashboardShell
       title="Petrol Allowance"
-      description="Track delivery route km from partner GPS (En Route → Delivered) and enter petrol allowance manually."
+      description="Hub→hub GPS trail km (Start / End trip + 30s pings). Enter petrol ₹ manually."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (
@@ -138,7 +143,7 @@ export default function AdminPetrolAllowance() {
           <div>
             <h3 className="text-xl font-bold text-white">Select Date</h3>
             <p className="text-sm text-slate-400 mt-1">
-              Km is summed stop-to-stop from GPS when partners mark On the way / Delivered.
+              Km from partner hub trip trail (preferred). Stop-to-stop GPS is fallback only.
             </p>
           </div>
           <div>
@@ -227,10 +232,17 @@ export default function AdminPetrolAllowance() {
                 </div>
                 <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
                   <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">
-                    Route km
+                    Trip km (hub)
                   </div>
                   <div className="text-2xl font-black text-amber-400">
                     {Number(partner.totalKm || 0).toFixed(2)} km
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-1">
+                    {partner.kmSource === "trip_trail"
+                      ? `Trail · ${partner.tripPointCount || 0} pts · ${partner.tripStatus || ""}`
+                      : partner.kmSource === "stop_fallback"
+                        ? `Fallback stop km ${Number(partner.stopKm || 0).toFixed(2)}`
+                        : "No trip GPS yet"}
                   </div>
                 </div>
                 <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-4 col-span-2 md:col-span-1">

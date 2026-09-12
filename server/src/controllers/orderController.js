@@ -1620,6 +1620,9 @@ const getTodayDeliveryStatus = async (req, res, next) => {
   try {
     const dateParam = req.query.date;
     const partnerId = req.query.partnerId;
+    const PartnerDeliveryTrip = require("../models/PartnerDeliveryTrip");
+    const { finalizeTripsForDate } = require("./deliveryTripController");
+    const { reverseGeocode } = require("../utils/reverseGeocode");
 
     let date = typeof dateParam === "string" ? dateParam.trim() : "";
     if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -1629,6 +1632,8 @@ const getTodayDeliveryStatus = async (req, res, next) => {
       const d = String(now.getDate()).padStart(2, "0");
       date = `${y}-${m}-${d}`;
     }
+
+    await finalizeTripsForDate(date);
 
     const orders = await Order.find({ deliveryDate: date }).select("_id").lean();
     const orderIds = orders.map((o) => o._id);
@@ -1654,13 +1659,96 @@ const getTodayDeliveryStatus = async (req, res, next) => {
       filter.deliveryPartner = partnerId;
     }
 
-    const assignments = await DeliveryAssignment.find(filter)
-      .populate({
-        path: "order",
-        populate: { path: "customer", select: "name email phone mapUrl" }
-      })
-      .populate("deliveryPartner", "name phone email")
-      .lean();
+    const [assignmentsRaw, trips] = await Promise.all([
+      DeliveryAssignment.find(filter)
+        .populate({
+          path: "order",
+          populate: { path: "customer", select: "name email phone mapUrl" }
+        })
+        .populate("deliveryPartner", "name phone email")
+        .lean(),
+      PartnerDeliveryTrip.find({ date })
+        .select(
+          "deliveryPartner status lastLat lastLng lastCapturedAt lastStreet lastArea lastLocationLabel lastGeocodedAt points"
+        )
+        .lean()
+    ]);
+
+    const tripByPartner = {};
+    for (const t of trips) {
+      tripByPartner[String(t.deliveryPartner)] = t;
+    }
+
+    const minutesBetween = (a, b) => {
+      if (!a || !b) return null;
+      const ms = new Date(b).getTime() - new Date(a).getTime();
+      if (!Number.isFinite(ms)) return null;
+      return Math.max(0, Math.round(ms / 60000));
+    };
+
+    const enrichTimingForPartner = (list) => {
+      const sorted = [...list].sort((a, b) => {
+        const seq = (a.sequence || 0) - (b.sequence || 0);
+        if (seq !== 0) return seq;
+        return String(a.order?.deliveryTime || "").localeCompare(String(b.order?.deliveryTime || ""));
+      });
+
+      let prevDeliveredAt = null;
+      return sorted.map((a, idx) => {
+        const enRouteAt =
+          a.enRouteLocation?.capturedAt ||
+          (a.status === "en_route" || a.status === "picked_up" ? a.updatedAt : null);
+        const deliveredAt =
+          a.deliveredLocation?.capturedAt ||
+          a.actualArrival ||
+          (a.status === "delivered" ? a.updatedAt : null);
+
+        let stopMinutes = null;
+        let stopLive = false;
+        if (enRouteAt && deliveredAt) {
+          stopMinutes = minutesBetween(enRouteAt, deliveredAt);
+        } else if (enRouteAt && (a.status === "en_route" || a.status === "picked_up")) {
+          stopMinutes = minutesBetween(enRouteAt, new Date());
+          stopLive = true;
+        }
+
+        const fromPrevMinutes =
+          prevDeliveredAt && enRouteAt ? minutesBetween(prevDeliveredAt, enRouteAt) : null;
+
+        if (deliveredAt) prevDeliveredAt = deliveredAt;
+
+        let pace = "normal";
+        if (stopMinutes != null) {
+          if (stopMinutes <= 12) pace = "quick";
+          else if (stopMinutes >= 25) pace = "slow";
+        }
+
+        return {
+          ...a,
+          timing: {
+            stopIndex: idx + 1,
+            scheduledSlot: a.order?.deliveryTime || "",
+            enRouteAt: enRouteAt || null,
+            deliveredAt: deliveredAt || null,
+            stopMinutes,
+            stopLive,
+            fromPrevMinutes,
+            pace
+          }
+        };
+      });
+    };
+
+    // Timing must be per partner route (order 1 → 2 → 3), not across all partners.
+    const byPartnerForTiming = {};
+    for (const a of assignmentsRaw) {
+      const pId = String(a.deliveryPartner?._id || a.deliveryPartner || "unknown");
+      if (!byPartnerForTiming[pId]) byPartnerForTiming[pId] = [];
+      byPartnerForTiming[pId].push(a);
+    }
+    const assignments = Object.values(byPartnerForTiming).flatMap((list) =>
+      enrichTimingForPartner(list)
+    );
 
     assignments.sort((a, b) => {
       const partnerA = String(a.deliveryPartner?._id || a.deliveryPartner || "");
@@ -1699,23 +1787,69 @@ const getTodayDeliveryStatus = async (req, res, next) => {
       byPartner[pId].deliveries.push(a);
     });
 
-    const partnerSummaries = Object.values(byPartner).map((group) => {
+    const buildLiveLocation = async (pId, deliveries) => {
+      const trip = tripByPartner[pId];
+      let lat = trip?.lastLat;
+      let lng = trip?.lastLng;
+      let capturedAt = trip?.lastCapturedAt;
+      let street = trip?.lastStreet || "";
+      let area = trip?.lastArea || "";
+      let label = trip?.lastLocationLabel || "";
+
+      if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+        const current = deliveries.find((a) => a.status === "en_route" || a.status === "picked_up");
+        const loc = current?.enRouteLocation || current?.deliveredLocation;
+        if (loc && Number.isFinite(Number(loc.lat)) && Number.isFinite(Number(loc.lng))) {
+          lat = loc.lat;
+          lng = loc.lng;
+          capturedAt = loc.capturedAt || current.updatedAt;
+        }
+      }
+
+      if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+        return null;
+      }
+
+      if (!label) {
+        const geo = await reverseGeocode(lat, lng);
+        if (geo) {
+          street = geo.street || street;
+          area = geo.area || area;
+          label = geo.label || label;
+        }
+      }
+
+      return {
+        lat: Number(lat),
+        lng: Number(lng),
+        capturedAt: capturedAt || null,
+        street,
+        area,
+        label: label || `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`,
+        mapsUrl: `https://www.google.com/maps?q=${Number(lat)},${Number(lng)}`,
+        tripStatus: trip?.status || null
+      };
+    };
+
+    const partnerSummaries = [];
+    for (const [pId, group] of Object.entries(byPartner)) {
       const list = group.deliveries;
       const ongoing = list.filter((a) => a.status === "en_route" || a.status === "picked_up");
       const pending = list.filter(
         (a) => !["delivered", "failed", "cancelled"].includes(a.status)
       );
       const current = ongoing[0] || null;
-      // Next = first pending that isn't the current ongoing stop
       const next =
         pending.find((a) => !current || String(a._id) !== String(current._id)) || null;
       const deliveredCount = list.filter((a) => a.status === "delivered").length;
+      const liveLocation = await buildLiveLocation(pId, list);
 
-      return {
+      partnerSummaries.push({
         partner: group.partner,
         total: list.length,
         delivered: deliveredCount,
         remaining: pending.length,
+        liveLocation,
         currentStop: current
           ? {
               assignmentId: current._id,
@@ -1725,7 +1859,8 @@ const getTodayDeliveryStatus = async (req, res, next) => {
               address: current.order?.address,
               deliveryTime: current.order?.deliveryTime,
               mapUrl: current.order?.mapUrl || current.order?.customer?.mapUrl,
-              updatedAt: current.updatedAt
+              updatedAt: current.updatedAt,
+              timing: current.timing || null
             }
           : null,
         nextStop: next
@@ -1737,11 +1872,12 @@ const getTodayDeliveryStatus = async (req, res, next) => {
               address: next.order?.address,
               deliveryTime: next.order?.deliveryTime,
               mapUrl: next.order?.mapUrl || next.order?.customer?.mapUrl,
-              sequence: next.sequence
+              sequence: next.sequence,
+              timing: next.timing || null
             }
           : null
-      };
-    });
+      });
+    }
 
     res.json({
       date,

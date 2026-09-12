@@ -86,10 +86,56 @@ export interface ProductPayload {
   availableCuts?: CutPayload[];
 }
 
-export const getAdminOverview = async (token: string) =>
-  request<{ totalProducts: number; activeOrders: number; revenue: number }>("/dashboard/admin", {
+export const getAdminOverview = async (token: string, date?: string) => {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+  return request<AdminOverviewPayload>(`/dashboard/admin${qs}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+};
+
+export interface AdminOverviewPayload {
+  date: string;
+  weekStart: string;
+  summary: {
+    totalProducts: number;
+    activeProducts: number;
+    activeOrders: number;
+    revenueAllTime: number;
+    revenueToday: number;
+    revenueWeek: number;
+  };
+  attention: {
+    newCustomers: number;
+    pendingPartners: number;
+    unassignedToday: number;
+    notDeliveredToday: number;
+    assignmentPendingToday: number;
+    pendingPaymentCustomers: number;
+    pendingPaymentAmount: number;
+  };
+  today: {
+    ordersTotal: number;
+    ordersDelivered: number;
+    ordersRemaining: number;
+    bookingManual: number;
+    bookingWebsite: number;
+    catchEnabled: boolean;
+    catchItemCount: number;
+    catchStockQty: number;
+  };
+  money: {
+    todayCash: number;
+    todayUpi: number;
+    todayCollected: number;
+    weekCash: number;
+    weekUpi: number;
+    weekCollected: number;
+    salaryUnconfirmedCount: number;
+    salaryUnconfirmedAmount: number;
+    petrolUnconfirmedCount: number;
+    petrolUnconfirmedAmount: number;
+  };
+}
 
 export const getAdminProducts = async (token: string) =>
   request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/admin/products?limit=200", {
@@ -738,6 +784,55 @@ export const getPartnerAssignments = async (token: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
+export type DeliveryTripPayload = {
+  id: string;
+  date: string;
+  status: "active" | "ended" | "auto_ended";
+  startedAt?: string;
+  endedAt?: string;
+  totalKm: number;
+  pointCount: number;
+};
+
+export const getMyDeliveryTripToday = async (token: string) =>
+  request<{
+    date: string;
+    trip: DeliveryTripPayload | null;
+    window: { trackingOpen: boolean; autoEndAfterMinutes: number; nowMinutesIst: number };
+  }>("/delivery-trips/me/today", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const startMyDeliveryTrip = async (
+  token: string,
+  location: { lat: number; lng: number }
+) =>
+  request<{ message: string; trip: DeliveryTripPayload }>("/delivery-trips/me/start", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ location })
+  });
+
+export const pingMyDeliveryTrip = async (
+  token: string,
+  location: { lat: number; lng: number }
+) =>
+  request<{ message?: string; trip: DeliveryTripPayload }>("/delivery-trips/me/ping", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ location })
+  });
+
+export const endMyDeliveryTrip = async (
+  token: string,
+  location?: { lat: number; lng: number }
+) =>
+  request<{ message: string; trip: DeliveryTripPayload }>("/delivery-trips/me/end", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(location ? { location } : {})
+  });
+
 export const updateDeliveryStatus = async (
   token: string,
   assignmentId: string,
@@ -795,6 +890,12 @@ export const getAllUsers = async (
     headers: { Authorization: `Bearer ${token}` }
   });
 };
+
+/** Unnoticed real customers — for New Customers sidebar badge */
+export const getNewCustomersCount = async (token: string) =>
+  request<{ count: number }>("/users/new-customers/count", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
 
 export const updateUser = async (token: string, userId: string, payload: any) =>
   request<{ user: any; message: string }>(`/users/${userId}`, {

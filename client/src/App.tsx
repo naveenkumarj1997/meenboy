@@ -52,6 +52,7 @@ import PaymentStatusPage from "./pages/PaymentStatusPage";
 import PaymentHistoryPage from "./pages/dashboards/PaymentHistoryPage";
 import PartnerEarnings from "./pages/dashboards/PartnerEarnings";
 import CustomCursor from "./components/CustomCursor";
+import { getAdminHomePath } from "./lib/adminSections";
 
 const DashboardRouter = () => {
   const { user, isLoading } = useAuth();
@@ -64,7 +65,9 @@ const DashboardRouter = () => {
   }
   if (!user) return <Navigate to="/login" replace />;
 
-  if (user.role === "admin") return <AdminDashboard />;
+  if (user.role === "admin") {
+    return <Navigate to={getAdminHomePath(user)} replace />;
+  }
   if (user.role === "delivery_partner") return <DeliveryDashboard />;
   
   return (

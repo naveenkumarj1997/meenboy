@@ -1,7 +1,17 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
-import { getPartnerAssignments, updateDeliveryStatus, reorderAssignments, uploadPartnerDocument } from "../../lib/api";
+import {
+  getPartnerAssignments,
+  updateDeliveryStatus,
+  reorderAssignments,
+  uploadPartnerDocument,
+  getMyDeliveryTripToday,
+  startMyDeliveryTrip,
+  pingMyDeliveryTrip,
+  endMyDeliveryTrip,
+  type DeliveryTripPayload
+} from "../../lib/api";
 import { formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
 
@@ -176,10 +186,93 @@ export default function DeliveryDashboard() {
     paymentMethod: "none"
   });
 
+  const [trip, setTrip] = useState<DeliveryTripPayload | null>(null);
+  const [tripBusy, setTripBusy] = useState(false);
+  const [trackingOpen, setTrackingOpen] = useState(true);
+  const pingLock = useRef(false);
+
+  const refreshTrip = async () => {
+    if (!token) return;
+    try {
+      const res = await getMyDeliveryTripToday(token);
+      setTrip(res.trip);
+      setTrackingOpen(Boolean(res.window?.trackingOpen));
+    } catch {
+      /* keep last */
+    }
+  };
+
   useEffect(() => {
     if (token) fetchAssignments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  useEffect(() => {
+    if (token && user?.status === "active") refreshTrip();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?.status]);
+
+  // Auto GPS every 30s while trip is active
+  useEffect(() => {
+    if (!token || trip?.status !== "active") return;
+
+    const sendPing = async () => {
+      if (pingLock.current) return;
+      pingLock.current = true;
+      try {
+        const location = await capturePartnerGps();
+        if (!location) return;
+        const res = await pingMyDeliveryTrip(token, location);
+        setTrip(res.trip);
+      } catch {
+        /* ignore transient ping errors */
+      } finally {
+        pingLock.current = false;
+      }
+    };
+
+    sendPing();
+    const id = window.setInterval(sendPing, 30000);
+    return () => window.clearInterval(id);
+  }, [token, trip?.status]);
+
+  const handleStartTrip = async () => {
+    if (!token) return;
+    try {
+      setTripBusy(true);
+      setError("");
+      const location = await capturePartnerGps();
+      if (!location) {
+        setError("Turn on location / GPS to start from hub.");
+        return;
+      }
+      const res = await startMyDeliveryTrip(token, location);
+      setTrip(res.trip);
+      setSuccess(res.message || "Trip started from hub.");
+    } catch (err: any) {
+      setError(err.message || "Could not start trip");
+      refreshTrip();
+    } finally {
+      setTripBusy(false);
+    }
+  };
+
+  const handleEndTrip = async () => {
+    if (!token) return;
+    try {
+      setTripBusy(true);
+      setError("");
+      const location = await capturePartnerGps();
+      const res = await endMyDeliveryTrip(token, location);
+      setTrip(res.trip);
+      setSuccess(res.message || "Trip ended. Petrol km saved.");
+    } catch (err: any) {
+      setError(err.message || "Could not end trip");
+      refreshTrip();
+    } finally {
+      setTripBusy(false);
+    }
+  };
 
   const fetchAssignments = async () => {
     try {
@@ -432,6 +525,60 @@ export default function DeliveryDashboard() {
     >
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
       {success && <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">{success}</div>}
+
+      {/* Hub trip petrol tracking — one trip/day, auto-end after 1 PM IST */}
+      <div className="mb-6 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-slate-900/80 p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-white">Petrol trip (hub → deliveries → hub)</h3>
+            <p className="text-sm text-slate-400 mt-1">
+              Start at hub before first delivery. Keep the app open — GPS saves every 30s. Waiting at
+              chicken/mutton shop is OK (same place barely adds km). End when you return to hub. Auto-ends
+              after 1:00 PM if you forget.
+            </p>
+            {trip ? (
+              <p className="text-sm text-teal-300 mt-2 font-medium">
+                Status: {trip.status.replace("_", " ")} · {Number(trip.totalKm || 0).toFixed(2)} km ·{" "}
+                {trip.pointCount} GPS points
+              </p>
+            ) : (
+              <p className="text-sm text-slate-500 mt-2">No trip started today yet.</p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2 shrink-0">
+            {!trip && (
+              <button
+                type="button"
+                onClick={handleStartTrip}
+                disabled={tripBusy || !trackingOpen}
+                className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-40 text-white font-bold text-sm"
+              >
+                {tripBusy ? "…" : "Start from hub"}
+              </button>
+            )}
+            {trip?.status === "active" && (
+              <button
+                type="button"
+                onClick={handleEndTrip}
+                disabled={tripBusy}
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-sm"
+              >
+                {tripBusy ? "…" : "End at hub (return)"}
+              </button>
+            )}
+            {trip && trip.status !== "active" && (
+              <span className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold">
+                Trip closed for today
+              </span>
+            )}
+          </div>
+        </div>
+        {!trackingOpen && !trip && (
+          <p className="text-xs text-amber-300/90 mt-3">
+            Tracking window is 5:00 AM – 1:00 PM IST.
+          </p>
+        )}
+      </div>
 
       <div className="flex space-x-4 mb-8">
         <button

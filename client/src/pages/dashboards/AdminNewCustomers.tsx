@@ -94,6 +94,7 @@ export default function AdminNewCustomers() {
       await updateUser(token!, userId, { isNoticed: true });
       setSuccess(`${name} has been marked as noticed.`);
       fetchNewCustomers();
+      window.dispatchEvent(new Event("ff:new-customers-count"));
     } catch (err: any) {
       setError(err.message || "Failed to update status");
     }

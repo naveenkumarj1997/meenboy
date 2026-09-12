@@ -1,7 +1,12 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import type { Role } from "../types/auth";
-import { hasAdminSection, sectionIdForPath, type AdminSectionId } from "../lib/adminSections";
+import {
+  getAdminHomePath,
+  hasAdminSection,
+  sectionIdForPath,
+  type AdminSectionId
+} from "../lib/adminSections";
 
 interface ProtectedRouteProps {
   allowedRoles?: Role[];
@@ -32,7 +37,11 @@ const ProtectedRoute = ({ allowedRoles, adminSection }: ProtectedRouteProps) => 
   if (user.role === "admin") {
     const section = adminSection || sectionIdForPath(location.pathname);
     if (section && !hasAdminSection(user, section)) {
-      return <Navigate to="/dashboard/admin" replace />;
+      const home = getAdminHomePath(user);
+      if (home === location.pathname) {
+        return <Navigate to="/dashboard/admin/profile" replace />;
+      }
+      return <Navigate to={home} replace />;
     }
   }
 
