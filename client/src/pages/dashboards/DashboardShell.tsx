@@ -3,7 +3,7 @@ import { useAuth } from "../../context/AuthContext";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAdminNavLinksForUser, hasAdminSection } from "../../lib/adminSections";
-import { getNewCustomersCount } from "../../lib/api";
+import { getNewCustomersCount, getUnassignedWebsiteOrdersCount } from "../../lib/api";
 
 interface NavLink {
   label: string;
@@ -116,9 +116,12 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [newCustomersCount, setNewCustomersCount] = useState(0);
+  const [unassignedWebsiteCount, setUnassignedWebsiteCount] = useState(0);
 
   const canSeeNewCustomers =
     user?.role === "admin" && hasAdminSection(user, "new_customers");
+  const canSeeDeliveries =
+    user?.role === "admin" && hasAdminSection(user, "deliveries");
 
   const refreshNewCustomersCount = useCallback(async () => {
     if (!token || !canSeeNewCustomers) {
@@ -133,9 +136,23 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     }
   }, [token, canSeeNewCustomers]);
 
+  const refreshUnassignedWebsiteCount = useCallback(async () => {
+    if (!token || !canSeeDeliveries) {
+      setUnassignedWebsiteCount(0);
+      return;
+    }
+    try {
+      const res = await getUnassignedWebsiteOrdersCount(token);
+      setUnassignedWebsiteCount(Number(res.count) || 0);
+    } catch {
+      /* keep last known count */
+    }
+  }, [token, canSeeDeliveries]);
+
   useEffect(() => {
     refreshNewCustomersCount();
-  }, [refreshNewCustomersCount, location.pathname]);
+    refreshUnassignedWebsiteCount();
+  }, [refreshNewCustomersCount, refreshUnassignedWebsiteCount, location.pathname]);
 
   useEffect(() => {
     if (!canSeeNewCustomers) return;
@@ -145,10 +162,20 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   }, [canSeeNewCustomers, refreshNewCustomersCount]);
 
   useEffect(() => {
-    if (!canSeeNewCustomers) return;
-    const id = window.setInterval(refreshNewCustomersCount, 60000);
+    if (!canSeeDeliveries) return;
+    const onRefresh = () => refreshUnassignedWebsiteCount();
+    window.addEventListener("ff:unassigned-website-count", onRefresh);
+    return () => window.removeEventListener("ff:unassigned-website-count", onRefresh);
+  }, [canSeeDeliveries, refreshUnassignedWebsiteCount]);
+
+  useEffect(() => {
+    if (!canSeeNewCustomers && !canSeeDeliveries) return;
+    const id = window.setInterval(() => {
+      refreshNewCustomersCount();
+      refreshUnassignedWebsiteCount();
+    }, 60000);
     return () => window.clearInterval(id);
-  }, [canSeeNewCustomers, refreshNewCustomersCount]);
+  }, [canSeeNewCustomers, canSeeDeliveries, refreshNewCustomersCount, refreshUnassignedWebsiteCount]);
 
   const resolvedNavLinks = useMemo(() => {
     let links: NavLink[] =
@@ -156,16 +183,22 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
         ? getAdminNavLinksForUser(user)
         : navLinks || [];
 
-    if (canSeeNewCustomers && newCustomersCount > 0) {
-      links = links.map((link) =>
-        link.href === "/dashboard/admin/new-customers"
-          ? { ...link, badgeCount: newCustomersCount }
-          : link
-      );
-    }
+    links = links.map((link) => {
+      if (canSeeNewCustomers && newCustomersCount > 0 && link.href === "/dashboard/admin/new-customers") {
+        return { ...link, badgeCount: newCustomersCount };
+      }
+      if (
+        canSeeDeliveries &&
+        unassignedWebsiteCount > 0 &&
+        link.href === "/dashboard/admin/deliveries"
+      ) {
+        return { ...link, badgeCount: unassignedWebsiteCount };
+      }
+      return link;
+    });
 
     return links;
-  }, [user, navLinks, canSeeNewCustomers, newCustomersCount]);
+  }, [user, navLinks, canSeeNewCustomers, newCustomersCount, canSeeDeliveries, unassignedWebsiteCount]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -184,6 +217,8 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     logout();
     navigate("/login");
   };
+
+  const mobileAttentionCount = newCustomersCount + unassignedWebsiteCount;
 
   const sidebarProps = {
     links: resolvedNavLinks,
@@ -211,9 +246,9 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
             )}
           </svg>
-          {!isMobileMenuOpen && newCustomersCount > 0 ? (
+          {!isMobileMenuOpen && mobileAttentionCount > 0 ? (
             <span className="absolute top-1 right-1 min-w-[1.1rem] h-4 px-1 rounded-full bg-rose-500 text-white text-[9px] font-bold flex items-center justify-center">
-              {formatBadgeCount(newCustomersCount)}
+              {formatBadgeCount(mobileAttentionCount)}
             </span>
           ) : null}
         </button>

@@ -89,7 +89,7 @@ const parseSavedAddress = (addr: {
 };
 
 const CheckoutPage = () => {
-  const { cartItems, cartTotal, clearCart } = useCart();
+  const { cartItems, cartTotal, clearCart, removeFromCart } = useCart();
   const { token, user, isLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -134,6 +134,7 @@ const CheckoutPage = () => {
     pincode: false
   });
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [availabilityNotices, setAvailabilityNotices] = useState<string[]>([]);
   const [unavailableByCartId, setUnavailableByCartId] = useState<Record<string, ItemAvailability>>({});
 
   const deliveryZoneError = useMemo(() => {
@@ -209,6 +210,7 @@ const CheckoutPage = () => {
   useEffect(() => {
     if (!form.deliveryDate) {
       setAvailabilityError(null);
+      setAvailabilityNotices([]);
       setUnavailableByCartId({});
       return;
     }
@@ -225,6 +227,7 @@ const CheckoutPage = () => {
         });
         setUnavailableByCartId(map);
         setAvailabilityError(result.warning);
+        setAvailabilityNotices(result.notices || []);
       } catch (error) {
         console.error("Availability check failed", error);
       }
@@ -412,6 +415,18 @@ const CheckoutPage = () => {
         <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl font-medium flex items-start gap-3">
           <span className="mt-0.5">⚠️</span>
           <p>{availabilityError}</p>
+        </div>
+      )}
+      {availabilityNotices.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/25 text-amber-100 rounded-xl">
+          <p className="text-xs font-bold uppercase tracking-wide text-amber-300 mb-2">
+            Delivery day notice
+          </p>
+          <ul className="text-sm space-y-1.5 list-disc pl-4">
+            {availabilityNotices.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -719,8 +734,31 @@ const CheckoutPage = () => {
                       <p className="text-[11px] text-rose-300 mt-1">{status.reason}</p>
                     )}
                   </div>
-                  <div className="text-sm font-bold text-teal-400">
-                    ₹{formatPrice(item.price * item.quantity)}
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <div className="text-sm font-bold text-teal-400">
+                      ₹{formatPrice(item.price * item.quantity)}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFromCart(item.id)}
+                      className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                        isUnavailable
+                          ? "bg-rose-500/20 text-rose-200 hover:bg-rose-500/30"
+                          : "bg-white/10 text-white/80 hover:bg-rose-500/20 hover:text-rose-300"
+                      }`}
+                      title="Remove item"
+                      aria-label={`Remove ${item.name}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                      Delete
+                    </button>
                   </div>
                 </div>
               );
@@ -803,6 +841,18 @@ const CheckoutPage = () => {
             <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl font-medium flex items-start gap-3">
               <span className="mt-0.5 shrink-0">⚠️</span>
               <p className="text-sm leading-relaxed">{availabilityError}</p>
+            </div>
+          )}
+          {availabilityNotices.length > 0 && (
+            <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/25 text-amber-100 rounded-xl">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-300 mb-2">
+                Delivery day notice
+              </p>
+              <ul className="text-sm space-y-1.5 list-disc pl-4">
+                {availabilityNotices.map((n) => (
+                  <li key={n}>{n}</li>
+                ))}
+              </ul>
             </div>
           )}
         </div>

@@ -1,5 +1,10 @@
-import { getAvailabilityByDate, getProductById } from "./api";
+import { getAvailabilityByDate, getProductById, getPublicCategoryWeekdayRules } from "./api";
 import type { CartItem } from "../context/CartContext";
+import {
+  buildCustomerNotices,
+  evaluateCategoryForDate,
+  type CategoryWeekdayConfig
+} from "./categoryWeekdayRules";
 
 export type ItemAvailability = {
   cartItemId: string;
@@ -14,6 +19,8 @@ export type CartAvailabilityResult = {
   items: ItemAvailability[];
   unavailableItems: ItemAvailability[];
   warning: string | null;
+  /** Informational notes (e.g. Fish only Wed/Sun + cutoff). */
+  notices: string[];
 };
 
 const normalizeId = (id: unknown) => String(id ?? "").trim();
@@ -22,18 +29,24 @@ const normalizeId = (id: unknown) => String(id ?? "").trim();
  * Checks cart items against:
  * 1) Live product visibility (hidden / inactive => getProductById 404)
  * 2) Optional delivery-date availability (closed day, category, product)
+ * 3) Website weekday + cutoff rules (Fish/Seafood Wed & Sun, etc.)
  */
 export const checkCartAvailability = async (
   cartItems: CartItem[],
   deliveryDate?: string
 ): Promise<CartAvailabilityResult> => {
   if (cartItems.length === 0) {
-    return { isClosed: false, items: [], unavailableItems: [], warning: null };
+    return { isClosed: false, items: [], unavailableItems: [], warning: null, notices: [] };
   }
 
   let isClosed = false;
   let unavailableCategories: string[] = [];
   let unavailableProductIds = new Set<string>();
+  let weekdayConfig: CategoryWeekdayConfig | null = null;
+
+  const cartCategories = [
+    ...new Set(cartItems.map((i) => i.category).filter(Boolean) as string[])
+  ];
 
   if (deliveryDate) {
     try {
@@ -48,6 +61,15 @@ export const checkCartAvailability = async (
       // Keep product visibility checks if availability API fails
     }
   }
+
+  try {
+    const rulesRes = await getPublicCategoryWeekdayRules(cartCategories);
+    weekdayConfig = rulesRes?.config || null;
+  } catch {
+    weekdayConfig = null;
+  }
+
+  const notices = buildCustomerNotices(weekdayConfig, cartCategories);
 
   // Each cart line: public product detail requires isActive:true
   const perProductActive = await Promise.all(
@@ -108,6 +130,17 @@ export const checkCartAvailability = async (
       };
     }
 
+    if (deliveryDate && item.category) {
+      const weekdayHit = evaluateCategoryForDate(weekdayConfig, item.category, deliveryDate);
+      if (weekdayHit) {
+        return {
+          ...base,
+          unavailable: true,
+          reason: weekdayHit.message
+        };
+      }
+    }
+
     return base;
   });
 
@@ -118,13 +151,14 @@ export const checkCartAvailability = async (
     warning = "Delivery is closed for the selected date. Please choose another date.";
   } else if (unavailableItems.length > 0) {
     const names = unavailableItems.map((i) => i.name).join(", ");
-    warning = `Remove unavailable item(s) to proceed with your order: ${names}.`;
+    warning = `Remove unavailable item(s) or pick another delivery day: ${names}.`;
   }
 
   return {
     isClosed,
     items: checked,
     unavailableItems,
-    warning
+    warning,
+    notices
   };
 };

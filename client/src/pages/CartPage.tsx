@@ -28,6 +28,7 @@ const CartPage = () => {
   });
   const [availabilityMap, setAvailabilityMap] = useState<Record<string, ItemAvailability>>({});
   const [warning, setWarning] = useState<string | null>(null);
+  const [notices, setNotices] = useState<string[]>([]);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
 
@@ -51,6 +52,7 @@ const CartPage = () => {
     if (cartItems.length === 0) {
       setAvailabilityMap({});
       setWarning(null);
+      setNotices([]);
       setCheckError(null);
       return;
     }
@@ -71,6 +73,7 @@ const CartPage = () => {
         });
         setAvailabilityMap(map);
         setWarning(result.warning);
+        setNotices(result.notices || []);
       } catch (err) {
         console.error("Cart availability check failed", err);
         if (!active) return;
@@ -90,6 +93,7 @@ const CartPage = () => {
         });
         setAvailabilityMap(map);
         setWarning("Could not verify cart items. Remove unavailable items or refresh the page.");
+        setNotices([]);
       } finally {
         if (active) setChecking(false);
       }
@@ -150,6 +154,18 @@ const CartPage = () => {
         <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl font-medium flex items-start gap-3">
           <span className="mt-0.5 shrink-0">⚠️</span>
           <p className="text-sm leading-relaxed">{warning}</p>
+        </div>
+      )}
+      {notices.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/25 text-amber-100 rounded-xl flex items-start gap-3">
+          <span className="mt-0.5 shrink-0 text-amber-300 font-black text-xs uppercase tracking-wide">
+            Note
+          </span>
+          <ul className="text-sm leading-relaxed space-y-1.5 list-disc pl-4">
+            {notices.map((n) => (
+              <li key={n}>{n}</li>
+            ))}
+          </ul>
         </div>
       )}
       {checkError && !warning && (

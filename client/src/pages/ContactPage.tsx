@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import { submitContactQuery } from "../lib/api";
 
 const ContactPage = () => {
   const [formData, setFormData] = useState({
@@ -9,15 +10,27 @@ const ContactPage = () => {
     message: ""
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    // In a real app, you would send this data to an API
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
+    setError("");
+    setSubmitting(true);
+    try {
+      await submitContactQuery({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        message: formData.message.trim()
+      });
+      setSubmitted(true);
       setFormData({ name: "", email: "", message: "" });
-    }, 3000);
+      setTimeout(() => setSubmitted(false), 4000);
+    } catch (err: any) {
+      setError(err?.message || "Could not send message. Please try again or call us.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -48,7 +61,8 @@ const ContactPage = () => {
                 type="text"
                 id="name"
                 required
-                className="w-full rounded-lg border border-cyan-700 bg-cyan-950 px-4 py-3 text-white outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all"
+                disabled={submitting}
+                className="w-full rounded-lg border border-cyan-700 bg-cyan-950 px-4 py-3 text-white outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-60"
                 value={formData.name}
                 onChange={(e) => setFormData({...formData, name: e.target.value})}
               />
@@ -60,7 +74,8 @@ const ContactPage = () => {
                 type="email"
                 id="email"
                 required
-                className="w-full rounded-lg border border-cyan-700 bg-cyan-950 px-4 py-3 text-white outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all"
+                disabled={submitting}
+                className="w-full rounded-lg border border-cyan-700 bg-cyan-950 px-4 py-3 text-white outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all disabled:opacity-60"
                 value={formData.email}
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
               />
@@ -72,17 +87,23 @@ const ContactPage = () => {
                 id="message"
                 required
                 rows={5}
-                className="w-full rounded-lg border border-cyan-700 bg-cyan-950 px-4 py-3 text-white outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all resize-none"
+                disabled={submitting}
+                className="w-full rounded-lg border border-cyan-700 bg-cyan-950 px-4 py-3 text-white outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all resize-none disabled:opacity-60"
                 value={formData.message}
                 onChange={(e) => setFormData({...formData, message: e.target.value})}
               ></textarea>
             </div>
+
+            {error ? (
+              <p className="text-sm text-rose-300">{error}</p>
+            ) : null}
             
             <button
               type="submit"
-              className="w-full rounded-lg bg-teal-500 px-4 py-3 font-semibold text-white hover:bg-teal-400 transition-colors shadow-lg"
+              disabled={submitting}
+              className="w-full rounded-lg bg-teal-500 px-4 py-3 font-semibold text-white hover:bg-teal-400 transition-colors shadow-lg disabled:opacity-60"
             >
-              {submitted ? "Message Sent!" : "Send Message"}
+              {submitting ? "Sending..." : submitted ? "Message Sent!" : "Send Message"}
             </button>
           </form>
         </motion.div>

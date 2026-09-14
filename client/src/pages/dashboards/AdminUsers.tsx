@@ -29,8 +29,10 @@ export default function AdminUsers() {
     phone: "",
     alternatePhone: "",
     mapUrl: "",
+    password: "",
     address: { line1: "", city: "", state: "", postalCode: "" }
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     const saved = authUser?.adminPreferences?.usersAccountFilter;
@@ -105,6 +107,7 @@ export default function AdminUsers() {
 
   const openEdit = (user: any) => {
     setEditingUser(user);
+    setShowPassword(false);
     setEditForm({
       name: user.name || "",
       email: user.email || "",
@@ -113,6 +116,7 @@ export default function AdminUsers() {
       phone: user.phone || "",
       alternatePhone: user.alternatePhone || "",
       mapUrl: user.mapUrl || "",
+      password: "",
       address: {
         line1: user.address?.line1 || "",
         city: user.address?.city || "",
@@ -126,8 +130,30 @@ export default function AdminUsers() {
     try {
       setError("");
       setSuccess("");
-      await updateUser(token!, editingUser._id, editForm);
-      setSuccess("User updated successfully");
+      const newPassword = editForm.password.trim();
+      if (newPassword && newPassword.length < 8) {
+        setError("New password must be at least 8 characters.");
+        return;
+      }
+      const payload: Record<string, unknown> = {
+        name: editForm.name,
+        email: editForm.email,
+        role: editForm.role,
+        status: editForm.status,
+        phone: editForm.phone,
+        alternatePhone: editForm.alternatePhone,
+        mapUrl: editForm.mapUrl,
+        address: editForm.address
+      };
+      if (newPassword) {
+        payload.password = newPassword;
+      }
+      await updateUser(token!, editingUser._id, payload);
+      setSuccess(
+        newPassword
+          ? `User updated. New login password set for ${editForm.email || editingUser.email}.`
+          : "User updated successfully"
+      );
       setEditingUser(null);
       fetchUsers();
     } catch (err: any) {
@@ -403,11 +429,14 @@ export default function AdminUsers() {
       )}
 
       {editingUser && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl my-8">
-            <h3 className="text-xl font-bold text-white mb-6">Edit User: {editingUser.name}</h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[92vh] shadow-2xl flex flex-col overflow-hidden">
+            <div className="shrink-0 px-6 pt-5 pb-3 border-b border-slate-800">
+              <h3 className="text-xl font-bold text-white">Edit User: {editingUser.name}</h3>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div>
                 <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Name</label>
                 <input 
@@ -470,10 +499,36 @@ export default function AdminUsers() {
                   onChange={e => setEditForm({...editForm, mapUrl: e.target.value})}
                 />
               </div>
+              <div className="md:col-span-2 rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+                <label className="block text-amber-200/90 text-xs mb-1 uppercase tracking-wider font-bold">
+                  Set login password
+                </label>
+                <p className="text-[11px] text-slate-400 mb-2">
+                  Leave blank to keep the current password. Use this for manual-booking customers who need to
+                  log in on the website (old random password is unknown).
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-white outline-none focus:border-teal-500"
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
+                    placeholder="New password (min 8 characters)"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="px-3 rounded-lg border border-slate-700 text-slate-300 text-xs font-semibold hover:bg-slate-800"
+                  >
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
             </div>
 
             <h4 className="text-white font-medium mb-3">Address</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
               <div className="md:col-span-2">
                 <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Street Address</label>
                 <input 
@@ -502,8 +557,9 @@ export default function AdminUsers() {
                 />
               </div>
             </div>
+            </div>
 
-            <div className="flex gap-4">
+            <div className="shrink-0 flex gap-4 px-6 py-4 border-t border-slate-800 bg-slate-900">
               <button 
                 onClick={() => setEditingUser(null)}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-lg font-medium transition-colors"

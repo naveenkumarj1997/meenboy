@@ -88,6 +88,8 @@ app.use("/api/purchases", purchaseRoutes);
 app.use("/api/walk-in", require("./routes/walkInRoutes"));
 app.use("/api/today-catch", require("./routes/todayCatchRoutes"));
 app.use("/api/booking-banner", require("./routes/bookingBannerRoutes"));
+app.use("/api/category-weekday-rules", require("./routes/categoryWeekdayRoutes"));
+app.use("/api/alert-emails", require("./routes/alertEmailRoutes"));
 app.use("/api/delivery-trips", require("./routes/deliveryTripRoutes"));
 
 app.use(notFound);

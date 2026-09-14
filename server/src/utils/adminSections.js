@@ -28,6 +28,7 @@ const ADMIN_SECTIONS = [
   { id: "expenses", label: "Expenses" },
   { id: "finance", label: "Manual Ledger" },
   { id: "availability", label: "Availability" },
+  { id: "notifications", label: "Notifications" },
   { id: "walk_in", label: "Walk-in" },
   { id: "manual_booking", label: "Manual Booking" },
   { id: "manage_admins", label: "Manage Admins", fullOnly: true }

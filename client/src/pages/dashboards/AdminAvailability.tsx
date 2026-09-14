@@ -5,12 +5,16 @@ import {
   updateAvailability,
   getAdminProducts,
   getAdminBookingBanner,
-  updateBookingBanner
+  updateBookingBanner,
+  getAdminCategoryWeekdayRules,
+  updateAdminCategoryWeekdayRules,
+  type CategoryWeekdayRulePayload
 } from "../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import { CATEGORIES } from "../../data/products";
 import DashboardShell from "./DashboardShell";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
+import { WEEKDAY_OPTIONS } from "../../lib/categoryWeekdayRules";
 
 const AdminAvailability = () => {
   const { token } = useAuth();
@@ -38,6 +42,14 @@ const AdminAvailability = () => {
     null
   );
 
+  const [weekdayEnabled, setWeekdayEnabled] = useState(true);
+  const [weekdayRules, setWeekdayRules] = useState<CategoryWeekdayRulePayload[]>([]);
+  const [weekdayLoading, setWeekdayLoading] = useState(false);
+  const [weekdaySaving, setWeekdaySaving] = useState(false);
+  const [weekdayFeedback, setWeekdayFeedback] = useState<{ type: "success" | "error"; text: string } | null>(
+    null
+  );
+
   const validCategories = CATEGORIES.filter((c) => c !== "All");
 
   const loadBanner = async () => {
@@ -52,6 +64,21 @@ const AdminAvailability = () => {
       setBannerFeedback({ type: "error", text: err.message || "Failed to load fish banner" });
     } finally {
       setBannerLoading(false);
+    }
+  };
+
+  const loadWeekdayRules = async () => {
+    if (!token) return;
+    try {
+      setWeekdayLoading(true);
+      const res = await getAdminCategoryWeekdayRules(token);
+      setWeekdayEnabled(res.config?.enabled !== false);
+      setWeekdayRules(res.config?.rules || []);
+    } catch (err: any) {
+      console.error(err);
+      setWeekdayFeedback({ type: "error", text: err.message || "Failed to load weekday rules" });
+    } finally {
+      setWeekdayLoading(false);
     }
   };
 
@@ -108,6 +135,7 @@ const AdminAvailability = () => {
 
   useEffect(() => {
     loadBanner();
+    loadWeekdayRules();
   }, [token]);
 
   const handleSaveBanner = async () => {
@@ -133,6 +161,48 @@ const AdminAvailability = () => {
     } finally {
       setBannerSaving(false);
     }
+  };
+
+  const handleSaveWeekdayRules = async () => {
+    if (!token) return;
+    try {
+      setWeekdaySaving(true);
+      setWeekdayFeedback(null);
+      const res = await updateAdminCategoryWeekdayRules(token, {
+        enabled: weekdayEnabled,
+        rules: weekdayRules
+      });
+      setWeekdayEnabled(res.config?.enabled !== false);
+      setWeekdayRules(res.config?.rules || []);
+      setWeekdayFeedback({
+        type: "success",
+        text: "Weekday category rules saved. Applies to website booking only (manual booking stays free)."
+      });
+      setTimeout(() => setWeekdayFeedback(null), 4000);
+    } catch (err: any) {
+      setWeekdayFeedback({ type: "error", text: err.message || "Failed to save weekday rules" });
+    } finally {
+      setWeekdaySaving(false);
+    }
+  };
+
+  const updateRule = (category: string, patch: Partial<CategoryWeekdayRulePayload>) => {
+    setWeekdayRules((prev) =>
+      prev.map((r) => (r.category === category ? { ...r, ...patch } : r))
+    );
+  };
+
+  const toggleRuleWeekday = (category: string, day: number) => {
+    setWeekdayRules((prev) =>
+      prev.map((r) => {
+        if (r.category !== category) return r;
+        const has = r.deliveryWeekdays.includes(day);
+        const deliveryWeekdays = has
+          ? r.deliveryWeekdays.filter((d) => d !== day)
+          : [...r.deliveryWeekdays, day].sort((a, b) => a - b);
+        return { ...r, deliveryWeekdays };
+      })
+    );
   };
 
   const handleSave = async () => {
@@ -179,7 +249,7 @@ const AdminAvailability = () => {
   return (
     <DashboardShell
       title="Date & Category Availability"
-      description="Manage pre-booking open/close, homepage fish banner message, and category availability."
+      description="Manage weekday category delivery days, website booking cutoffs, homepage banner, and per-date open/close."
       navLinks={ADMIN_NAV_LINKS}
     >
       <div className="max-w-2xl space-y-6">
@@ -244,6 +314,165 @@ const AdminAvailability = () => {
                   className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-white font-bold rounded-xl transition-colors disabled:opacity-50 self-end"
                 >
                   {bannerSaving ? "Saving..." : "Save Banner"}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="bg-cyan-950/50 border border-amber-500/20 rounded-2xl p-6 shadow-xl shadow-cyan-950/50">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <h3 className="text-lg font-bold text-white">Weekday category delivery</h3>
+              <p className="text-sm text-white/50 mt-1">
+                Choose which weekdays each category can be delivered. Optional cutoff times apply to{" "}
+                <span className="text-amber-200 font-semibold">website booking only</span> — manual booking
+                stays unrestricted. Default: Fish &amp; Seafood on Wednesday &amp; Sunday (order by Mon / Fri
+                9 PM IST).
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setWeekdayEnabled(!weekdayEnabled)}
+              disabled={weekdayLoading}
+              className={`relative inline-flex h-7 w-14 shrink-0 items-center rounded-full transition-colors ${
+                weekdayEnabled ? "bg-teal-500" : "bg-white/20"
+              }`}
+              aria-label="Toggle weekday category rules"
+            >
+              <span
+                className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                  weekdayEnabled ? "translate-x-8" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          {weekdayLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-7 h-7 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
+            </div>
+          ) : (
+            <>
+              <div className={`space-y-4 ${weekdayEnabled ? "" : "opacity-50 pointer-events-none"}`}>
+                {weekdayRules.map((rule) => (
+                  <div
+                    key={rule.category}
+                    className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-bold text-white">{rule.category}</span>
+                      <label className="flex items-center gap-2 text-xs text-white/60 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={rule.cutoffEnabled}
+                          onChange={(e) =>
+                            updateRule(rule.category, { cutoffEnabled: e.target.checked })
+                          }
+                          className="rounded border-white/30"
+                        />
+                        Website cutoff
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {WEEKDAY_OPTIONS.map(({ label, value }) => {
+                        const on = rule.deliveryWeekdays.includes(value);
+                        return (
+                          <button
+                            key={`${rule.category}-${value}`}
+                            type="button"
+                            onClick={() => toggleRuleWeekday(rule.category, value)}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                              on
+                                ? "bg-teal-500/20 border-teal-400/40 text-teal-200"
+                                : "bg-transparent border-white/10 text-white/40"
+                            }`}
+                          >
+                            {label.slice(0, 3)}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {rule.cutoffEnabled && (
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                        <label className="text-xs text-white/50">
+                          Days before delivery
+                          <input
+                            type="number"
+                            min={0}
+                            max={14}
+                            value={rule.cutoffDaysBefore}
+                            onChange={(e) =>
+                              updateRule(rule.category, {
+                                cutoffDaysBefore: Math.max(0, Math.min(14, Number(e.target.value) || 0))
+                              })
+                            }
+                            className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                          />
+                        </label>
+                        <label className="text-xs text-white/50">
+                          Hour (IST 0–23)
+                          <input
+                            type="number"
+                            min={0}
+                            max={23}
+                            value={rule.cutoffHour}
+                            onChange={(e) =>
+                              updateRule(rule.category, {
+                                cutoffHour: Math.max(0, Math.min(23, Number(e.target.value) || 0))
+                              })
+                            }
+                            className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                          />
+                        </label>
+                        <label className="text-xs text-white/50">
+                          Minute
+                          <input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={rule.cutoffMinute}
+                            onChange={(e) =>
+                              updateRule(rule.category, {
+                                cutoffMinute: Math.max(0, Math.min(59, Number(e.target.value) || 0))
+                              })
+                            }
+                            className="mt-1 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm"
+                          />
+                        </label>
+                        <p className="sm:col-span-3 text-[11px] text-amber-200/80">
+                          Example with 2 days + 21:00 — Wednesday delivery must be booked by Monday 9:00 PM;
+                          Sunday by Friday 9:00 PM.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4">
+                {weekdayFeedback ? (
+                  <span
+                    className={`text-sm font-semibold ${
+                      weekdayFeedback.type === "success" ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {weekdayFeedback.text}
+                  </span>
+                ) : (
+                  <span className="text-xs text-white/40">
+                    {weekdayEnabled ? "Rules active for website checkout" : "Rules currently off"}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={handleSaveWeekdayRules}
+                  disabled={weekdaySaving}
+                  className="px-5 py-2 bg-teal-500 hover:bg-teal-400 text-white font-bold rounded-xl transition-colors disabled:opacity-50 self-end"
+                >
+                  {weekdaySaving ? "Saving..." : "Save Weekday Rules"}
                 </button>
               </div>
             </>

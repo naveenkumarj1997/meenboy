@@ -278,6 +278,7 @@ export default function AdminDeliveryTracking() {
       setSuccess("");
       await assignDeliveryPartner(token!, orderId, { deliveryPartnerId: partnerId });
       setSuccess("Delivery partner assigned successfully!");
+      window.dispatchEvent(new Event("ff:unassigned-website-count"));
       fetchAllData(); // Refresh to update lists and stats
     } catch (err: any) {
       setError(err.message || "Failed to assign partner");

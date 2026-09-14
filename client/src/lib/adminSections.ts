@@ -27,6 +27,7 @@ export type AdminSectionId =
   | "expenses"
   | "finance"
   | "availability"
+  | "notifications"
   | "walk_in"
   | "manual_booking"
   | "manage_admins";
@@ -101,6 +102,7 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   { id: "expenses", label: "Expenses", href: "/dashboard/admin/expenses" },
   { id: "finance", label: "Manual Ledger", href: "/dashboard/admin/finance" },
   { id: "availability", label: "Availability", href: "/dashboard/admin/availability" },
+  { id: "notifications", label: "Notifications", href: "/dashboard/admin/notifications" },
   { id: "walk_in", label: "Walk-in", href: "/dashboard/admin/walk-in" },
   { id: "manual_booking", label: "Manual Booking", href: "/dashboard/admin/manual-booking" },
   {

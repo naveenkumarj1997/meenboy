@@ -152,6 +152,23 @@ const createOrder = async (req, res, next) => {
           }
         }
       }
+
+      // Website-only weekday + cutoff rules (Fish/Seafood Wed & Sun, etc.)
+      const { getOrCreate } = require("./categoryWeekdayController");
+      const { shapeConfig, evaluateItemsForDate } = require("../utils/categoryWeekdayRules");
+      const weekdayDoc = await getOrCreate();
+      const weekdayConfig = shapeConfig(weekdayDoc);
+      if (weekdayConfig.enabled) {
+        const productIds = items.map((item) => item.product).filter(Boolean);
+        const products = await Product.find({ _id: { $in: productIds } }).lean();
+        const blocked = evaluateItemsForDate(weekdayConfig, products, deliveryDate);
+        if (blocked.length > 0) {
+          const msg = blocked
+            .map((b) => `${b.product?.name || "Item"}: ${b.message}`)
+            .join(" ");
+          return res.status(400).json({ message: msg });
+        }
+      }
     }
 
     const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
@@ -198,6 +215,14 @@ const createOrder = async (req, res, next) => {
       metadata: { orderId: order._id, total: order.total }
     });
 
+    // Fire-and-forget admin email alert (website booking only; never blocks response)
+    try {
+      const { notifyWebsiteBooking } = require("../utils/mailAlert");
+      void notifyWebsiteBooking(order, req.user);
+    } catch (mailErr) {
+      console.error("[createOrder] mail alert setup failed:", mailErr?.message || mailErr);
+    }
+
     res.status(201).json({ order });
   } catch (error) {
     next(error);
@@ -238,6 +263,37 @@ const listOrdersForAdmin = async (req, res, next) => {
       .populate("customer", "name email phone mapUrl")
       .lean();
     res.json({ orders });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * Website bookings waiting in Assign Delivery Partners
+ * (pending/confirmed/preparing, no delivery assignment yet).
+ * @route GET /api/orders/admin/unassigned-website-count
+ */
+const getUnassignedWebsiteOrdersCount = async (req, res, next) => {
+  try {
+    const websiteOrders = await Order.find({
+      bookingSource: "website",
+      status: { $in: ["pending", "confirmed", "preparing"] }
+    })
+      .select("_id")
+      .lean();
+
+    if (websiteOrders.length === 0) {
+      return res.json({ count: 0 });
+    }
+
+    const orderIds = websiteOrders.map((o) => o._id);
+    const assigned = await DeliveryAssignment.find({ order: { $in: orderIds } })
+      .select("order")
+      .lean();
+    const assignedSet = new Set(assigned.map((a) => String(a.order)));
+    const count = orderIds.filter((id) => !assignedSet.has(String(id))).length;
+
+    res.json({ count });
   } catch (error) {
     next(error);
   }
@@ -1993,6 +2049,7 @@ module.exports = {
   createOrder,
   getMyOrders,
   listOrdersForAdmin,
+  getUnassignedWebsiteOrdersCount,
   getCustomerLastDeliveryTime,
   listAssignmentsForPartner,
   updateOrderStatus,

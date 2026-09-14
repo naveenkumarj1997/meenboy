@@ -213,6 +213,92 @@ export const updateBookingBanner = async (
     body: JSON.stringify(payload)
   });
 
+export interface AlertEmailSettingsPayload {
+  emails: string[];
+  notifyWebsiteBooking: boolean;
+  notifyContactQuery: boolean;
+  updatedAt?: string | null;
+  smtpConfigured?: boolean;
+}
+
+export const getAdminAlertEmails = async (token: string) =>
+  request<{ settings: AlertEmailSettingsPayload }>("/alert-emails/admin", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const updateAdminAlertEmails = async (
+  token: string,
+  payload: {
+    emails?: string[];
+    notifyWebsiteBooking?: boolean;
+    notifyContactQuery?: boolean;
+  }
+) =>
+  request<{ settings: AlertEmailSettingsPayload; message: string }>("/alert-emails/admin", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const sendTestAlertEmail = async (token: string) =>
+  request<{ message: string; recipients?: string[] }>("/alert-emails/admin/test", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const submitContactQuery = async (payload: {
+  name: string;
+  email: string;
+  message: string;
+}) =>
+  request<{ message: string }>("/alert-emails/contact", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
+export interface CategoryWeekdayRulePayload {
+  category: string;
+  deliveryWeekdays: number[];
+  cutoffEnabled: boolean;
+  cutoffDaysBefore: number;
+  cutoffHour: number;
+  cutoffMinute: number;
+}
+
+export interface CategoryWeekdayConfigPayload {
+  enabled: boolean;
+  rules: CategoryWeekdayRulePayload[];
+  updatedAt?: string | null;
+}
+
+export const getPublicCategoryWeekdayRules = async (categories?: string[]) => {
+  const qs =
+    categories && categories.length > 0
+      ? `?categories=${encodeURIComponent(categories.join(","))}`
+      : "";
+  return request<{ config: CategoryWeekdayConfigPayload; notices: string[] }>(
+    `/category-weekday-rules${qs}`
+  );
+};
+
+export const getAdminCategoryWeekdayRules = async (token: string) =>
+  request<{ config: CategoryWeekdayConfigPayload }>("/category-weekday-rules/admin", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const updateAdminCategoryWeekdayRules = async (
+  token: string,
+  payload: { enabled?: boolean; rules?: CategoryWeekdayRulePayload[] }
+) =>
+  request<{ config: CategoryWeekdayConfigPayload; message: string }>(
+    "/category-weekday-rules/admin",
+    {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }
+  );
+
 export const getCatalog = async () =>
   request<{ success: boolean; data: { products: any[]; pagination: any } }>("/catalog/products?limit=100");
 
@@ -894,6 +980,12 @@ export const getAllUsers = async (
 /** Unnoticed real customers — for New Customers sidebar badge */
 export const getNewCustomersCount = async (token: string) =>
   request<{ count: number }>("/users/new-customers/count", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+/** Website bookings waiting to assign a delivery partner — Order Management badge */
+export const getUnassignedWebsiteOrdersCount = async (token: string) =>
+  request<{ count: number }>("/orders/admin/unassigned-website-count", {
     headers: { Authorization: `Bearer ${token}` }
   });
 

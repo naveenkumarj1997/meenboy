@@ -26,6 +26,7 @@ import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
 import AdminMoneyManagement from "./pages/dashboards/AdminMoneyManagement";
 import AdminExpenses from "./pages/dashboards/AdminExpenses";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
+import AdminNotifications from "./pages/dashboards/AdminNotifications";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
 import AdminWalkIn from "./pages/dashboards/AdminWalkIn";
 import AdminProfile from "./pages/dashboards/AdminProfile";
@@ -136,6 +137,7 @@ function App() {
           <Route path="/dashboard/admin/money-management" element={<AdminMoneyManagement />} />
           <Route path="/dashboard/admin/expenses" element={<AdminExpenses />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
+          <Route path="/dashboard/admin/notifications" element={<AdminNotifications />} />
           <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />
           <Route path="/dashboard/admin/manual-booking" element={<AdminManualBooking />} />
           <Route path="/dashboard/admin/manage-admins" element={<AdminManageAdmins />} />
