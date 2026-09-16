@@ -6,6 +6,12 @@ const walkInItemSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Product"
     },
+    /** Today's Catch line this sale deducted from */
+    catchItemId: {
+      type: String,
+      trim: true,
+      default: ""
+    },
     productName: {
       type: String,
       required: true,

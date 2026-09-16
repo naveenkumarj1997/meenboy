@@ -1,6 +1,7 @@
 const WalkInSale = require("../models/WalkInSale");
 const Product = require("../models/Product");
 const { generateWalkInBill } = require("../utils/pdfWalkInBill");
+const { deductTodayCatchForWalkIn } = require("./todayCatchController");
 const path = require("path");
 const fs = require("fs");
 
@@ -61,6 +62,7 @@ const createWalkInSale = async (req, res, next) => {
       let category = String(raw.category || "").trim();
       let unit = raw.unit === "piece" ? "piece" : "kg";
       let productId = raw.product || null;
+      const catchItemId = String(raw.catchItemId || "").trim();
 
       if (productId) {
         const product = await Product.findById(productId).select("name category unit").lean();
@@ -74,6 +76,7 @@ const createWalkInSale = async (req, res, next) => {
       const totalPrice = Math.round(quantity * unitPrice * 100) / 100;
       normalizedItems.push({
         product: productId || undefined,
+        catchItemId,
         productName,
         category,
         cutName: String(raw.cutName || "").trim(),
@@ -82,6 +85,22 @@ const createWalkInSale = async (req, res, next) => {
         unitPrice,
         totalPrice
       });
+    }
+
+    // Deduct from Today's Catch stock before saving the bill
+    let updatedCatch;
+    try {
+      updatedCatch = await deductTodayCatchForWalkIn(
+        normalizedItems.map((i) => ({
+          catchItemId: i.catchItemId,
+          product: i.product,
+          productName: i.productName,
+          quantity: i.quantity
+        }))
+      );
+    } catch (stockErr) {
+      const status = stockErr.statusCode || 400;
+      return res.status(status).json({ message: stockErr.message || "Stock update failed" });
     }
 
     const subtotal = Math.round(normalizedItems.reduce((s, i) => s + i.totalPrice, 0) * 100) / 100;
@@ -109,7 +128,11 @@ const createWalkInSale = async (req, res, next) => {
     }
 
     sale = await WalkInSale.findById(sale._id).populate("createdBy", "name").lean();
-    res.status(201).json({ message: "Walk-in sale saved", sale });
+    res.status(201).json({
+      message: "Walk-in sale saved — Today's Catch stock updated",
+      sale,
+      todayCatch: updatedCatch
+    });
   } catch (error) {
     next(error);
   }

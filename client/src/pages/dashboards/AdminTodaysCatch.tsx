@@ -186,7 +186,7 @@ export default function AdminTodaysCatch() {
   return (
     <DashboardShell
       title="Today's Catch"
-      description="Control the homepage board: add fish with today's prices, then turn the toggle ON to show it to customers."
+      description="Store stock board for the homepage — and the same stock Walk-in sells from. When you sell in Walk-in, available qty here drops automatically."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (

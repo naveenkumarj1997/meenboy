@@ -1270,7 +1270,7 @@ export const createWalkInSale = async (
     notes?: string;
   }
 ) =>
-  request<{ message: string; sale: any }>("/walk-in", {
+  request<{ message: string; sale: any; todayCatch?: any }>("/walk-in", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)

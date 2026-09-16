@@ -6,14 +6,17 @@ import {
   createWalkInSale,
   downloadWalkInBill,
   getAdminProducts,
+  getAdminTodayCatch,
   getWalkInStats,
   listWalkInSales
 } from "../../lib/api";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { formatQuantityLabel, WEIGHT_OPTIONS } from "../../lib/weightOptions";
+import { printThermalBill } from "../../lib/thermalPrint";
 
 type CartLine = {
   key: string;
+  catchItemId: string;
   product?: string;
   productName: string;
   category: string;
@@ -24,6 +27,16 @@ type CartLine = {
   totalPrice: number;
 };
 
+type CatchStockItem = {
+  id: string;
+  name: string;
+  price: number;
+  unit: string;
+  availableQty: number;
+  productId: string | null;
+  note?: string;
+};
+
 const money = (n: number) => `₹${Number(n || 0).toFixed(2)}`;
 
 const localToday = () => {
@@ -31,85 +44,38 @@ const localToday = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
-const printShopBill = (sale: any) => {
-  const rows = (sale.items || [])
-    .map(
-      (item: any, i: number) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${item.productName}${item.cutName ? ` (${item.cutName})` : ""}</td>
-        <td>${formatQuantityLabel(item.quantity, item.unit)}</td>
-        <td style="text-align:right">${Number(item.unitPrice).toFixed(2)}</td>
-        <td style="text-align:right">${Number(item.totalPrice).toFixed(2)}</td>
-      </tr>`
-    )
-    .join("");
+const mapCatchItems = (items: any[]): CatchStockItem[] =>
+  (items || []).map((it: any) => ({
+    id: String(it.id),
+    name: it.name,
+    price: Number(it.price) || 0,
+    unit: String(it.unit || "kg"),
+    availableQty: Number(it.availableQty) || 0,
+    productId: it.productId ? String(it.productId) : null,
+    note: it.note || ""
+  }));
 
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>Bill ${sale.billNumber}</title>
-  <style>
-    @page { margin: 10mm; }
-    body { font-family: Arial, sans-serif; color: #111; max-width: 80mm; margin: 0 auto; padding: 8px; }
-    h1 { font-size: 16px; margin: 0 0 4px; text-align: center; }
-    .muted { font-size: 11px; color: #444; text-align: center; line-height: 1.35; }
-    .title { text-align: center; font-weight: bold; margin: 10px 0 6px; font-size: 13px; }
-    .meta { font-size: 12px; margin: 8px 0; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { padding: 4px 2px; border-bottom: 1px solid #ddd; vertical-align: top; }
-    th { text-align: left; }
-    .total { font-size: 14px; font-weight: bold; text-align: right; margin-top: 10px; }
-    .thanks { text-align: center; font-size: 11px; margin-top: 14px; }
-    @media print {
-      body { max-width: none; }
-    }
-  </style>
-</head>
-<body>
-  <h1>FISHFRIENDLY</h1>
-  <div class="muted">Balusamy konnar street, Madakkulam<br/>Bypass Road in Kalavasal<br/>Madurai, Tamil Nadu - 625003<br/>+91 9087894319</div>
-  <div class="title">SHOP BILL / CASH MEMO</div>
-  <div class="meta">
-    <div><strong>Bill:</strong> ${sale.billNumber}</div>
-    <div><strong>Date:</strong> ${sale.saleDate}${sale.createdAt ? ` ${new Date(sale.createdAt).toLocaleTimeString()}` : ""}</div>
-    <div><strong>Customer:</strong> ${sale.customerName}</div>
-    <div><strong>Phone:</strong> ${sale.customerPhone}</div>
-    <div><strong>Payment:</strong> ${String(sale.paymentMethod || "cash").toUpperCase()}</div>
-  </div>
-  <table>
-    <thead>
-      <tr><th>#</th><th>Item</th><th>Qty</th><th style="text-align:right">Rate</th><th style="text-align:right">Amt</th></tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="total">TOTAL: ₹${Number(sale.total || 0).toFixed(2)}</div>
-  ${sale.notes ? `<div class="meta">Note: ${sale.notes}</div>` : ""}
-  <div class="thanks">Thank you for visiting FISHFRIENDLY!</div>
-  <script>
-    window.onload = function () {
-      window.focus();
-      window.print();
-    };
-  </script>
-</body>
-</html>`;
-
-  const win = window.open("", "_blank", "width=420,height=720");
-  if (!win) {
-    alert("Please allow pop-ups to print the bill.");
-    return;
-  }
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
+const printWalkInThermal = (sale: any) => {
+  printThermalBill({
+    billNumber: sale.billNumber,
+    titleBadge: "CASH MEMO",
+    customerName: sale.customerName,
+    customerPhone: sale.customerPhone,
+    paymentMethod: sale.paymentMethod || "cash",
+    dateLine: `${sale.saleDate || ""}${
+      sale.createdAt ? ` ${new Date(sale.createdAt).toLocaleTimeString()}` : ""
+    }`,
+    notes: sale.notes,
+    total: sale.total,
+    items: sale.items
+  });
 };
 
 export default function AdminWalkIn() {
   const { token } = useAuth();
   const [tab, setTab] = useState<"new" | "history">("new");
   const [products, setProducts] = useState<any[]>([]);
+  const [catchItems, setCatchItems] = useState<CatchStockItem[]>([]);
   const [stats, setStats] = useState({
     today: { date: localToday(), count: 0, amount: 0 },
     total: { count: 0, amount: 0 }
@@ -127,8 +93,7 @@ export default function AdminWalkIn() {
   const [cart, setCart] = useState<CartLine[]>([]);
 
   const [productSearch, setProductSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("all");
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedCatchId, setSelectedCatchId] = useState("");
   const [selectedCut, setSelectedCut] = useState("");
   const [qty, setQty] = useState(1);
   const [unitPrice, setUnitPrice] = useState<number | "">("");
@@ -137,35 +102,49 @@ export default function AdminWalkIn() {
   const [historyPhone, setHistoryPhone] = useState("");
   const [historyLoading, setHistoryLoading] = useState(false);
 
-  const selectedProduct = useMemo(
-    () => products.find((p) => p._id === selectedProductId) || null,
-    [products, selectedProductId]
+  const selectedCatch = useMemo(
+    () => catchItems.find((c) => c.id === selectedCatchId) || null,
+    [catchItems, selectedCatchId]
   );
 
-  const filteredProducts = useMemo(() => {
+  const linkedProduct = useMemo(() => {
+    if (!selectedCatch?.productId) return null;
+    return products.find((p) => String(p._id) === String(selectedCatch.productId)) || null;
+  }, [products, selectedCatch]);
+
+  const remainingForCatch = (catchItemId: string) => {
+    const stock = catchItems.find((c) => c.id === catchItemId);
+    if (!stock) return 0;
+    const inCart = cart
+      .filter((l) => l.catchItemId === catchItemId)
+      .reduce((s, l) => s + Number(l.quantity || 0), 0);
+    return Math.round((Number(stock.availableQty || 0) - inCart) * 10) / 10;
+  };
+
+  const filteredCatchItems = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
-    return products.filter((p) => {
-      if (categoryFilter !== "all" && p.category !== categoryFilter) return false;
+    return catchItems.filter((c) => {
+      if (Number(c.availableQty) <= 0) return false;
       if (!q) return true;
-      return String(p.name || "").toLowerCase().includes(q);
+      return String(c.name || "").toLowerCase().includes(q);
     });
-  }, [products, productSearch, categoryFilter]);
+  }, [catchItems, productSearch]);
 
   const cartTotal = useMemo(
     () => cart.reduce((sum, line) => sum + Number(line.totalPrice || 0), 0),
     [cart]
   );
 
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    products.forEach((p) => p.category && set.add(p.category));
-    return Array.from(set);
-  }, [products]);
-
   const refreshStats = async () => {
     if (!token) return;
     const res = await getWalkInStats(token);
     setStats(res);
+  };
+
+  const refreshCatchStock = async () => {
+    if (!token) return;
+    const catchRes = await getAdminTodayCatch(token);
+    setCatchItems(mapCatchItems(catchRes.todayCatch?.items || []));
   };
 
   const loadHistory = async () => {
@@ -190,7 +169,11 @@ export default function AdminWalkIn() {
     (async () => {
       try {
         setLoading(true);
-        const [prodRes] = await Promise.all([getAdminProducts(token), refreshStats()]);
+        const [prodRes] = await Promise.all([
+          getAdminProducts(token),
+          refreshStats(),
+          refreshCatchStock()
+        ]);
         setProducts((prodRes.data?.products || []).filter((p: any) => p.isActive !== false));
       } catch (err: any) {
         setError(err.message || "Failed to load walk-in data");
@@ -207,35 +190,35 @@ export default function AdminWalkIn() {
   }, [tab, token]);
 
   useEffect(() => {
-    if (!selectedProduct) {
+    if (!selectedCatch) {
       setUnitPrice("");
       setSelectedCut("");
       return;
     }
-    const cuts = selectedProduct.availableCuts || [];
+    setUnitPrice(Number(selectedCatch.price) || 0);
+    setQty(String(selectedCatch.unit).toLowerCase() === "piece" ? 1 : 1);
+    const cuts = linkedProduct?.availableCuts || [];
     if (cuts.length > 0) {
       const cut = cuts[0];
       setSelectedCut(cut.name || "");
-      setUnitPrice(Number(cut.price) > 0 ? Number(cut.price) : Number(selectedProduct.minPrice) || 0);
+      if (Number(cut.price) > 0) setUnitPrice(Number(cut.price));
     } else {
       setSelectedCut("");
-      setUnitPrice(Number(selectedProduct.minPrice) || 0);
     }
-    setQty(selectedProduct.unit === "piece" ? 1 : 1);
-  }, [selectedProductId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedCatchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyCut = (cutName: string) => {
     setSelectedCut(cutName);
-    if (!selectedProduct) return;
-    const cut = (selectedProduct.availableCuts || []).find((c: any) => c.name === cutName);
+    if (!linkedProduct) return;
+    const cut = (linkedProduct.availableCuts || []).find((c: any) => c.name === cutName);
     if (cut && Number(cut.price) > 0) setUnitPrice(Number(cut.price));
-    else setUnitPrice(Number(selectedProduct.minPrice) || 0);
+    else if (selectedCatch) setUnitPrice(Number(selectedCatch.price) || 0);
   };
 
   const addToCart = () => {
     setError("");
-    if (!selectedProduct) {
-      setError("Select a product from the menu");
+    if (!selectedCatch) {
+      setError("Select an item from Today's Catch stock");
       return;
     }
     const quantity = Number(qty);
@@ -248,20 +231,30 @@ export default function AdminWalkIn() {
       setError("Enter a valid rate");
       return;
     }
-    const unit = selectedProduct.unit === "piece" ? "piece" : "kg";
+    const left = remainingForCatch(selectedCatch.id);
+    if (quantity > left + 0.001) {
+      setError(
+        `Only ${left} ${selectedCatch.unit || "kg"} left in Today's Catch for "${selectedCatch.name}".`
+      );
+      return;
+    }
+    const unit = String(selectedCatch.unit).toLowerCase() === "piece" ? "piece" : "kg";
     const totalPrice = Math.round(quantity * price * 100) / 100;
-    const line: CartLine = {
-      key: `${selectedProduct._id}-${selectedCut}-${Date.now()}`,
-      product: selectedProduct._id,
-      productName: selectedProduct.name,
-      category: selectedProduct.category || "",
-      cutName: selectedCut,
-      quantity,
-      unit,
-      unitPrice: price,
-      totalPrice
-    };
-    setCart((prev) => [...prev, line]);
+    setCart((prev) => [
+      ...prev,
+      {
+        key: `${selectedCatch.id}-${selectedCut}-${Date.now()}`,
+        catchItemId: selectedCatch.id,
+        product: selectedCatch.productId || undefined,
+        productName: selectedCatch.name,
+        category: linkedProduct?.category || "",
+        cutName: selectedCut,
+        quantity,
+        unit,
+        unitPrice: price,
+        totalPrice
+      }
+    ]);
   };
 
   const removeLine = (key: string) => setCart((prev) => prev.filter((l) => l.key !== key));
@@ -272,7 +265,7 @@ export default function AdminWalkIn() {
     setPaymentMethod("cash");
     setNotes("");
     setCart([]);
-    setSelectedProductId("");
+    setSelectedCatchId("");
     setProductSearch("");
   };
 
@@ -285,7 +278,7 @@ export default function AdminWalkIn() {
       return;
     }
     if (cart.length === 0) {
-      setError("Add at least one item to the bill");
+      setError("Add at least one item from Today's Catch stock");
       return;
     }
 
@@ -297,6 +290,7 @@ export default function AdminWalkIn() {
         paymentMethod,
         notes,
         items: cart.map((l) => ({
+          catchItemId: l.catchItemId,
           product: l.product,
           productName: l.productName,
           category: l.category,
@@ -306,12 +300,18 @@ export default function AdminWalkIn() {
           unitPrice: l.unitPrice
         }))
       });
-      setSuccess(`Bill ${res.sale.billNumber} saved · ${money(res.sale.total)}`);
+      setSuccess(`Bill ${res.sale.billNumber} saved · stock updated · ${money(res.sale.total)}`);
+      if (res.todayCatch?.items) {
+        setCatchItems(mapCatchItems(res.todayCatch.items));
+      } else {
+        await refreshCatchStock();
+      }
       await refreshStats();
-      if (andPrint) printShopBill(res.sale);
+      if (andPrint) printWalkInThermal(res.sale);
       resetForm();
     } catch (err: any) {
       setError(err.message || "Failed to save walk-in sale");
+      await refreshCatchStock();
     } finally {
       setSaving(false);
     }
@@ -330,7 +330,7 @@ export default function AdminWalkIn() {
   return (
     <DashboardShell
       title="Walk-in Shop"
-      description="Counter sales for customers visiting the physical shop — create bill, print, and track visits."
+      description="Sell only from Today's Catch stock. Each bill auto-reduces remaining quantity there."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (
@@ -339,6 +339,11 @@ export default function AdminWalkIn() {
       {success && (
         <div className="mb-4 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300">{success}</div>
       )}
+
+      <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3 text-sm text-amber-100">
+        Stock comes from <span className="font-semibold text-amber-50">Today&apos;s Catch</span>. Add /
+        update qty there first. Walk-in sales deduct stock automatically.
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <div className="bg-teal-500/10 border border-teal-500/20 rounded-xl p-4">
@@ -350,8 +355,10 @@ export default function AdminWalkIn() {
           <div className="text-2xl font-black text-emerald-300">{money(stats.today.amount)}</div>
         </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
-          <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Total bills</div>
-          <div className="text-2xl font-black text-white">{stats.total.count}</div>
+          <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Catch items in stock</div>
+          <div className="text-2xl font-black text-white">
+            {catchItems.filter((c) => c.availableQty > 0).length}
+          </div>
         </div>
         <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
           <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">Total shop sales</div>
@@ -432,48 +439,63 @@ export default function AdminWalkIn() {
             </div>
 
             <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3">
-              <h3 className="text-white font-bold">Add from menu</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  placeholder="Search fish / chicken / mutton..."
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500"
-                />
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500"
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-white font-bold">Add from Today&apos;s Catch stock</h3>
+                <button
+                  type="button"
+                  onClick={() => refreshCatchStock()}
+                  className="text-[11px] font-bold text-teal-300 hover:text-teal-200"
                 >
-                  <option value="all">All categories</option>
-                  {categories.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
+                  Refresh stock
+                </button>
               </div>
 
+              {catchItems.length === 0 ? (
+                <p className="text-sm text-rose-300">
+                  No items in Today&apos;s Catch. Open Today&apos;s Catch, add products with available qty,
+                  then come back.
+                </p>
+              ) : filteredCatchItems.length === 0 ? (
+                <p className="text-sm text-amber-200">
+                  No stock left (qty 0). Update quantities in Today&apos;s Catch.
+                </p>
+              ) : null}
+
+              <input
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                placeholder="Search stock item..."
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500"
+              />
+
               <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(e.target.value)}
+                value={selectedCatchId}
+                onChange={(e) => setSelectedCatchId(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-white outline-none focus:border-teal-500"
               >
-                <option value="">-- Select product --</option>
-                {filteredProducts.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.name} ({p.category})
+                <option value="">-- Select stock item --</option>
+                {filteredCatchItems.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · left {c.availableQty} {c.unit} · ₹{c.price}/{c.unit}
                   </option>
                 ))}
               </select>
 
-              {selectedProduct && (selectedProduct.availableCuts || []).length > 0 && (
+              {selectedCatch && (
+                <p className="text-xs text-teal-300">
+                  Available now (after cart): {remainingForCatch(selectedCatch.id)}{" "}
+                  {selectedCatch.unit}
+                  {selectedCatch.note ? ` · ${selectedCatch.note}` : ""}
+                </p>
+              )}
+
+              {linkedProduct && (linkedProduct.availableCuts || []).length > 0 && (
                 <select
                   value={selectedCut}
                   onChange={(e) => applyCut(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500"
                 >
-                  {(selectedProduct.availableCuts || []).map((c: any) => (
+                  {(linkedProduct.availableCuts || []).map((c: any) => (
                     <option key={c.name} value={c.name}>
                       {c.name} {c.price ? `· ₹${c.price}` : ""}
                     </option>
@@ -484,7 +506,9 @@ export default function AdminWalkIn() {
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-xs text-slate-400 mb-1">
-                    {selectedProduct?.unit === "piece" ? "Pieces" : "Weight (kg)"}
+                    {String(selectedCatch?.unit || "").toLowerCase() === "piece"
+                      ? "Pieces"
+                      : "Weight (kg)"}
                   </label>
                   <input
                     type="number"
@@ -494,7 +518,7 @@ export default function AdminWalkIn() {
                     onChange={(e) => setQty(Number(e.target.value))}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-teal-500"
                   />
-                  {selectedProduct?.unit !== "piece" && (
+                  {String(selectedCatch?.unit || "").toLowerCase() !== "piece" && (
                     <div className="flex flex-wrap gap-1 mt-2">
                       {[...WEIGHT_OPTIONS, { value: 2.5, label: "2.5 kg" }, { value: 3, label: "3 kg" }].map(
                         (opt) => (
@@ -512,7 +536,9 @@ export default function AdminWalkIn() {
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1">Rate (₹ / {selectedProduct?.unit || "kg"})</label>
+                  <label className="block text-xs text-slate-400 mb-1">
+                    Rate (₹ / {selectedCatch?.unit || "kg"})
+                  </label>
                   <input
                     type="number"
                     step="0.01"
@@ -541,8 +567,8 @@ export default function AdminWalkIn() {
             </div>
 
             {cart.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-                No items yet — add fish / chicken / mutton from the menu.
+              <div className="flex-1 flex items-center justify-center text-slate-500 text-sm text-center px-4">
+                No items yet — pick from Today&apos;s Catch stock on the left.
               </div>
             ) : (
               <div className="flex-1 space-y-2 overflow-y-auto mb-4">
@@ -588,11 +614,14 @@ export default function AdminWalkIn() {
                 type="button"
                 disabled={saving}
                 onClick={() => handleSave(true)}
-                className="py-3 rounded-xl bg-teal-500 hover:bg-teal-400 text-white font-bold disabled:opacity-50 shadow-lg shadow-teal-500/20"
+                className="py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold disabled:opacity-50 shadow-lg shadow-amber-500/20"
               >
-                {saving ? "Saving..." : "Save & Print"}
+                {saving ? "Saving..." : "Save & Thermal Print"}
               </button>
             </div>
+            <p className="text-[11px] text-slate-500 mt-2">
+              Saving deducts qty from Today&apos;s Catch automatically.
+            </p>
           </div>
         </div>
       ) : (
@@ -638,10 +667,7 @@ export default function AdminWalkIn() {
           ) : (
             <div className="space-y-3">
               {sales.map((sale) => (
-                <div
-                  key={sale._id}
-                  className="bg-slate-900/50 border border-slate-800 rounded-xl p-4"
-                >
+                <div key={sale._id} className="bg-slate-900/50 border border-slate-800 rounded-xl p-4">
                   <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -672,17 +698,17 @@ export default function AdminWalkIn() {
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
-                          onClick={() => printShopBill(sale)}
-                          className="px-3 py-1.5 rounded-lg bg-teal-500/20 border border-teal-500/30 text-teal-300 text-xs font-bold hover:bg-teal-500/30"
+                          onClick={() => printWalkInThermal(sale)}
+                          className="px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 text-xs font-bold hover:bg-amber-500/30"
                         >
-                          Print
+                          Thermal Print
                         </button>
                         <button
                           type="button"
                           onClick={() => handleDownloadBill(sale._id, sale.billNumber)}
                           className="px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold hover:bg-slate-700"
                         >
-                          PDF
+                          PDF (A4)
                         </button>
                       </div>
                     </div>

@@ -197,8 +197,90 @@ const updateTodayCatch = async (req, res, next) => {
   }
 };
 
+const roundQty = (q) => Math.round(Number(q) * 10) / 10;
+
+/**
+ * Deduct walk-in sale quantities from Today's Catch stock.
+ * lines: [{ catchItemId?, product?, productName, quantity }]
+ * Mutates and saves the catch document. Throws Error with .statusCode = 400 on failure.
+ */
+const deductTodayCatchForWalkIn = async (lines) => {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    const err = new Error("No items to deduct from stock");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const doc = await getOrCreate();
+  const items = doc.items || [];
+  if (!items.length) {
+    const err = new Error(
+      "Today's Catch has no stock items. Add products and quantities in Today's Catch first."
+    );
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Aggregate required qty per catch item index
+  const needByIndex = new Map();
+
+  for (const line of lines) {
+    const qty = Number(line.quantity);
+    if (!(qty > 0)) continue;
+
+    let idx = -1;
+    const catchId = line.catchItemId ? String(line.catchItemId) : "";
+    if (catchId) {
+      idx = items.findIndex((it) => String(it._id) === catchId);
+    }
+    if (idx < 0 && line.product) {
+      idx = items.findIndex(
+        (it) => it.productId && String(it.productId) === String(line.product)
+      );
+    }
+    if (idx < 0 && line.productName) {
+      const name = String(line.productName).trim().toLowerCase();
+      idx = items.findIndex((it) => String(it.name || "").trim().toLowerCase() === name);
+    }
+    if (idx < 0) {
+      const err = new Error(
+        `"${line.productName || "Item"}" is not in Today's Catch stock. Add it there first.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+
+    needByIndex.set(idx, roundQty((needByIndex.get(idx) || 0) + qty));
+  }
+
+  for (const [idx, need] of needByIndex.entries()) {
+    const item = items[idx];
+    const available = roundQty(item.availableQty || 0);
+    if (need > available + 0.001) {
+      const unit = item.unit || "kg";
+      const err = new Error(
+        `Not enough stock for "${item.name}". Available ${available} ${unit}, needed ${need} ${unit}.`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  for (const [idx, need] of needByIndex.entries()) {
+    const item = items[idx];
+    item.availableQty = Math.max(0, roundQty((item.availableQty || 0) - need));
+  }
+
+  doc.markModified("items");
+  await doc.save();
+  return shapeAdmin(doc);
+};
+
 module.exports = {
   getPublicTodayCatch,
   getAdminTodayCatch,
-  updateTodayCatch
+  updateTodayCatch,
+  getOrCreate,
+  shapeAdmin,
+  deductTodayCatchForWalkIn
 };

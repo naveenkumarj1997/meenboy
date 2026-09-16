@@ -3,6 +3,7 @@ import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
 import { getAdminInvoices, downloadInvoice } from "../../lib/api";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
+import { printThermalBill } from "../../lib/thermalPrint";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 
 const toWhatsAppNumber = (phone?: string) => {
@@ -72,6 +73,29 @@ export default function AdminInvoices() {
     }
   };
 
+  const handleThermalPrint = () => {
+    if (!selected) {
+      setError("Please choose a customer first.");
+      return;
+    }
+    setError("");
+    setSuccess("");
+    const shortId = String(selected.orderId).slice(-6).toUpperCase();
+    printThermalBill({
+      billNumber: `#${shortId}`,
+      titleBadge: "INVOICE",
+      customerName: selected.customerName,
+      customerPhone: selected.customerPhone,
+      paymentMethod: String(selected.paymentMethod || "cash_on_delivery").replace(/_/g, " "),
+      dateLine: selected.deliveryDate || deliveryDate,
+      deliveryTime: selected.deliveryTime || "",
+      notes: selected.notes || "",
+      total: selected.total,
+      items: selected.items || []
+    });
+    setSuccess(`Thermal print opened for ${selected.customerName}. Choose TVS RP 3200 Lite (80mm).`);
+  };
+
   const whatsappUrl = selected
     ? `https://wa.me/${toWhatsAppNumber(selected.customerPhone)}?text=${encodeURIComponent(
         `Hi ${selected.customerName}, here is your Fish Friendly invoice for ${deliveryDate}. Order #${String(selected.orderId).slice(-8).toUpperCase()}.`
@@ -81,12 +105,16 @@ export default function AdminInvoices() {
   return (
     <DashboardShell
       title="Customer Invoices"
-      description="Choose a delivery date and customer, then download the invoice to send on WhatsApp."
+      description="Download A4 PDF for WhatsApp, or Thermal Print a physical bill on TVS RP 3200 Lite."
       navLinks={ADMIN_NAV_LINKS}
     >
-      <div className="mb-6 rounded-xl border border-teal-500/20 bg-teal-500/10 p-4">
+      <div className="mb-6 rounded-xl border border-teal-500/20 bg-teal-500/10 p-4 space-y-1">
         <p className="text-teal-200 text-sm">
-          Download the PDF, then open WhatsApp and attach that file to the customer chat.
+          <span className="font-semibold text-teal-100">PDF</span> — download and attach on WhatsApp.
+        </p>
+        <p className="text-teal-200 text-sm">
+          <span className="font-semibold text-amber-200">Thermal Print</span> — 80mm receipt for the TVS
+          printer (hand physical bill to customer).
         </p>
       </div>
 
@@ -135,6 +163,7 @@ export default function AdminInvoices() {
             {selected.customerAlternatePhone ? (
               <p><span className="text-slate-500">Alternate:</span> {selected.customerAlternatePhone}</p>
             ) : null}
+            <p><span className="text-slate-500">Items:</span> {(selected.items || []).length}</p>
             <p><span className="text-slate-500">Total:</span> ₹{Number(selected.total || 0).toFixed(2)}</p>
             <p><span className="text-slate-500">Status:</span> {String(selected.status || "").replace(/_/g, " ")}</p>
           </div>
@@ -146,12 +175,23 @@ export default function AdminInvoices() {
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             type="button"
+            onClick={handleThermalPrint}
+            disabled={!selected}
+            className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 px-4 rounded-lg disabled:opacity-50"
+          >
+            Thermal Print
+          </button>
+          <button
+            type="button"
             onClick={handleDownload}
             disabled={!selected || downloading}
             className="flex-1 bg-teal-500 hover:bg-teal-400 text-white font-semibold py-2.5 px-4 rounded-lg disabled:opacity-50"
           >
-            {downloading ? "Downloading..." : "Download invoice"}
+            {downloading ? "Downloading..." : "Download PDF (A4)"}
           </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-3">
           {selected && toWhatsAppNumber(selected.customerPhone) ? (
             <a
               href={whatsappUrl}

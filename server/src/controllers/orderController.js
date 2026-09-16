@@ -938,7 +938,19 @@ const listInvoicesForAdmin = async (req, res, next) => {
         order.address?.alternatePhone || order.customer?.alternatePhone || "",
       total: order.total,
       status: order.status,
+      deliveryDate: order.deliveryDate,
       deliveryTime: order.deliveryTime,
+      paymentMethod: order.paymentMethod || "cash_on_delivery",
+      bookingSource: order.bookingSource || "website",
+      notes: [order.discountNote, order.addonNote].filter(Boolean).join(" · ") || "",
+      items: (order.items || []).map((item) => ({
+        productName: item.productName,
+        cutName: item.cutName || "",
+        quantity: item.quantity,
+        unit: item.unit || "kg",
+        unitPrice: item.unitPrice,
+        totalPrice: item.totalPrice
+      })),
       dailyPriceUpdated: Boolean(order.dailyPriceUpdated)
     }));
 

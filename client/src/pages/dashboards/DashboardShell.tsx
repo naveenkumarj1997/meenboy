@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAdminNavLinksForUser, hasAdminSection } from "../../lib/adminSections";
 import { getNewCustomersCount, getUnassignedWebsiteOrdersCount } from "../../lib/api";
+import BrandLogo from "../../components/BrandLogo";
 
 interface NavLink {
   label: string;
@@ -39,9 +40,7 @@ const SidebarContent = ({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="shrink-0 p-5 sm:p-6 flex flex-col items-start gap-1 border-b border-slate-800">
-        <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-emerald-500 tracking-wider">
-          FISHFRIENDLY
-        </h1>
+        <BrandLogo size="lg" />
         <span className="text-xs text-slate-500 font-medium uppercase tracking-widest">Workspace</span>
       </div>
 
@@ -231,7 +230,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row font-sans">
       <div className="md:hidden flex items-center justify-between border-b border-slate-800 bg-slate-900/95 backdrop-blur px-4 py-3 sticky top-0 z-50">
-        <h1 className="text-lg font-bold text-teal-400 tracking-wider truncate">FISHFRIENDLY</h1>
+        <BrandLogo size="sm" />
         <button
           type="button"
           aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
