@@ -788,9 +788,23 @@ export default function AdminDeliveryTracking() {
             if (!searchQuery) return true;
             const q = searchQuery.toLowerCase();
             const orderIdStr = String(a.order?._id || a.order).slice(-6).toLowerCase();
-            const partnerName = (a.deliveryPartner?.name || 'Unknown').toLowerCase();
-            const statusStr = a.status.toLowerCase();
-            return orderIdStr.includes(q) || partnerName.includes(q) || statusStr.includes(q);
+            const partnerName = (a.deliveryPartner?.name || "Unknown").toLowerCase();
+            const statusStr = String(a.status || "").toLowerCase();
+            const customerName = String(
+              a.order?.customer?.name || a.order?.customerName || ""
+            ).toLowerCase();
+            const customerPhone = String(
+              a.order?.customer?.phone || a.order?.address?.phone || ""
+            ).toLowerCase();
+            const city = String(a.order?.address?.city || "").toLowerCase();
+            return (
+              orderIdStr.includes(q) ||
+              partnerName.includes(q) ||
+              statusStr.includes(q) ||
+              customerName.includes(q) ||
+              customerPhone.includes(q) ||
+              city.includes(q)
+            );
           });
 
           filteredAssignments.sort((a, b) => {
@@ -834,7 +848,7 @@ export default function AdminDeliveryTracking() {
                   </button>
                   <input
                     type="text"
-                    placeholder="Search order ID, partner, status..."
+                    placeholder="Search customer name, phone, order ID, partner..."
                     className="w-full md:w-72 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-white outline-none focus:border-teal-500 text-sm"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}

@@ -3,7 +3,11 @@ import { useAuth } from "../../context/AuthContext";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getAdminNavLinksForUser, hasAdminSection } from "../../lib/adminSections";
-import { getNewCustomersCount, getUnassignedWebsiteOrdersCount } from "../../lib/api";
+import {
+  getDueDatesAttentionCount,
+  getNewCustomersCount,
+  getUnassignedWebsiteOrdersCount
+} from "../../lib/api";
 import BrandLogo from "../../components/BrandLogo";
 
 interface NavLink {
@@ -116,11 +120,14 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [newCustomersCount, setNewCustomersCount] = useState(0);
   const [unassignedWebsiteCount, setUnassignedWebsiteCount] = useState(0);
+  const [dueDatesAttentionCount, setDueDatesAttentionCount] = useState(0);
 
   const canSeeNewCustomers =
     user?.role === "admin" && hasAdminSection(user, "new_customers");
   const canSeeDeliveries =
     user?.role === "admin" && hasAdminSection(user, "deliveries");
+  const canSeeDueDates =
+    user?.role === "admin" && hasAdminSection(user, "due_dates");
 
   const refreshNewCustomersCount = useCallback(async () => {
     if (!token || !canSeeNewCustomers) {
@@ -148,10 +155,29 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     }
   }, [token, canSeeDeliveries]);
 
+  const refreshDueDatesCount = useCallback(async () => {
+    if (!token || !canSeeDueDates) {
+      setDueDatesAttentionCount(0);
+      return;
+    }
+    try {
+      const res = await getDueDatesAttentionCount(token);
+      setDueDatesAttentionCount(Number(res.attentionCount) || 0);
+    } catch {
+      /* keep last known count */
+    }
+  }, [token, canSeeDueDates]);
+
   useEffect(() => {
     refreshNewCustomersCount();
     refreshUnassignedWebsiteCount();
-  }, [refreshNewCustomersCount, refreshUnassignedWebsiteCount, location.pathname]);
+    refreshDueDatesCount();
+  }, [
+    refreshNewCustomersCount,
+    refreshUnassignedWebsiteCount,
+    refreshDueDatesCount,
+    location.pathname
+  ]);
 
   useEffect(() => {
     if (!canSeeNewCustomers) return;
@@ -168,13 +194,28 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   }, [canSeeDeliveries, refreshUnassignedWebsiteCount]);
 
   useEffect(() => {
-    if (!canSeeNewCustomers && !canSeeDeliveries) return;
+    if (!canSeeDueDates) return;
+    const onRefresh = () => refreshDueDatesCount();
+    window.addEventListener("ff:due-dates-count", onRefresh);
+    return () => window.removeEventListener("ff:due-dates-count", onRefresh);
+  }, [canSeeDueDates, refreshDueDatesCount]);
+
+  useEffect(() => {
+    if (!canSeeNewCustomers && !canSeeDeliveries && !canSeeDueDates) return;
     const id = window.setInterval(() => {
       refreshNewCustomersCount();
       refreshUnassignedWebsiteCount();
+      refreshDueDatesCount();
     }, 60000);
     return () => window.clearInterval(id);
-  }, [canSeeNewCustomers, canSeeDeliveries, refreshNewCustomersCount, refreshUnassignedWebsiteCount]);
+  }, [
+    canSeeNewCustomers,
+    canSeeDeliveries,
+    canSeeDueDates,
+    refreshNewCustomersCount,
+    refreshUnassignedWebsiteCount,
+    refreshDueDatesCount
+  ]);
 
   const resolvedNavLinks = useMemo(() => {
     let links: NavLink[] =
@@ -193,11 +234,27 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
       ) {
         return { ...link, badgeCount: unassignedWebsiteCount };
       }
+      if (
+        canSeeDueDates &&
+        dueDatesAttentionCount > 0 &&
+        link.href === "/dashboard/admin/due-dates"
+      ) {
+        return { ...link, badgeCount: dueDatesAttentionCount };
+      }
       return link;
     });
 
     return links;
-  }, [user, navLinks, canSeeNewCustomers, newCustomersCount, canSeeDeliveries, unassignedWebsiteCount]);
+  }, [
+    user,
+    navLinks,
+    canSeeNewCustomers,
+    newCustomersCount,
+    canSeeDeliveries,
+    unassignedWebsiteCount,
+    canSeeDueDates,
+    dueDatesAttentionCount
+  ]);
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -217,7 +274,8 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     navigate("/login");
   };
 
-  const mobileAttentionCount = newCustomersCount + unassignedWebsiteCount;
+  const mobileAttentionCount =
+    newCustomersCount + unassignedWebsiteCount + dueDatesAttentionCount;
 
   const sidebarProps = {
     links: resolvedNavLinks,

@@ -60,12 +60,78 @@ export const loginUser = async (payload: AuthPayload) =>
     body: JSON.stringify(payload)
   });
 
+export const verifyEmailForPasswordReset = async (email: string) =>
+  request<{ exists: boolean; email?: string; name?: string; message: string }>(
+    "/auth/forgot-password/verify-email",
+    {
+      method: "POST",
+      body: JSON.stringify({ email })
+    }
+  );
+
+export const resetPasswordByEmail = async (payload: {
+  email: string;
+  password: string;
+  confirmPassword: string;
+}) =>
+  request<{ message: string }>("/auth/forgot-password/reset", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+
 export const getCurrentUser = async (token: string) =>
   request<{ user: AuthResponse["user"] }>("/auth/me", {
     headers: {
       Authorization: `Bearer ${token}`
     }
   });
+
+export const submitPartnerNda = async (
+  token: string,
+  payload: {
+    aadhaarNumber: string;
+    dlNumber: string;
+    bikeRcNumber: string;
+    bikeNumber: string;
+    phone?: string;
+    accepted: boolean;
+    downloaded: boolean;
+  }
+) =>
+  request<{ message: string; user: AuthResponse["user"] }>("/auth/partner-nda", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const downloadPartnerNdaPdf = async (
+  token: string,
+  draft?: {
+    aadhaarNumber?: string;
+    dlNumber?: string;
+    bikeRcNumber?: string;
+    bikeNumber?: string;
+    phone?: string;
+    partnerId?: string;
+  }
+) => {
+  const qs = new URLSearchParams();
+  if (draft?.aadhaarNumber) qs.set("aadhaarNumber", draft.aadhaarNumber);
+  if (draft?.dlNumber) qs.set("dlNumber", draft.dlNumber);
+  if (draft?.bikeRcNumber) qs.set("bikeRcNumber", draft.bikeRcNumber);
+  if (draft?.bikeNumber) qs.set("bikeNumber", draft.bikeNumber);
+  if (draft?.phone) qs.set("phone", draft.phone);
+  if (draft?.partnerId) qs.set("partnerId", draft.partnerId);
+  const query = qs.toString() ? `?${qs.toString()}` : "";
+  const response = await fetch(`${API_BASE}/auth/partner-nda.pdf${query}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message || "Failed to download NDA PDF");
+  }
+  return response.blob();
+};
 
 // ─── Products API ─────────────────────────────────────────────────────────────
 
@@ -962,6 +1028,16 @@ export const reorderAssignments = async (token: string, assignments: { id: strin
     body: JSON.stringify({ assignments })
   });
 
+export const adminReorderAssignments = async (
+  token: string,
+  assignments: { id: string; sequence: number }[]
+) =>
+  request<{ message: string }>("/orders/admin/assignments/reorder", {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ assignments })
+  });
+
 // ─── User Management API ─────────────────────────────────────────────────────────────
 
 export const getAllUsers = async (
@@ -1286,3 +1362,88 @@ export const downloadWalkInBill = async (token: string, saleId: string) => {
   }
   return response.blob();
 };
+
+// ─── Due Dates API ─────────────────────────────────────────────────────────────
+
+export type DueDateItem = {
+  _id: string;
+  title: string;
+  category: string;
+  dueDate: string;
+  recurrence: "none" | "monthly";
+  dayOfMonth?: number | null;
+  amount?: number | null;
+  notes?: string;
+  isActive: boolean;
+  acknowledgedForDate?: string;
+  nextDueDate: string;
+  daysUntil: number;
+  needsAttention: boolean;
+  isOverdue: boolean;
+  isAcknowledged: boolean;
+};
+
+export const getDueDates = async (token: string, includeInactive = false) => {
+  const q = includeInactive ? "?includeInactive=1" : "";
+  return request<{
+    today: string;
+    items: DueDateItem[];
+    attentionCount: number;
+    categories: string[];
+  }>(`/due-dates${q}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const getDueDatesAttentionCount = async (token: string) =>
+  request<{ today: string; attentionCount: number }>("/due-dates/attention-count", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createDueDate = async (
+  token: string,
+  payload: {
+    title: string;
+    category?: string;
+    dueDate: string;
+    recurrence?: "none" | "monthly";
+    amount?: number | null;
+    notes?: string;
+  }
+) =>
+  request<{ message: string; item: DueDateItem }>("/due-dates", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const updateDueDate = async (
+  token: string,
+  id: string,
+  payload: Partial<{
+    title: string;
+    category: string;
+    dueDate: string;
+    recurrence: "none" | "monthly";
+    amount: number | null;
+    notes: string;
+    isActive: boolean;
+  }>
+) =>
+  request<{ message: string; item: DueDateItem }>(`/due-dates/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const acknowledgeDueDate = async (token: string, id: string) =>
+  request<{ message: string; item: DueDateItem }>(`/due-dates/${id}/acknowledge`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const deleteDueDate = async (token: string, id: string) =>
+  request<{ message: string }>(`/due-dates/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });

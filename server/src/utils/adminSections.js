@@ -12,6 +12,7 @@ const ADMIN_SECTIONS = [
   { id: "deliveries", label: "Order Management" },
   { id: "all_orders", label: "ALL Orders" },
   { id: "today_delivery_status", label: "Today Delivery Status" },
+  { id: "manage_delivery_order_list", label: "Manage Delivery Order List" },
   { id: "partner_report", label: "Partner Report" },
   { id: "overall_reports", label: "Overall Reports" },
   { id: "pending_payments", label: "Pending Payments" },
@@ -29,6 +30,7 @@ const ADMIN_SECTIONS = [
   { id: "finance", label: "Manual Ledger" },
   { id: "availability", label: "Availability" },
   { id: "notifications", label: "Notifications" },
+  { id: "due_dates", label: "Due Dates" },
   { id: "walk_in", label: "Walk-in" },
   { id: "manual_booking", label: "Manual Booking" },
   { id: "manage_admins", label: "Manage Admins", fullOnly: true }

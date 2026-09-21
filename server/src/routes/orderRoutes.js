@@ -29,6 +29,7 @@ const {
   getDeliveryStats,
   getTodayDeliveryStatus,
   reorderAssignments,
+  adminReorderAssignments,
   createAdminOrder,
   adminUpdateDeliveryPayment
 } = require("../controllers/orderController");
@@ -40,6 +41,7 @@ const orderAdminAccess = authorizeAdminSections(
   "deliveries",
   "all_orders",
   "today_delivery_status",
+  "manage_delivery_order_list",
   "partner_report",
   "overall_reports",
   "pending_payments",
@@ -227,6 +229,16 @@ router.patch(
   [body("assignments").isArray().withMessage("Assignments array is required")],
   validateRequest,
   reorderAssignments
+);
+
+router.patch(
+  "/admin/assignments/reorder",
+  protect,
+  authorizeRoles("admin"),
+  orderAdminAccess,
+  [body("assignments").isArray().withMessage("Assignments array is required")],
+  validateRequest,
+  adminReorderAssignments
 );
 
 module.exports = router;

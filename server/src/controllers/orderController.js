@@ -116,6 +116,13 @@ const createOrder = async (req, res, next) => {
     }
 
     if (deliveryDate) {
+      // Same-day website orders: slot must start at least 2 hours from now
+      const { validateSameDayDeliverySlot } = require("../utils/deliverySlots");
+      const slotCheck = validateSameDayDeliverySlot(deliveryDate, deliveryTime);
+      if (!slotCheck.ok) {
+        return res.status(400).json({ message: slotCheck.message });
+      }
+
       const availability = await DateAvailability.findOne({ date: deliveryDate }).lean();
       if (availability) {
         if (availability.isClosed) {
@@ -584,6 +591,48 @@ const updateDeliveryStatus = async (req, res, next) => {
 
     if (status === "failed" && !String(notes || "").trim()) {
       return res.status(400).json({ message: "Reason is required for failed delivery." });
+    }
+
+    const currentStatus = String(existing.status || "");
+    const isOnTheWay = currentStatus === "en_route" || currentStatus === "picked_up";
+
+    // Step 1: On the way requires active hub trip
+    if (status === "en_route") {
+      if (["delivered", "failed", "cancelled"].includes(currentStatus)) {
+        return res.status(400).json({
+          message: "This delivery is already finished. You cannot mark On the way again."
+        });
+      }
+
+      const PartnerDeliveryTrip = require("../models/PartnerDeliveryTrip");
+      const { istYmd } = require("../utils/geoDistance");
+      const deliveryDate = String(existing.order.deliveryDate || "");
+      const today = istYmd();
+      const tripDate = /^\d{4}-\d{2}-\d{2}$/.test(deliveryDate) ? deliveryDate : today;
+      const trip = await PartnerDeliveryTrip.findOne({
+        deliveryPartner: req.user._id,
+        date: tripDate,
+        status: "active"
+      })
+        .select("_id status")
+        .lean();
+
+      if (!trip) {
+        return res.status(400).json({
+          message:
+            "Tap Start from hub first, then mark On the way. This is required for petrol km tracking."
+        });
+      }
+    }
+
+    // Step 2: Delivered / Failed only after On the way
+    if (status === "delivered" || status === "failed") {
+      if (!isOnTheWay) {
+        return res.status(400).json({
+          message:
+            "Mark On the way first, then you can set Delivered or Failed."
+        });
+      }
     }
 
     const wasAlreadyDelivered = existing.status === "delivered";
@@ -1465,6 +1514,31 @@ const reorderAssignments = async (req, res, next) => {
   }
 };
 
+/** Admin can reorder any partner's delivery sequence for the day. */
+const adminReorderAssignments = async (req, res, next) => {
+  try {
+    const { assignments } = req.body; // Array of { id, sequence }
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return res.status(400).json({ message: "Assignments array is required" });
+    }
+
+    const updates = assignments
+      .filter((a) => a && a.id != null && Number.isFinite(Number(a.sequence)))
+      .map((a) =>
+        DeliveryAssignment.updateOne({ _id: a.id }, { sequence: Number(a.sequence) })
+      );
+
+    if (!updates.length) {
+      return res.status(400).json({ message: "No valid assignment sequences to update" });
+    }
+
+    await Promise.all(updates);
+    res.json({ message: "Delivery order list updated" });
+  } catch (error) {
+    next(error);
+  }
+};
+
 const createAdminOrder = async (req, res, next) => {
   try {
     const {
@@ -2084,6 +2158,7 @@ module.exports = {
   getDeliveryStats,
   getTodayDeliveryStatus,
   reorderAssignments,
+  adminReorderAssignments,
   createAdminOrder,
   adminUpdateDeliveryPayment
 };

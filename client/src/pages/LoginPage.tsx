@@ -63,7 +63,12 @@ const LoginPage = () => {
         >
           {loading ? "Signing in..." : "Login"}
         </button>
-        <p className="mt-5 text-sm text-slate-300">
+        <p className="mt-4 text-sm text-right">
+          <Link to="/forgot-password" className="text-indigo-400 hover:text-indigo-300">
+            Forgot password?
+          </Link>
+        </p>
+        <p className="mt-3 text-sm text-slate-300">
           New user?{" "}
           <Link to="/register" className="text-indigo-400 hover:text-indigo-300">
             Create an account

@@ -42,7 +42,7 @@ const Footer = () => {
             <ul className="space-y-2 text-sm">
               <li>Email: fishfriendlymeats@gmail.com</li>
               <li>Phone: +91 9087894319</li>
-              <li>Address: Balusamy konnar street, Madakkulam, Bypass Road in Kalavasal, Madurai, Tamil Nadu - 625003</li>
+              <li>Address: 177, Kalai Nagar, Thanakkankulam, Madurai, Tamil Nadu - 625006</li>
             </ul>
           </div>
           

@@ -6,9 +6,9 @@ const SHOP = {
   name: "FISHFRIENDLY",
   email: "fishfriendlymeats@gmail.com",
   phone: "+91 9087894319",
-  addressLine1: "Balusamy konnar street, Madakkulam",
-  addressLine2: "Bypass Road in Kalavasal",
-  cityLine: "Madurai, Tamil Nadu - 625003"
+  addressLine1: "177, Kalai Nagar",
+  addressLine2: "Thanakkankulam",
+  cityLine: "Madurai, Tamil Nadu - 625006"
 };
 
 const { resolvePdfFonts } = require("./pdfFonts");

@@ -31,7 +31,8 @@ const getAllUsers = async (req, res, next) => {
     const shaped = users.map((u) => ({
       ...u,
       hasDocument: Boolean(u.documentUploadedAt || u.documentFileName || u.documentUrl),
-      documentTypeLabel: DOC_TYPE_LABELS[u.documentType] || u.documentType || ""
+      documentTypeLabel: DOC_TYPE_LABELS[u.documentType] || u.documentType || "",
+      hasNdaAccepted: Boolean(u.ndaAccepted || u.ndaAcceptedAt)
     }));
 
     res.json({ users: shaped });

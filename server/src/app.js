@@ -91,6 +91,7 @@ app.use("/api/booking-banner", require("./routes/bookingBannerRoutes"));
 app.use("/api/category-weekday-rules", require("./routes/categoryWeekdayRoutes"));
 app.use("/api/alert-emails", require("./routes/alertEmailRoutes"));
 app.use("/api/delivery-trips", require("./routes/deliveryTripRoutes"));
+app.use("/api/due-dates", require("./routes/dueDateRoutes"));
 
 app.use(notFound);
 app.use(errorHandler);

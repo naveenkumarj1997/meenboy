@@ -5,7 +5,8 @@ import {
   getAllUsers,
   updateUser,
   fetchPartnerDocumentBlob,
-  deletePartnerDocument
+  deletePartnerDocument,
+  downloadPartnerNdaPdf
 } from "../../lib/api";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 
@@ -72,6 +73,24 @@ export default function AdminPartnerApprovals() {
     }
   };
 
+  const handleDownloadNda = async (partner: any) => {
+    try {
+      setError("");
+      setBusyId(partner._id);
+      const blob = await downloadPartnerNdaPdf(token!, { partnerId: partner._id });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `NDA-${String(partner.name || "partner").replace(/\s+/g, "-")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || "Failed to download NDA PDF");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleDeleteDocument = async (partner: any) => {
     if (
       !window.confirm(
@@ -98,7 +117,7 @@ export default function AdminPartnerApprovals() {
   return (
     <DashboardShell
       title="Partner Approvals"
-      description="Review partner PDF proof (Aadhaar / DL / RC / Voter ID), then approve or reject. Delete docs after review to save DB space."
+      description="Review NDA hire details + PDF proof (Aadhaar / DL / RC / Voter ID), collect signed NDA printout, then approve or reject."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (
@@ -114,8 +133,7 @@ export default function AdminPartnerApprovals() {
             <thead className="bg-slate-800/50 text-slate-400 border-b border-slate-800">
               <tr>
                 <th className="px-6 py-4 font-medium">Applicant Details</th>
-                <th className="px-6 py-4 font-medium">Phone</th>
-                <th className="px-6 py-4 font-medium">Applied</th>
+                <th className="px-6 py-4 font-medium">NDA / Hire</th>
                 <th className="px-6 py-4 font-medium">Document</th>
                 <th className="px-6 py-4 font-medium">Actions</th>
               </tr>
@@ -123,13 +141,13 @@ export default function AdminPartnerApprovals() {
             <tbody className="divide-y divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
                     Loading pending applications...
                   </td>
                 </tr>
               ) : pendingPartners.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                  <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
                     <div className="text-4xl mb-3">✅</div>
                     <div>You're all caught up! No pending applications.</div>
                   </td>
@@ -137,22 +155,44 @@ export default function AdminPartnerApprovals() {
               ) : (
                 pendingPartners.map((partner) => {
                   const hasDoc = Boolean(partner.hasDocument);
+                  const hasNda = Boolean(partner.hasNdaAccepted);
+                  const canApprove = hasDoc && hasNda;
                   const busy = busyId === partner._id;
                   return (
                     <tr key={partner._id} className="hover:bg-slate-800/20">
                       <td className="px-6 py-4">
                         <div className="font-bold text-white">{partner.name}</div>
                         <div className="text-xs text-slate-400">{partner.email}</div>
+                        <div className="text-xs text-slate-500 mt-1">
+                          {partner.phone ? (
+                            <span className="text-teal-400">📞 {partner.phone}</span>
+                          ) : (
+                            <span className="italic">No phone</span>
+                          )}
+                          {" · "}
+                          {new Date(partner.createdAt).toLocaleString()}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
-                        {partner.phone ? (
-                          <span className="text-teal-400">📞 {partner.phone}</span>
+                        {hasNda ? (
+                          <div className="space-y-1 text-xs">
+                            <div className="text-emerald-400 font-medium">NDA accepted online</div>
+                            <div className="text-slate-400">Aadhaar: {partner.aadhaarNumber || "—"}</div>
+                            <div className="text-slate-400">DL: {partner.dlNumber || "—"}</div>
+                            <div className="text-slate-400">RC: {partner.bikeRcNumber || "—"}</div>
+                            <div className="text-slate-400">Bike: {partner.bikeNumber || "—"}</div>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => handleDownloadNda(partner)}
+                              className="mt-2 px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-300 text-xs font-bold hover:bg-teal-500/25 disabled:opacity-40"
+                            >
+                              Download NDA PDF
+                            </button>
+                          </div>
                         ) : (
-                          <span className="text-slate-500 italic">Not provided</span>
+                          <span className="text-amber-500/80 text-xs italic">Waiting for NDA</span>
                         )}
-                      </td>
-                      <td className="px-6 py-4 text-xs text-slate-400">
-                        {new Date(partner.createdAt).toLocaleString()}
                       </td>
                       <td className="px-6 py-4">
                         {hasDoc ? (
@@ -191,9 +231,13 @@ export default function AdminPartnerApprovals() {
                         <div className="flex flex-wrap gap-2 items-center">
                           <button
                             onClick={() => handleAction(partner._id, "active", partner.name)}
-                            disabled={!hasDoc || busy}
+                            disabled={!canApprove || busy}
                             className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white rounded-lg font-bold transition-colors shadow-lg disabled:opacity-30 disabled:cursor-not-allowed"
-                            title={!hasDoc ? "Cannot approve until document is uploaded" : ""}
+                            title={
+                              !canApprove
+                                ? "Need NDA accepted + document uploaded before approve"
+                                : "Collect signed NDA paper, then approve"
+                            }
                           >
                             Approve
                           </button>
@@ -233,9 +277,20 @@ export default function AdminPartnerApprovals() {
                   <div className="text-white font-medium">{partner.name}</div>
                   <div className="text-xs text-slate-500">
                     {partner.status} · {partner.documentTypeLabel || partner.documentType || "PDF"}
+                    {partner.hasNdaAccepted ? " · NDA ok" : ""}
                   </div>
                 </div>
                 <div className="flex gap-2">
+                  {partner.hasNdaAccepted && (
+                    <button
+                      type="button"
+                      disabled={busyId === partner._id}
+                      onClick={() => handleDownloadNda(partner)}
+                      className="px-3 py-1.5 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-300 text-xs font-bold"
+                    >
+                      NDA PDF
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={busyId === partner._id}

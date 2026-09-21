@@ -11,6 +11,7 @@ import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
 import AdminAllOrders from "./pages/dashboards/AdminAllOrders";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
 import AdminTodayDeliveryStatus from "./pages/dashboards/AdminTodayDeliveryStatus";
+import AdminManageDeliveryOrderList from "./pages/dashboards/AdminManageDeliveryOrderList";
 import AdminOverallReports from "./pages/dashboards/AdminOverallReports";
 import AdminPendingPayments from "./pages/dashboards/AdminPendingPayments";
 import AdminCollectedPayments from "./pages/dashboards/AdminCollectedPayments";
@@ -27,6 +28,7 @@ import AdminMoneyManagement from "./pages/dashboards/AdminMoneyManagement";
 import AdminExpenses from "./pages/dashboards/AdminExpenses";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
 import AdminNotifications from "./pages/dashboards/AdminNotifications";
+import AdminDueDates from "./pages/dashboards/AdminDueDates";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
 import AdminWalkIn from "./pages/dashboards/AdminWalkIn";
 import AdminProfile from "./pages/dashboards/AdminProfile";
@@ -38,6 +40,7 @@ import DeliveryDashboard from "./pages/dashboards/DeliveryDashboard";
 import CustomerDeliveryStatus from "./pages/dashboards/CustomerDeliveryStatus";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import RegisterPage from "./pages/RegisterPage";
 import UnauthorizedPage from "./pages/UnauthorizedPage";
 
@@ -100,6 +103,7 @@ function App() {
 
         {/* Auth Pages */}
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/unauthorized" element={<UnauthorizedPage />} />
 
@@ -121,6 +125,7 @@ function App() {
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
           <Route path="/dashboard/admin/all-orders" element={<AdminAllOrders />} />
           <Route path="/dashboard/admin/today-delivery-status" element={<AdminTodayDeliveryStatus />} />
+          <Route path="/dashboard/admin/manage-delivery-order-list" element={<AdminManageDeliveryOrderList />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />
           <Route path="/dashboard/admin/overall-reports" element={<AdminOverallReports />} />
           <Route path="/dashboard/admin/pending-payments" element={<AdminPendingPayments />} />
@@ -138,6 +143,7 @@ function App() {
           <Route path="/dashboard/admin/expenses" element={<AdminExpenses />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
           <Route path="/dashboard/admin/notifications" element={<AdminNotifications />} />
+          <Route path="/dashboard/admin/due-dates" element={<AdminDueDates />} />
           <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />
           <Route path="/dashboard/admin/manual-booking" element={<AdminManualBooking />} />
           <Route path="/dashboard/admin/manage-admins" element={<AdminManageAdmins />} />

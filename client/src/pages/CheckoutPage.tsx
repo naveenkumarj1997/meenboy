@@ -15,7 +15,15 @@ import {
 } from "../lib/maduraiDelivery";
 import OrderPriceNotice from "../components/OrderPriceNotice";
 import { SHOP_PHONE_DISPLAY, SHOP_PHONE_TEL, shopWhatsAppUrl } from "../lib/shopContact";
-import { DELIVERY_TIMES, DEFAULT_DELIVERY_TIME } from "../lib/deliveryTimes";
+import {
+  DEFAULT_DELIVERY_TIME,
+  SAME_DAY_ETA_HOURS,
+  SAME_DAY_ONLINE_CUTOFF_HOUR,
+  getAvailableDeliveryTimes,
+  getExpectedDeliveryAround,
+  isSameDayDeliveryDate,
+  mustContactAdminForSameDay
+} from "../lib/deliveryTimes";
 
 const CART_CHECK_DATE_KEY = "meenboy_cart_check_date";
 
@@ -136,6 +144,37 @@ const CheckoutPage = () => {
   const [availabilityError, setAvailabilityError] = useState<string | null>(null);
   const [availabilityNotices, setAvailabilityNotices] = useState<string[]>([]);
   const [unavailableByCartId, setUnavailableByCartId] = useState<Record<string, ItemAvailability>>({});
+  const [nowTick, setNowTick] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const now = useMemo(() => new Date(nowTick), [nowTick]);
+  const sameDaySelected = isSameDayDeliveryDate(form.deliveryDate, now);
+  const contactAdminSameDay = mustContactAdminForSameDay(form.deliveryDate, now);
+  const availableSlots = useMemo(
+    () => getAvailableDeliveryTimes(form.deliveryDate, now),
+    [form.deliveryDate, now]
+  );
+  const noOnlineSameDaySlots =
+    sameDaySelected && (contactAdminSameDay || availableSlots.length === 0);
+  const expectedDelivery = useMemo(() => getExpectedDeliveryAround(now), [now]);
+
+  useEffect(() => {
+    if (!form.deliveryDate || contactAdminSameDay) return;
+    if (availableSlots.length === 0) {
+      if (form.deliveryTime) {
+        setForm((prev) => ({ ...prev, deliveryTime: "" }));
+      }
+      return;
+    }
+    if (!availableSlots.includes(form.deliveryTime)) {
+      setForm((prev) => ({ ...prev, deliveryTime: availableSlots[0] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.deliveryDate, availableSlots, contactAdminSameDay]);
 
   const deliveryZoneError = useMemo(() => {
     const cityFilled = form.city.trim().length > 0;
@@ -299,6 +338,31 @@ const CheckoutPage = () => {
       isValid = false;
     }
 
+    if (
+      isSameDayDeliveryDate(form.deliveryDate) &&
+      mustContactAdminForSameDay(form.deliveryDate)
+    ) {
+      newErrors.deliveryTime =
+        "Same-day after 9:00 AM — please contact admin to confirm delivery.";
+      isValid = false;
+    } else if (
+      isSameDayDeliveryDate(form.deliveryDate) &&
+      getAvailableDeliveryTimes(form.deliveryDate).length === 0
+    ) {
+      newErrors.deliveryTime =
+        "No morning slots left today. Contact admin or pick another date.";
+      isValid = false;
+    } else if (!form.deliveryTime) {
+      newErrors.deliveryTime = "Delivery time slot is required";
+      isValid = false;
+    } else if (
+      isSameDayDeliveryDate(form.deliveryDate) &&
+      !getAvailableDeliveryTimes(form.deliveryDate).includes(form.deliveryTime)
+    ) {
+      newErrors.deliveryTime = "That slot has passed. Pick a later morning slot.";
+      isValid = false;
+    }
+
     setErrors(newErrors);
     return isValid;
   };
@@ -316,6 +380,14 @@ const CheckoutPage = () => {
     }
     if (availabilityError) {
       alert(availabilityError);
+      return;
+    }
+    if (noOnlineSameDaySlots) {
+      alert(
+        contactAdminSameDay
+          ? "Same-day orders after 9:00 AM need admin confirmation. Please call or WhatsApp the shop."
+          : "No morning slots left today. Please contact admin or choose another date."
+      );
       return;
     }
 
@@ -360,6 +432,37 @@ const CheckoutPage = () => {
         provider: selectedMethod,
         amount: cartTotal
       });
+
+      // Free admin ping without SMTP: open WhatsApp to shop with order details
+      const itemLines = cartItems
+        .map(
+          (item) =>
+            `• ${item.name}${item.cutName ? ` (${item.cutName})` : ""} × ${item.quantity}${item.unit || ""}`
+        )
+        .join("\n");
+      const waMsg = [
+        "🔔 NEW WEBSITE ORDER",
+        `Order: #${String(orderId).slice(-6).toUpperCase()}`,
+        `Customer: ${form.name}`,
+        `Phone: ${form.phone}${form.alternatePhone.trim() ? ` / ${form.alternatePhone.trim()}` : ""}`,
+        `Delivery: ${form.deliveryDate} · ${form.deliveryTime}`,
+        sameDaySelected
+          ? `Expected ~${expectedDelivery.label} (+${SAME_DAY_ETA_HOURS} hrs from order)`
+          : null,
+        `Address: ${line1}, ${form.area.trim()}, ${MADURAI_CITY} - ${form.pincode.trim()}`,
+        `Approx total: ₹${formatPrice(cartTotal)} (COD)`,
+        "",
+        "Items:",
+        itemLines || "-"
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      try {
+        window.open(shopWhatsAppUrl(waMsg), "_blank", "noopener,noreferrer");
+      } catch {
+        /* ignore popup blockers */
+      }
 
       clearCart();
       navigate("/payment-status", { 
@@ -608,18 +711,84 @@ const CheckoutPage = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-white/60 mb-1.5">Time Slot *</label>
-                  <select
-                    value={form.deliveryTime}
-                    onChange={(e) => setForm({ ...form, deliveryTime: e.target.value })}
-                    className="w-full bg-cyan-950/50 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors"
-                  >
-                    {DELIVERY_TIMES.map((slot) => (
-                      <option key={slot} value={slot}>
-                        {slot}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-white/40 text-xs mt-1.5">Morning delivery window: 6 AM to 11 AM.</p>
+                  {noOnlineSameDaySlots ? (
+                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 space-y-3">
+                      {contactAdminSameDay ? (
+                        <>
+                          <p className="font-semibold text-amber-200">
+                            Same-day after {SAME_DAY_ONLINE_CUTOFF_HOUR}:00 AM — contact admin
+                          </p>
+                          <p className="text-amber-100/90 text-xs leading-relaxed">
+                            Online slot booking closes at {SAME_DAY_ONLINE_CUTOFF_HOUR}:00 AM for
+                            today. Please call or WhatsApp to confirm. Approximate delivery is about{" "}
+                            {SAME_DAY_ETA_HOURS} hours from now — around{" "}
+                            <span className="font-bold text-white">{expectedDelivery.label}</span>
+                            {` (e.g. order now → ~${expectedDelivery.label}).`}
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-amber-200">
+                            No morning slots left for today
+                          </p>
+                          <p className="text-amber-100/90 text-xs leading-relaxed">
+                            Please contact admin to confirm, or choose another date. Approx delivery
+                            if confirmed: around{" "}
+                            <span className="font-bold text-white">{expectedDelivery.label}</span>.
+                          </p>
+                        </>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={SHOP_PHONE_TEL}
+                          className="inline-flex items-center px-3 py-2 rounded-lg bg-teal-500 text-white text-xs font-bold hover:bg-teal-400"
+                        >
+                          Call admin {SHOP_PHONE_DISPLAY}
+                        </a>
+                        <a
+                          href={shopWhatsAppUrl(
+                            contactAdminSameDay
+                              ? `Hi Fish Friendly, I want same-day delivery today (ordered after 9 AM). Approx delivery around ${expectedDelivery.label}. Please confirm.\nName: ${form.name || "-"}\nPhone: ${form.phone || "-"}`
+                              : `Hi Fish Friendly, I want same-day delivery but morning slots are over. Approx around ${expectedDelivery.label}. Please confirm.\nName: ${form.name || "-"}\nPhone: ${form.phone || "-"}`
+                          )}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 text-xs font-bold hover:bg-emerald-500/25"
+                        >
+                          WhatsApp admin
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        value={form.deliveryTime}
+                        onChange={(e) => setForm({ ...form, deliveryTime: e.target.value })}
+                        className={`w-full bg-cyan-950/50 border ${errors.deliveryTime ? "border-red-500" : "border-white/10"} rounded-xl px-4 py-3 text-white focus:outline-none focus:border-teal-500 transition-colors`}
+                      >
+                        {availableSlots.map((slot) => (
+                          <option key={slot} value={slot}>
+                            {slot}
+                          </option>
+                        ))}
+                      </select>
+                      {sameDaySelected ? (
+                        <p className="text-teal-300/90 text-xs mt-1.5">
+                          Same-day online booking is open until {SAME_DAY_ONLINE_CUTOFF_HOUR}:00 AM.
+                          Approx delivery if you order now: around{" "}
+                          <span className="font-semibold text-teal-200">{expectedDelivery.label}</span>{" "}
+                          (+{SAME_DAY_ETA_HOURS} hours).
+                        </p>
+                      ) : (
+                        <p className="text-white/40 text-xs mt-1.5">
+                          Morning delivery window: 5:00 AM to 11:00 AM.
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {errors.deliveryTime && (
+                    <p className="text-red-400 text-xs mt-1.5">{errors.deliveryTime}</p>
+                  )}
                 </div>
               </div>
             </section>
@@ -787,8 +956,8 @@ const CheckoutPage = () => {
 
           <button
             onClick={handleSubmit}
-            disabled={isSubmitting || !!availabilityError || !!deliveryZoneError}
-            className={`w-full bg-teal-500 hover:bg-teal-400 text-white font-bold py-4 rounded-xl shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 ${(isSubmitting || availabilityError || deliveryZoneError) ? 'opacity-75 cursor-not-allowed' : ''}`}
+            disabled={isSubmitting || !!availabilityError || !!deliveryZoneError || noOnlineSameDaySlots}
+            className={`w-full bg-teal-500 hover:bg-teal-400 text-white font-bold py-4 rounded-xl shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 ${(isSubmitting || availabilityError || deliveryZoneError || noOnlineSameDaySlots) ? 'opacity-75 cursor-not-allowed' : ''}`}
           >
             {isSubmitting ? (
               <>

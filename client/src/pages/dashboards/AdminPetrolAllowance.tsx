@@ -124,7 +124,7 @@ export default function AdminPetrolAllowance() {
   return (
     <DashboardShell
       title="Petrol Allowance"
-      description="Hub→hub GPS trail km (Start / End trip + 30s pings). Enter petrol ₹ manually."
+      description="Hub→hub GPS trail km (Start / End trip + 15s pings). Enter petrol ₹ manually."
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (

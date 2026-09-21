@@ -92,6 +92,37 @@ const userSchema = new mongoose.Schema(
     documentUploadedAt: {
       type: Date
     },
+    /** Delivery partner hire / NDA onboarding */
+    aadhaarNumber: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    dlNumber: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    bikeRcNumber: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    bikeNumber: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    ndaAccepted: {
+      type: Boolean,
+      default: false
+    },
+    ndaAcceptedAt: {
+      type: Date
+    },
+    ndaDownloadedAt: {
+      type: Date
+    },
     address: {
       line1: { type: String, trim: true },
       line2: { type: String, trim: true },

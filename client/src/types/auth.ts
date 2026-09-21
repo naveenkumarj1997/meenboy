@@ -8,6 +8,13 @@ export interface User {
   role: Role;
   status?: string;
   phone?: string;
+  hasDocument?: boolean;
+  hasNdaAccepted?: boolean;
+  aadhaarNumber?: string;
+  dlNumber?: string;
+  bikeRcNumber?: string;
+  bikeNumber?: string;
+  ndaAcceptedAt?: string | null;
   /** Empty / missing = full admin (legacy). Non-empty = limited sections. */
   adminSections?: string[];
   /** Explicit full vs limited; prefer this when present. */

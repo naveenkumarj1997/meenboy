@@ -11,6 +11,7 @@ export type AdminSectionId =
   | "deliveries"
   | "all_orders"
   | "today_delivery_status"
+  | "manage_delivery_order_list"
   | "partner_report"
   | "overall_reports"
   | "pending_payments"
@@ -28,6 +29,7 @@ export type AdminSectionId =
   | "finance"
   | "availability"
   | "notifications"
+  | "due_dates"
   | "walk_in"
   | "manual_booking"
   | "manage_admins";
@@ -66,6 +68,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
     label: "Today Delivery Status",
     href: "/dashboard/admin/today-delivery-status"
   },
+  {
+    id: "manage_delivery_order_list",
+    label: "Manage Delivery Order List",
+    href: "/dashboard/admin/manage-delivery-order-list"
+  },
   { id: "partner_report", label: "Partner Report", href: "/dashboard/admin/partner-report" },
   { id: "overall_reports", label: "Overall Reports", href: "/dashboard/admin/overall-reports" },
   { id: "pending_payments", label: "Pending Payments", href: "/dashboard/admin/pending-payments" },
@@ -103,6 +110,7 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   { id: "finance", label: "Manual Ledger", href: "/dashboard/admin/finance" },
   { id: "availability", label: "Availability", href: "/dashboard/admin/availability" },
   { id: "notifications", label: "Notifications", href: "/dashboard/admin/notifications" },
+  { id: "due_dates", label: "Due Dates", href: "/dashboard/admin/due-dates" },
   { id: "walk_in", label: "Walk-in", href: "/dashboard/admin/walk-in" },
   { id: "manual_booking", label: "Manual Booking", href: "/dashboard/admin/manual-booking" },
   {

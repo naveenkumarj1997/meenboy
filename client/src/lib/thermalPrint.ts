@@ -171,9 +171,9 @@ export const printThermalBill = (sale: ThermalBillInput) => {
   <div class="center">
     <div class="shop">FISH FRIENDLY</div>
     <div class="addr">
-      Balusamy konnar street, Madakkulam<br/>
-      Bypass Road, Kalavasal<br/>
-      Madurai - 625003<br/>
+      177, Kalai Nagar<br/>
+      Thanakkankulam<br/>
+      Madurai - 625006<br/>
       Ph: +91 9087894319
     </div>
     <div class="badge">${badge}</div>

@@ -10,6 +10,8 @@ import {
   startMyDeliveryTrip,
   pingMyDeliveryTrip,
   endMyDeliveryTrip,
+  submitPartnerNda,
+  downloadPartnerNdaPdf,
   type DeliveryTripPayload
 } from "../../lib/api";
 import { formatQuantityLabel } from "../../lib/weightOptions";
@@ -50,7 +52,209 @@ const capturePartnerGps = (): Promise<{ lat: number; lng: number } | undefined> 
     );
   });
 
-function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: () => void }) {
+function PartnerNdaForm({
+  token,
+  initialPhone,
+  onSuccess
+}: {
+  token: string;
+  initialPhone?: string;
+  onSuccess: () => void;
+}) {
+  const [aadhaarNumber, setAadhaarNumber] = useState("");
+  const [dlNumber, setDlNumber] = useState("");
+  const [bikeRcNumber, setBikeRcNumber] = useState("");
+  const [bikeNumber, setBikeNumber] = useState("");
+  const [phone, setPhone] = useState(initialPhone || "");
+  const [downloaded, setDownloaded] = useState(false);
+  const [accepted, setAccepted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+
+  const draft = {
+    aadhaarNumber: aadhaarNumber.trim(),
+    dlNumber: dlNumber.trim(),
+    bikeRcNumber: bikeRcNumber.trim(),
+    bikeNumber: bikeNumber.trim().toUpperCase(),
+    phone: phone.trim()
+  };
+
+  const handleDownload = async () => {
+    if (!draft.aadhaarNumber || !draft.dlNumber || !draft.bikeRcNumber || !draft.bikeNumber) {
+      setError("Fill Aadhaar, DL, bike RC, and bike number before downloading the NDA PDF.");
+      return;
+    }
+    try {
+      setDownloading(true);
+      setError("");
+      const blob = await downloadPartnerNdaPdf(token, draft);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "FishFriendly-Partner-NDA.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+      setDownloaded(true);
+      setInfo("NDA PDF downloaded. Print it, sign by hand, and give the signed copy to admin.");
+    } catch (err: any) {
+      setError(err.message || "Failed to download NDA PDF");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!downloaded) {
+      setError("Download the NDA PDF first, then accept the agreement.");
+      return;
+    }
+    if (!accepted) {
+      setError("Please accept the NDA agreement to continue.");
+      return;
+    }
+    try {
+      setLoading(true);
+      setError("");
+      await submitPartnerNda(token, {
+        ...draft,
+        accepted: true,
+        downloaded: true
+      });
+      onSuccess();
+    } catch (err: any) {
+      setError(err.message || "Failed to submit NDA details");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 mt-10">
+      <h2 className="text-xl font-bold text-white mb-2">Partner hire &amp; NDA</h2>
+      <p className="text-sm text-slate-400 mb-6">
+        Enter your details, download the NDA PDF, print and sign it manually, then accept the
+        agreement here. After that you can upload ID proof for admin approval.
+      </p>
+
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+          {error}
+        </div>
+      )}
+      {info && (
+        <div className="mb-4 p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-sm">
+          {info}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            Aadhaar number
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="XXXX XXXX XXXX"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            value={aadhaarNumber}
+            onChange={(e) => setAadhaarNumber(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            DL number
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="Driving licence number"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            value={dlNumber}
+            onChange={(e) => setDlNumber(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            Bike RC number
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="RC book number"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            value={bikeRcNumber}
+            onChange={(e) => setBikeRcNumber(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            Bike number
+          </label>
+          <input
+            type="text"
+            required
+            placeholder="e.g. TN 58 AB 1234"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500 uppercase"
+            value={bikeNumber}
+            onChange={(e) => setBikeNumber(e.target.value.toUpperCase())}
+          />
+        </div>
+        <div>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            Phone number
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. 9876543210"
+            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+        >
+          {downloading
+            ? "Preparing PDF..."
+            : downloaded
+              ? "Download NDA PDF again"
+              : "Download NDA form PDF"}
+        </button>
+
+        <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1 accent-teal-500"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+          />
+          <span>
+            I have downloaded the NDA PDF, will print and sign it by hand, and give the signed copy
+            to the admin. I accept the confidentiality and hire terms.
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={loading || !downloaded || !accepted}
+          className="w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+        >
+          {loading ? "Saving..." : "Accept & continue"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function DocumentUploadForm({ token, onSuccess }: { token: string; onSuccess: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [phone, setPhone] = useState("");
   const [documentType, setDocumentType] = useState("aadhaar");
@@ -86,18 +290,24 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: ()
     <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 mt-10">
       <h2 className="text-xl font-bold text-white mb-4">Required Document</h2>
       <p className="text-sm text-slate-400 mb-6">
-        Upload <span className="text-teal-300 font-medium">any one</span> PDF proof:
-        Aadhaar, Driving License, RC Book, or Voter ID.
-        File must be under <span className="text-amber-300 font-medium">200 KB</span>.
+        Upload <span className="text-teal-300 font-medium">any one</span> PDF proof: Aadhaar,
+        Driving License, RC Book, or Voter ID. File must be under{" "}
+        <span className="text-amber-300 font-medium">200 KB</span>.
       </p>
 
-      {error && <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">{error}</div>}
+      {error && (
+        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+          {error}
+        </div>
+      )}
 
       <form onSubmit={handleUpload} className="space-y-4">
         <div>
-          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Phone Number</label>
-          <input 
-            type="text" 
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            Phone Number
+          </label>
+          <input
+            type="text"
             required
             placeholder="e.g. 9876543210"
             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
@@ -107,7 +317,9 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: ()
         </div>
 
         <div>
-          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Document Type</label>
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            Document Type
+          </label>
           <select
             required
             value={documentType}
@@ -122,22 +334,26 @@ function DocumentUploadForm({ token, onSuccess }: { token: string, onSuccess: ()
         </div>
 
         <div>
-          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">PDF Document (max 200 KB)</label>
-          <input 
-            type="file" 
+          <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+            PDF Document (max 200 KB)
+          </label>
+          <input
+            type="file"
             accept="application/pdf,.pdf"
             required
             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-teal-500/20 file:text-teal-400 hover:file:bg-teal-500/30 cursor-pointer"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           {file && (
-            <p className={`text-xs mt-2 ${file.size > 200 * 1024 ? "text-rose-400" : "text-slate-500"}`}>
+            <p
+              className={`text-xs mt-2 ${file.size > 200 * 1024 ? "text-rose-400" : "text-slate-500"}`}
+            >
               Selected: {file.name} ({Math.round(file.size / 1024)} KB)
             </p>
           )}
         </div>
 
-        <button 
+        <button
           type="submit"
           disabled={loading || !file || !phone}
           className="w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4"
@@ -159,7 +375,7 @@ function getLocalDateStr(offsetDays = 0) {
 }
 
 export default function DeliveryDashboard() {
-  const { token, user } = useAuth();
+  const { token, user, refreshUser } = useAuth();
   const [assignments, setAssignments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -189,6 +405,7 @@ export default function DeliveryDashboard() {
   const [trip, setTrip] = useState<DeliveryTripPayload | null>(null);
   const [tripBusy, setTripBusy] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(true);
+  const [gpsOffWarning, setGpsOffWarning] = useState(false);
   const pingLock = useRef(false);
 
   const refreshTrip = async () => {
@@ -212,16 +429,23 @@ export default function DeliveryDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, user?.status]);
 
-  // Auto GPS every 30s while trip is active
+  // Auto GPS every 15s while trip is active (tighter trail for curves / bends)
   useEffect(() => {
-    if (!token || trip?.status !== "active") return;
+    if (!token || trip?.status !== "active") {
+      if (trip?.status !== "active") setGpsOffWarning(false);
+      return;
+    }
 
     const sendPing = async () => {
       if (pingLock.current) return;
       pingLock.current = true;
       try {
         const location = await capturePartnerGps();
-        if (!location) return;
+        if (!location) {
+          setGpsOffWarning(true);
+          return;
+        }
+        setGpsOffWarning(false);
         const res = await pingMyDeliveryTrip(token, location);
         setTrip(res.trip);
       } catch {
@@ -232,7 +456,7 @@ export default function DeliveryDashboard() {
     };
 
     sendPing();
-    const id = window.setInterval(sendPing, 30000);
+    const id = window.setInterval(sendPing, 15000);
     return () => window.clearInterval(id);
   }, [token, trip?.status]);
 
@@ -263,6 +487,11 @@ export default function DeliveryDashboard() {
       setTripBusy(true);
       setError("");
       const location = await capturePartnerGps();
+      if (!location) {
+        setGpsOffWarning(true);
+      } else {
+        setGpsOffWarning(false);
+      }
       const res = await endMyDeliveryTrip(token, location);
       setTrip(res.trip);
       setSuccess(res.message || "Trip ended. Petrol km saved.");
@@ -332,8 +561,13 @@ export default function DeliveryDashboard() {
 
   const openStatusModal = (assignment: any) => {
     setSelectedAssignment(assignment);
+    const tripActive = trip?.status === "active";
+    const onTheWay = ["en_route", "picked_up"].includes(String(assignment.status || ""));
+    let nextStatus = "en_route";
+    if (onTheWay) nextStatus = "delivered";
+    else if (!tripActive) nextStatus = "en_route";
     setStatusForm({
-      status: "delivered",
+      status: nextStatus,
       notes: "",
       paymentCollected: assignment.order?.total || 0,
       paymentMethod: "cash"
@@ -367,6 +601,24 @@ export default function DeliveryDashboard() {
 
   const submitStatus = async () => {
     if (!selectedAssignment) return;
+
+    const tripActive = trip?.status === "active";
+    const onTheWay = ["en_route", "picked_up"].includes(
+      String(selectedAssignment.status || "")
+    );
+
+    if (statusForm.status === "en_route" && !tripActive) {
+      setError("Tap Start from hub first, then mark On the way.");
+      return;
+    }
+
+    if (
+      (statusForm.status === "delivered" || statusForm.status === "failed") &&
+      !onTheWay
+    ) {
+      setError("Mark On the way first, then you can set Delivered or Failed.");
+      return;
+    }
 
     if (statusForm.status === "failed" && !statusForm.notes.trim()) {
       setError("Please enter a reason for failed delivery.");
@@ -412,6 +664,9 @@ export default function DeliveryDashboard() {
         const location = await capturePartnerGps();
         if (location) {
           payload.location = location;
+          setGpsOffWarning(false);
+        } else if (trip?.status === "active") {
+          setGpsOffWarning(true);
         }
       }
 
@@ -429,28 +684,70 @@ export default function DeliveryDashboard() {
   const [localHasDocument, setLocalHasDocument] = useState<boolean>(
     Boolean((user as any)?.hasDocument || (user as any)?.documentUrl || (user as any)?.documentUploadedAt)
   );
+  const [localHasNda, setLocalHasNda] = useState<boolean>(
+    Boolean(user?.hasNdaAccepted || user?.ndaAcceptedAt)
+  );
 
   if (user?.status === "pending") {
+    if (!localHasNda) {
+      return (
+        <DashboardShell
+          title="Delivery Partner Dashboard"
+          description={`Welcome, ${user?.name}.`}
+          navLinks={NAV_LINKS}
+        >
+          <PartnerNdaForm
+            token={token!}
+            initialPhone={user?.phone}
+            onSuccess={async () => {
+              setLocalHasNda(true);
+              try {
+                await refreshUser();
+              } catch {
+                /* keep local gate */
+              }
+            }}
+          />
+        </DashboardShell>
+      );
+    }
+
     if (!localHasDocument) {
       return (
-        <DashboardShell title="Delivery Partner Dashboard" description={`Welcome, ${user?.name}.`} navLinks={NAV_LINKS}>
-          <DocumentUploadForm 
-            token={token!} 
-            onSuccess={() => setLocalHasDocument(true)} 
+        <DashboardShell
+          title="Delivery Partner Dashboard"
+          description={`Welcome, ${user?.name}.`}
+          navLinks={NAV_LINKS}
+        >
+          <DocumentUploadForm
+            token={token!}
+            onSuccess={async () => {
+              setLocalHasDocument(true);
+              try {
+                await refreshUser();
+              } catch {
+                /* keep local gate */
+              }
+            }}
           />
         </DashboardShell>
       );
     }
 
     return (
-      <DashboardShell title="Delivery Partner Dashboard" description={`Welcome, ${user?.name}.`} navLinks={NAV_LINKS}>
+      <DashboardShell
+        title="Delivery Partner Dashboard"
+        description={`Welcome, ${user?.name}.`}
+        navLinks={NAV_LINKS}
+      >
         <div className="flex flex-col items-center justify-center py-20 text-center">
           <div className="w-16 h-16 bg-amber-500/10 text-amber-500 text-3xl rounded-full flex items-center justify-center mb-6 border border-amber-500/20">
             ⏳
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Waiting for Admin Approval</h2>
           <p className="text-slate-400 max-w-md mx-auto">
-            Your verification document has been submitted. You will be able to access your deliveries once an admin approves your account.
+            Your NDA details and verification document have been submitted. Give the signed NDA
+            printout to admin. You will access deliveries once an admin approves your account.
           </p>
         </div>
       </DashboardShell>
@@ -525,6 +822,15 @@ export default function DeliveryDashboard() {
     >
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
       {success && <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">{success}</div>}
+      {gpsOffWarning && trip?.status === "active" ? (
+        <div className="mb-6 p-4 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-100">
+          <div className="font-bold text-amber-200">GPS is off now</div>
+          <p className="text-sm mt-1 text-amber-100/90">
+            Your petrol allowance is not calculated correctly. Please turn on location / GPS.
+            You can continue deliveries — turn GPS on whenever you can.
+          </p>
+        </div>
+      ) : null}
 
       {/* Hub trip petrol tracking — one trip/day, auto-end after 1 PM IST */}
       <div className="mb-6 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-slate-900/80 p-5">
@@ -532,17 +838,27 @@ export default function DeliveryDashboard() {
           <div>
             <h3 className="text-lg font-bold text-white">Petrol trip (hub → deliveries → hub)</h3>
             <p className="text-sm text-slate-400 mt-1">
-              Start at hub before first delivery. Keep the app open — GPS saves every 30s. Waiting at
-              chicken/mutton shop is OK (same place barely adds km). End when you return to hub. Auto-ends
-              after 1:00 PM if you forget.
+              You must tap <span className="text-teal-300 font-semibold">Start from hub</span>, then
+              mark <span className="text-teal-300 font-semibold">On the way</span> first. Only after
+              that can you set <span className="text-teal-300 font-semibold">Delivered</span> or{" "}
+              <span className="text-teal-300 font-semibold">Failed</span>.
+              Keep the app open — GPS saves every 15s. Waiting at chicken/mutton shop is OK (same place
+              barely adds km). End when you return to hub. Auto-ends after 1:00 PM if you forget.
             </p>
+            {gpsOffWarning && trip?.status === "active" ? (
+              <p className="text-sm text-amber-300 mt-2 font-semibold">
+                GPS off — petrol km may be wrong until you turn it on.
+              </p>
+            ) : null}
             {trip ? (
               <p className="text-sm text-teal-300 mt-2 font-medium">
                 Status: {trip.status.replace("_", " ")} · {Number(trip.totalKm || 0).toFixed(2)} km ·{" "}
                 {trip.pointCount} GPS points
               </p>
             ) : (
-              <p className="text-sm text-slate-500 mt-2">No trip started today yet.</p>
+              <p className="text-sm text-amber-300 mt-2 font-medium">
+                No trip started — Start from hub, then On the way, then Delivered / Failed.
+              </p>
             )}
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
@@ -788,6 +1104,29 @@ export default function DeliveryDashboard() {
                       >
                         Update Status
                       </button>
+                      {trip?.status !== "active" &&
+                      a.order?.deliveryDate === todayStr &&
+                      !["delivered", "failed", "cancelled", "en_route", "picked_up"].includes(
+                        a.status
+                      ) ? (
+                        <p className="text-[10px] text-amber-300/90 text-center leading-snug">
+                          Flow: Start hub → On the way → Delivered/Failed
+                        </p>
+                      ) : null}
+                      {trip?.status === "active" &&
+                      a.order?.deliveryDate === todayStr &&
+                      !["delivered", "failed", "cancelled", "en_route", "picked_up"].includes(
+                        a.status
+                      ) ? (
+                        <p className="text-[10px] text-teal-300/90 text-center leading-snug">
+                          Next: mark On the way
+                        </p>
+                      ) : null}
+                      {["en_route", "picked_up"].includes(a.status) ? (
+                        <p className="text-[10px] text-blue-300/90 text-center leading-snug">
+                          Next: Delivered or Failed
+                        </p>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -904,18 +1243,57 @@ export default function DeliveryDashboard() {
             </div>
             
             <div className="space-y-4">
-              <div>
-                <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">Status</label>
-                <select 
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
-                  value={statusForm.status}
-                  onChange={(e) => setStatusForm({...statusForm, status: e.target.value})}
-                >
-                  <option value="delivered">Delivered Successfully</option>
-                  <option value="failed">Failed / Could not deliver</option>
-                  <option value="en_route">En Route (On the way)</option>
-                </select>
-              </div>
+              {(() => {
+                const tripActive = trip?.status === "active";
+                const onTheWay = ["en_route", "picked_up"].includes(
+                  String(selectedAssignment.status || "")
+                );
+                return (
+                  <>
+                    {!tripActive && !onTheWay ? (
+                      <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-sm">
+                        <span className="font-bold">Start from hub</span> first, then mark{" "}
+                        <span className="font-bold">On the way</span>.
+                      </div>
+                    ) : null}
+                    {tripActive && !onTheWay ? (
+                      <div className="p-3 rounded-lg bg-teal-500/10 border border-teal-500/30 text-teal-100 text-sm">
+                        Step 1: mark <span className="font-bold">On the way</span>. Delivered / Failed
+                        unlock after that.
+                      </div>
+                    ) : null}
+                    {onTheWay ? (
+                      <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-100 text-sm">
+                        On the way is set. Now choose <span className="font-bold">Delivered</span> or{" "}
+                        <span className="font-bold">Failed</span>.
+                      </div>
+                    ) : null}
+                    <div>
+                      <label className="block text-slate-400 text-xs mb-1 uppercase tracking-wider">
+                        Status
+                      </label>
+                      <select
+                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+                        value={statusForm.status}
+                        onChange={(e) => setStatusForm({ ...statusForm, status: e.target.value })}
+                      >
+                        <option value="en_route" disabled={!tripActive || onTheWay}>
+                          En Route (On the way)
+                          {!tripActive ? " — start hub first" : onTheWay ? " — already on the way" : ""}
+                        </option>
+                        <option value="delivered" disabled={!onTheWay}>
+                          Delivered Successfully
+                          {!onTheWay ? " — mark on the way first" : ""}
+                        </option>
+                        <option value="failed" disabled={!onTheWay}>
+                          Failed / Could not deliver
+                          {!onTheWay ? " — mark on the way first" : ""}
+                        </option>
+                      </select>
+                    </div>
+                  </>
+                );
+              })()}
 
               {statusForm.status === "delivered" && (
                 <>

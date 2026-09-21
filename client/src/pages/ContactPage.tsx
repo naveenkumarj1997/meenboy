@@ -150,9 +150,9 @@ const ContactPage = () => {
             <div>
               <h3 className="text-xl font-semibold text-white mb-2">Visit Us</h3>
               <p className="text-slate-400">
-                Balusamy konnar street, Madakkulam<br />
-                Bypass Road in Kalavasal<br />
-                Madurai, Tamil Nadu - 625003
+                177, Kalai Nagar<br />
+                Thanakkankulam<br />
+                Madurai, Tamil Nadu - 625006
               </p>
             </div>
           </div>
