@@ -94,10 +94,19 @@ function PartnerNdaForm({
       const a = document.createElement("a");
       a.href = url;
       a.download = "FishFriendly-Partner-NDA.pdf";
+      a.rel = "noopener";
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      a.remove();
+      // Mobile browsers often ignore download= — open PDF so partner can save/share/print
+      window.setTimeout(() => {
+        window.open(url, "_blank", "noopener,noreferrer");
+        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      }, 250);
       setDownloaded(true);
-      setInfo("NDA PDF downloaded. Print it, sign by hand, and give the signed copy to admin.");
+      setInfo(
+        "NDA PDF ready. On phone: open the PDF, save or share to print, sign by hand, and give the copy to admin."
+      );
     } catch (err: any) {
       setError(err.message || "Failed to download NDA PDF");
     } finally {
@@ -108,7 +117,7 @@ function PartnerNdaForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!downloaded) {
-      setError("Download the NDA PDF first, then accept the agreement.");
+      setError("Open / download the NDA PDF first, then accept the agreement.");
       return;
     }
     if (!accepted) {
@@ -131,21 +140,27 @@ function PartnerNdaForm({
     }
   };
 
+  const inputClass =
+    "w-full min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-base text-white outline-none focus:border-teal-500";
+
   return (
-    <div className="max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 mt-10">
-      <h2 className="text-xl font-bold text-white mb-2">Partner hire &amp; NDA</h2>
-      <p className="text-sm text-slate-400 mb-6">
-        Enter your details, download the NDA PDF, print and sign it manually, then accept the
-        agreement here. After that you can upload ID proof for admin approval.
+    <div className="w-full max-w-lg mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-8 mt-2 sm:mt-6 mb-8">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-teal-400 mb-2">
+        Step 1 of 2 · Hire &amp; NDA
+      </p>
+      <h2 className="text-lg sm:text-xl font-bold text-white mb-2">Partner hire &amp; NDA</h2>
+      <p className="text-sm text-slate-400 mb-5 leading-relaxed">
+        Enter your details, open the NDA PDF, print and sign it by hand, then accept here. Next you
+        upload ID proof for admin approval.
       </p>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm break-words">
           {error}
         </div>
       )}
       {info && (
-        <div className="mb-4 p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-sm">
+        <div className="mb-4 p-3 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-sm break-words">
           {info}
         </div>
       )}
@@ -157,9 +172,11 @@ function PartnerNdaForm({
           </label>
           <input
             type="text"
+            inputMode="numeric"
+            autoComplete="off"
             required
             placeholder="XXXX XXXX XXXX"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            className={inputClass}
             value={aadhaarNumber}
             onChange={(e) => setAadhaarNumber(e.target.value)}
           />
@@ -170,9 +187,10 @@ function PartnerNdaForm({
           </label>
           <input
             type="text"
+            autoComplete="off"
             required
             placeholder="Driving licence number"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            className={inputClass}
             value={dlNumber}
             onChange={(e) => setDlNumber(e.target.value)}
           />
@@ -183,9 +201,10 @@ function PartnerNdaForm({
           </label>
           <input
             type="text"
+            autoComplete="off"
             required
             placeholder="RC book number"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            className={inputClass}
             value={bikeRcNumber}
             onChange={(e) => setBikeRcNumber(e.target.value)}
           />
@@ -196,9 +215,10 @@ function PartnerNdaForm({
           </label>
           <input
             type="text"
+            autoComplete="off"
             required
             placeholder="e.g. TN 58 AB 1234"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500 uppercase"
+            className={`${inputClass} uppercase`}
             value={bikeNumber}
             onChange={(e) => setBikeNumber(e.target.value.toUpperCase())}
           />
@@ -208,9 +228,11 @@ function PartnerNdaForm({
             Phone number
           </label>
           <input
-            type="text"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             placeholder="e.g. 9876543210"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            className={inputClass}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
@@ -220,32 +242,44 @@ function PartnerNdaForm({
           type="button"
           onClick={handleDownload}
           disabled={downloading}
-          className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+          className="w-full min-h-12 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors text-sm sm:text-base"
         >
           {downloading
             ? "Preparing PDF..."
             : downloaded
-              ? "Download NDA PDF again"
-              : "Download NDA form PDF"}
+              ? "Open NDA PDF again"
+              : "Open / download NDA PDF"}
         </button>
 
         <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
           <input
             type="checkbox"
-            className="mt-1 accent-teal-500"
+            className="mt-1 h-4 w-4 shrink-0 accent-teal-500"
+            checked={downloaded}
+            onChange={(e) => setDownloaded(e.target.checked)}
+          />
+          <span className="leading-snug">
+            I opened or saved the NDA PDF on this phone (ready to print and sign).
+          </span>
+        </label>
+
+        <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+          <input
+            type="checkbox"
+            className="mt-1 h-4 w-4 shrink-0 accent-teal-500"
             checked={accepted}
             onChange={(e) => setAccepted(e.target.checked)}
           />
-          <span>
-            I have downloaded the NDA PDF, will print and sign it by hand, and give the signed copy
-            to the admin. I accept the confidentiality and hire terms.
+          <span className="leading-snug">
+            I will print and sign the NDA by hand and give it to the admin. I accept the
+            confidentiality and hire terms.
           </span>
         </label>
 
         <button
           type="submit"
           disabled={loading || !downloaded || !accepted}
-          className="w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors"
+          className="w-full min-h-12 bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors text-sm sm:text-base"
         >
           {loading ? "Saving..." : "Accept & continue"}
         </button>
@@ -286,17 +320,23 @@ function DocumentUploadForm({ token, onSuccess }: { token: string; onSuccess: ()
     }
   };
 
+  const inputClass =
+    "w-full min-w-0 bg-slate-950 border border-slate-800 rounded-lg px-3 py-3 text-base text-white outline-none focus:border-teal-500";
+
   return (
-    <div className="max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-8 mt-10">
-      <h2 className="text-xl font-bold text-white mb-4">Required Document</h2>
-      <p className="text-sm text-slate-400 mb-6">
+    <div className="w-full max-w-md mx-auto bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-8 mt-2 sm:mt-6 mb-8">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-teal-400 mb-2">
+        Step 2 of 2 · ID proof
+      </p>
+      <h2 className="text-lg sm:text-xl font-bold text-white mb-4">Required Document</h2>
+      <p className="text-sm text-slate-400 mb-5 leading-relaxed">
         Upload <span className="text-teal-300 font-medium">any one</span> PDF proof: Aadhaar,
         Driving License, RC Book, or Voter ID. File must be under{" "}
         <span className="text-amber-300 font-medium">200 KB</span>.
       </p>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+        <div className="mb-4 p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm break-words">
           {error}
         </div>
       )}
@@ -307,10 +347,11 @@ function DocumentUploadForm({ token, onSuccess }: { token: string; onSuccess: ()
             Phone Number
           </label>
           <input
-            type="text"
+            type="tel"
+            inputMode="tel"
             required
             placeholder="e.g. 9876543210"
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            className={inputClass}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
@@ -324,7 +365,7 @@ function DocumentUploadForm({ token, onSuccess }: { token: string; onSuccess: ()
             required
             value={documentType}
             onChange={(e) => setDocumentType(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500"
+            className={inputClass}
           >
             <option value="aadhaar">Aadhaar</option>
             <option value="dl">Driving License (DL)</option>
@@ -341,12 +382,12 @@ function DocumentUploadForm({ token, onSuccess }: { token: string; onSuccess: ()
             type="file"
             accept="application/pdf,.pdf"
             required
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-white outline-none focus:border-teal-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-teal-500/20 file:text-teal-400 hover:file:bg-teal-500/30 cursor-pointer"
+            className="w-full min-w-0 bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-white outline-none focus:border-teal-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-500/20 file:text-teal-400"
             onChange={(e) => setFile(e.target.files?.[0] || null)}
           />
           {file && (
             <p
-              className={`text-xs mt-2 ${file.size > 200 * 1024 ? "text-rose-400" : "text-slate-500"}`}
+              className={`text-xs mt-2 break-all ${file.size > 200 * 1024 ? "text-rose-400" : "text-slate-500"}`}
             >
               Selected: {file.name} ({Math.round(file.size / 1024)} KB)
             </p>
@@ -356,7 +397,7 @@ function DocumentUploadForm({ token, onSuccess }: { token: string; onSuccess: ()
         <button
           type="submit"
           disabled={loading || !file || !phone}
-          className="w-full bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4"
+          className="w-full min-h-12 bg-teal-500 hover:bg-teal-400 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-2"
         >
           {loading ? "Uploading..." : "Submit Document"}
         </button>
@@ -420,9 +461,14 @@ export default function DeliveryDashboard() {
   };
 
   useEffect(() => {
-    if (token) fetchAssignments();
+    if (!token) return;
+    if (user?.status === "pending") {
+      setLoading(false);
+      return;
+    }
+    fetchAssignments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
+  }, [token, user?.status]);
 
   useEffect(() => {
     if (token && user?.status === "active") refreshTrip();
@@ -688,12 +734,23 @@ export default function DeliveryDashboard() {
     Boolean(user?.hasNdaAccepted || user?.ndaAcceptedAt)
   );
 
+  useEffect(() => {
+    setLocalHasNda(Boolean(user?.hasNdaAccepted || user?.ndaAcceptedAt));
+    setLocalHasDocument(
+      Boolean(
+        (user as any)?.hasDocument ||
+          (user as any)?.documentUrl ||
+          (user as any)?.documentUploadedAt
+      )
+    );
+  }, [user]);
+
   if (user?.status === "pending") {
     if (!localHasNda) {
       return (
         <DashboardShell
           title="Delivery Partner Dashboard"
-          description={`Welcome, ${user?.name}.`}
+          description={`Welcome, ${user?.name}. Complete your hire form below.`}
           navLinks={NAV_LINKS}
         >
           <PartnerNdaForm
@@ -716,7 +773,7 @@ export default function DeliveryDashboard() {
       return (
         <DashboardShell
           title="Delivery Partner Dashboard"
-          description={`Welcome, ${user?.name}.`}
+          description={`Welcome, ${user?.name}. Upload your ID proof next.`}
           navLinks={NAV_LINKS}
         >
           <DocumentUploadForm
@@ -740,12 +797,12 @@ export default function DeliveryDashboard() {
         description={`Welcome, ${user?.name}.`}
         navLinks={NAV_LINKS}
       >
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-16 h-16 bg-amber-500/10 text-amber-500 text-3xl rounded-full flex items-center justify-center mb-6 border border-amber-500/20">
+        <div className="flex flex-col items-center justify-center py-12 sm:py-20 text-center px-2">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-amber-500/10 text-amber-500 text-2xl sm:text-3xl rounded-full flex items-center justify-center mb-6 border border-amber-500/20">
             ⏳
           </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Waiting for Admin Approval</h2>
-          <p className="text-slate-400 max-w-md mx-auto">
+          <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">Waiting for Admin Approval</h2>
+          <p className="text-slate-400 max-w-md mx-auto text-sm sm:text-base leading-relaxed">
             Your NDA details and verification document have been submitted. Give the signed NDA
             printout to admin. You will access deliveries once an admin approves your account.
           </p>
@@ -833,11 +890,11 @@ export default function DeliveryDashboard() {
       ) : null}
 
       {/* Hub trip petrol tracking — one trip/day, auto-end after 1 PM IST */}
-      <div className="mb-6 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-slate-900/80 p-5">
+      <div className="mb-6 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-slate-900/80 p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-bold text-white">Petrol trip (hub → deliveries → hub)</h3>
-            <p className="text-sm text-slate-400 mt-1">
+          <div className="min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-white">Petrol trip (hub → deliveries → hub)</h3>
+            <p className="text-sm text-slate-400 mt-1 leading-relaxed">
               You must tap <span className="text-teal-300 font-semibold">Start from hub</span>, then
               mark <span className="text-teal-300 font-semibold">On the way</span> first. Only after
               that can you set <span className="text-teal-300 font-semibold">Delivered</span> or{" "}
@@ -896,16 +953,26 @@ export default function DeliveryDashboard() {
         )}
       </div>
 
-      <div className="flex space-x-4 mb-8">
+      <div className="flex gap-2 sm:gap-4 mb-8 overflow-x-auto overscroll-contain pb-1 -mx-1 px-1">
         <button
+          type="button"
           onClick={() => setActiveTab("queue")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === "queue" ? "bg-teal-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`}
+          className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+            activeTab === "queue"
+              ? "bg-teal-500/20 text-teal-300 border border-teal-500/30"
+              : "bg-slate-900 text-slate-400 border border-slate-800"
+          }`}
         >
           Active Queue
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("collections")}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${activeTab === "collections" ? "bg-teal-500 text-white" : "bg-white/10 text-white hover:bg-white/20"}`}
+          className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-bold transition-colors ${
+            activeTab === "collections"
+              ? "bg-teal-500/20 text-teal-300 border border-teal-500/30"
+              : "bg-slate-900 text-slate-400 border border-slate-800"
+          }`}
         >
           My Collections
         </button>
@@ -913,23 +980,25 @@ export default function DeliveryDashboard() {
 
       {activeTab === "queue" && (
         <div className="space-y-6">
-          <div className="flex space-x-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800 w-fit">
+          <div className="flex space-x-2 bg-slate-900/50 p-1.5 rounded-xl border border-slate-800 w-full sm:w-fit overflow-x-auto">
             <button
               onClick={() => setQueueFilter("today")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${queueFilter === "today" ? "bg-teal-500 text-white shadow-lg" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+              className={`shrink-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${queueFilter === "today" ? "bg-teal-500 text-white shadow-lg" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
             >
               Today ({todayStr})
             </button>
             <button
               onClick={() => setQueueFilter("tomorrow")}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${queueFilter === "tomorrow" ? "bg-teal-500 text-white shadow-lg" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
+              className={`shrink-0 px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${queueFilter === "tomorrow" ? "bg-teal-500 text-white shadow-lg" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}
             >
               Tomorrow ({tomorrowStr})
             </button>
           </div>
 
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-white">Deliveries for {queueFilter === "today" ? "Today" : "Tomorrow"} ({activeAssignments.length})</h2>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h2 className="text-lg sm:text-xl font-bold text-white">
+              Deliveries for {queueFilter === "today" ? "Today" : "Tomorrow"} ({activeAssignments.length})
+            </h2>
             <div className="text-xs text-slate-400">Rearrange the cards to plan your route</div>
           </div>
 

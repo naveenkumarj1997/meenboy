@@ -536,7 +536,7 @@ const CheckoutPage = () => {
       <div className="grid lg:grid-cols-3 gap-10 items-start">
         {/* Left Column: Form */}
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="bg-white/5 border border-white/10 p-6 md:p-8 rounded-3xl space-y-8">
+          <form onSubmit={handleSubmit} className="bg-white/5 border border-white/10 p-4 sm:p-6 md:p-8 rounded-3xl space-y-8">
             {/* Contact Info */}
             <section>
               <h3 className="text-xl font-bold text-white mb-5 flex items-center gap-2">
@@ -738,10 +738,10 @@ const CheckoutPage = () => {
                           </p>
                         </>
                       )}
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-col sm:flex-row flex-wrap gap-2">
                         <a
                           href={SHOP_PHONE_TEL}
-                          className="inline-flex items-center px-3 py-2 rounded-lg bg-teal-500 text-white text-xs font-bold hover:bg-teal-400"
+                          className="inline-flex items-center justify-center px-3 py-2.5 rounded-lg bg-teal-500 text-white text-xs font-bold hover:bg-teal-400 min-h-11"
                         >
                           Call admin {SHOP_PHONE_DISPLAY}
                         </a>
@@ -753,7 +753,7 @@ const CheckoutPage = () => {
                           )}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center px-3 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 text-xs font-bold hover:bg-emerald-500/25"
+                          className="inline-flex items-center justify-center px-3 py-2.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 text-emerald-200 text-xs font-bold hover:bg-emerald-500/25 min-h-11"
                         >
                           WhatsApp admin
                         </a>

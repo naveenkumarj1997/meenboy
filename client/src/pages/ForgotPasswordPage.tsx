@@ -71,7 +71,7 @@ const ForgotPasswordPage = () => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8"
+        className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-5 sm:p-8"
       >
         <h1 className="text-2xl font-bold text-white">Forgot password</h1>
         <p className="mt-1 text-sm text-slate-300">

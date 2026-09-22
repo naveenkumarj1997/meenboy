@@ -500,16 +500,22 @@ export default function AdminManageDeliveryOrderList() {
             No assigned deliveries for this date. Assign partners in Order Management first.
           </div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-4 overscroll-contain">
-            {lanes.map((lane) => (
-              <PartnerOrderColumn
-                key={lane.partnerId}
-                lane={lane}
-                categoryMap={categoryMap}
-                onReorder={handleReorder}
-                savingPartnerId={savingPartnerId}
-              />
-            ))}
+          <div className="space-y-2">
+            <p className="text-[11px] text-slate-500 md:hidden px-1">
+              Swipe sideways to see each partner column. Use ↑↓ on cards if drag is hard on phone.
+            </p>
+            <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 overscroll-contain snap-x snap-mandatory -mx-1 px-1">
+              {lanes.map((lane) => (
+                <div key={lane.partnerId} className="snap-start shrink-0">
+                  <PartnerOrderColumn
+                    lane={lane}
+                    categoryMap={categoryMap}
+                    onReorder={handleReorder}
+                    savingPartnerId={savingPartnerId}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
