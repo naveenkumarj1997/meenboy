@@ -190,6 +190,25 @@ export default function AdminUsers() {
     }
   };
 
+  const handleToggleFamily = async (user: any) => {
+    if (user.role !== "customer") return;
+    try {
+      setError("");
+      const next = !user.excludeFromEarnings;
+      await updateUser(token!, user._id, { excludeFromEarnings: next });
+      setSuccess(
+        next
+          ? `${user.name} marked as family (excluded from Calculations earn)`
+          : `${user.name} removed from family list`
+      );
+      setUsers(
+        users.map((u) => (u._id === user._id ? { ...u, excludeFromEarnings: next } : u))
+      );
+    } catch (err: any) {
+      setError(err.message || "Failed to update family flag");
+    }
+  };
+
   const filteredUsers = users.filter((user) => {
     const matchesAccount =
       accountFilter === "real" ? isRealAccount(user) : isTestAccount(user);
@@ -378,6 +397,24 @@ export default function AdminUsers() {
                             title={user.isRealUser ? "Mark as test user (hide from lists)" : "Mark as real user"}
                           >
                             {user.isRealUser ? "Mark test" : "Mark real"}
+                          </button>
+                        )}
+
+                        {user.role === "customer" && (
+                          <button
+                            onClick={() => handleToggleFamily(user)}
+                            className={`px-3 py-1.5 rounded text-xs transition-colors ${
+                              user.excludeFromEarnings
+                                ? "bg-violet-500/25 hover:bg-violet-500/35 text-violet-200"
+                                : "bg-slate-800 hover:bg-slate-700 text-slate-300"
+                            }`}
+                            title={
+                              user.excludeFromEarnings
+                                ? "Remove family flag — include in Calculations earn"
+                                : "Sister/brother account — exclude from Fish Friendly Calculations earn"
+                            }
+                          >
+                            {user.excludeFromEarnings ? "Family ✓" : "Mark family"}
                           </button>
                         )}
                         

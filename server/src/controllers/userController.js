@@ -102,6 +102,9 @@ const updateUser = async (req, res, next) => {
     if (password) user.password = password;
     if (isNoticed !== undefined) user.isNoticed = isNoticed;
     if (req.body.isRealUser !== undefined) user.isRealUser = Boolean(req.body.isRealUser);
+    if (req.body.excludeFromEarnings !== undefined) {
+      user.excludeFromEarnings = Boolean(req.body.excludeFromEarnings);
+    }
     if (req.body.adminPreferences?.usersAccountFilter) {
       if (!user.adminPreferences) user.adminPreferences = {};
       user.adminPreferences.usersAccountFilter = req.body.adminPreferences.usersAccountFilter;

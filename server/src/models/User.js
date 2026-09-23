@@ -136,6 +136,14 @@ const userSchema = new mongoose.Schema(
       default: 0,
       min: 0
     },
+    /**
+     * Family / sister-brother accounts: orders may be marked collected in the app
+     * but money is not taken in real life. Excluded from Fish Friendly Calculations.
+     */
+    excludeFromEarnings: {
+      type: Boolean,
+      default: false
+    },
     /** Default discount/addon for manual bookings (bulk / shop customers) */
     bookingAdjustments: {
       discountAmount: { type: Number, default: 0, min: 0 },

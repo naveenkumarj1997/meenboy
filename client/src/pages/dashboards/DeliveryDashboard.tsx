@@ -16,6 +16,11 @@ import {
 } from "../../lib/api";
 import { formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
+import {
+  releaseScreenWakeLock,
+  requestScreenWakeLock,
+  type WakeLockState
+} from "../../lib/screenWakeLock";
 
 const NAV_LINKS = [
   { label: "Deliveries", href: "/dashboard/delivery" },
@@ -447,7 +452,14 @@ export default function DeliveryDashboard() {
   const [tripBusy, setTripBusy] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(true);
   const [gpsOffWarning, setGpsOffWarning] = useState(false);
+  const [wakeLockState, setWakeLockState] = useState<WakeLockState>("off");
   const pingLock = useRef(false);
+  const wakeLockRef = useRef<{
+    released: boolean;
+    release: () => Promise<void>;
+    addEventListener: (type: "release", listener: () => void) => void;
+    removeEventListener: (type: "release", listener: () => void) => void;
+  } | null>(null);
 
   const refreshTrip = async () => {
     if (!token) return;
@@ -505,6 +517,60 @@ export default function DeliveryDashboard() {
     const id = window.setInterval(sendPing, 15000);
     return () => window.clearInterval(id);
   }, [token, trip?.status]);
+
+  // Keep phone screen on while trip is active so GPS pings don't stop when screen sleeps
+  useEffect(() => {
+    const tripActive = trip?.status === "active";
+    if (!tripActive) {
+      void releaseScreenWakeLock(wakeLockRef.current);
+      wakeLockRef.current = null;
+      setWakeLockState("off");
+      return;
+    }
+
+    let cancelled = false;
+
+    const acquire = async () => {
+      if (cancelled) return;
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+        return;
+      }
+      await releaseScreenWakeLock(wakeLockRef.current);
+      wakeLockRef.current = null;
+      const { sentinel, state } = await requestScreenWakeLock();
+      if (cancelled) {
+        await releaseScreenWakeLock(sentinel);
+        return;
+      }
+      wakeLockRef.current = sentinel;
+      setWakeLockState(state);
+      if (sentinel) {
+        const onRelease = () => {
+          if (wakeLockRef.current === sentinel) {
+            wakeLockRef.current = null;
+            setWakeLockState((prev) => (prev === "active" ? "off" : prev));
+          }
+        };
+        sentinel.addEventListener("release", onRelease);
+      }
+    };
+
+    void acquire();
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void acquire();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisibility);
+      void releaseScreenWakeLock(wakeLockRef.current);
+      wakeLockRef.current = null;
+    };
+  }, [trip?.status]);
 
   const handleStartTrip = async () => {
     if (!token) return;
@@ -899,9 +965,27 @@ export default function DeliveryDashboard() {
               mark <span className="text-teal-300 font-semibold">On the way</span> first. Only after
               that can you set <span className="text-teal-300 font-semibold">Delivered</span> or{" "}
               <span className="text-teal-300 font-semibold">Failed</span>.
-              Keep the app open — GPS saves every 15s. Waiting at chicken/mutton shop is OK (same place
-              barely adds km). End when you return to hub. Auto-ends after 1:00 PM if you forget.
+              Keep this page open — the screen stays on during the trip so GPS can save every 15s.
+              Waiting at chicken/mutton shop is OK (same place barely adds km). End when you return
+              to hub. Auto-ends after 1:00 PM if you forget.
             </p>
+            {trip?.status === "active" ? (
+              <p
+                className={`text-sm mt-2 font-semibold ${
+                  wakeLockState === "active"
+                    ? "text-emerald-300"
+                    : wakeLockState === "unsupported" || wakeLockState === "denied"
+                      ? "text-amber-300"
+                      : "text-teal-300"
+                }`}
+              >
+                {wakeLockState === "active"
+                  ? "Screen stay-on: ON — phone should not sleep while this page is open."
+                  : wakeLockState === "unsupported" || wakeLockState === "denied"
+                    ? "Screen stay-on not available on this phone. Keep Fish Friendly open and set Display → sleep to Never while delivering."
+                    : "Screen stay-on: reconnecting… keep this tab open in front."}
+              </p>
+            ) : null}
             {gpsOffWarning && trip?.status === "active" ? (
               <p className="text-sm text-amber-300 mt-2 font-semibold">
                 GPS off — petrol km may be wrong until you turn it on.

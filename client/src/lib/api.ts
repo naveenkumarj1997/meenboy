@@ -1176,6 +1176,72 @@ export const getMoneyManagement = async (
     headers: { Authorization: `Bearer ${token}` }
   });
 
+export const getCalculations = async (
+  token: string,
+  params: {
+    period?: "today" | "week" | "month" | "all" | "custom";
+    from?: string;
+    to?: string;
+  } = {}
+) => {
+  const qs = new URLSearchParams();
+  qs.set("period", params.period || "today");
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  return request<{
+    period: string;
+    range: { from: string; to: string };
+    businessStartDate: string;
+    today: string;
+    summary: Record<string, number>;
+    customers: Array<{
+      customerId: string | null;
+      name: string;
+      phone: string;
+      email: string;
+      isFamily: boolean;
+      bookings: number;
+      collectedAtDelivery: number;
+      pendingOnOrders: number;
+      orderCount: number;
+      orders: Array<{
+        orderId: string;
+        assignmentId: string;
+        deliveryDate: string;
+        total: number;
+        paymentCollected: number;
+        paymentMethod: string;
+        pendingOnOrder: number;
+        partnerName: string;
+      }>;
+    }>;
+    familyAccounts: Array<{
+      id: string;
+      name: string;
+      phone: string;
+      pendingBalance: number;
+    }>;
+    manualCollections: Array<{
+      id: string;
+      amount: number;
+      createdAt: string;
+      notes: string;
+      customerName: string;
+      isFamily: boolean;
+    }>;
+    walkIns: Array<{
+      id: string;
+      saleDate: string;
+      total: number;
+      billNumber: string;
+      customerName: string;
+    }>;
+    formula: Record<string, string>;
+  }>(`/finance/calculations?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
 export const getTransactions = async (token: string, query: string = "") =>
   request<any[]>(`/finance${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` }

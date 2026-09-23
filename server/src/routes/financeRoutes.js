@@ -5,6 +5,7 @@ const {
   getTransactions,
   getFinanceSummary,
   getMoneyManagement,
+  getCalculations,
   updateTransactionStatus
 } = require("../controllers/financeController");
 
@@ -14,6 +15,7 @@ router.use(protect);
 router.use(authorizeRoles("admin"));
 
 router.get("/money-management", authorizeAdminSections("money_management"), getMoneyManagement);
+router.get("/calculations", authorizeAdminSections("calculations"), getCalculations);
 
 router.post("/", authorizeAdminSections("finance"), addTransaction);
 router.get("/", authorizeAdminSections("finance"), getTransactions);
