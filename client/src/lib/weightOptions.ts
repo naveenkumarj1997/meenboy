@@ -1,6 +1,7 @@
 export const WEIGHT_OPTIONS = [
   { value: 0.25, label: "250 gram" },
   { value: 0.5, label: "500 gram" },
+  { value: 0.75, label: "750 gram" },
   { value: 1, label: "1 kg" },
   { value: 1.5, label: "1.5 kg" },
   { value: 2, label: "2 kg" }

@@ -81,6 +81,7 @@ export default function AdminManualBooking() {
   });
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
   const [cart, setCart] = useState<any[]>([]);
 
   const [deliveryDate, setDeliveryDate] = useState("");
@@ -156,12 +157,35 @@ export default function AdminManualBooking() {
   useEffect(() => {
     if (customerType === "new") {
       setSelectedUserId("");
+      setCustomerSearch("");
       setNewCustomer({ name: "", email: "", phone: "", alternatePhone: "" });
       setAddressForm(emptyAddressForm());
       setAdjustments(emptyBookingAdjustments());
       setDeliveryTime(DEFAULT_DELIVERY_TIME);
     }
   }, [customerType]);
+
+  const filteredCustomers = useMemo(() => {
+    const q = customerSearch.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => {
+      const name = String(u.name || "").toLowerCase();
+      const phone = String(u.phone || "").toLowerCase();
+      const email = String(u.email || "").toLowerCase();
+      const alt = String(u.alternatePhone || "").toLowerCase();
+      return (
+        name.includes(q) ||
+        phone.includes(q) ||
+        email.includes(q) ||
+        alt.includes(q)
+      );
+    });
+  }, [users, customerSearch]);
+
+  const selectedCustomer = useMemo(
+    () => users.find((u) => u._id === selectedUserId) || null,
+    [users, selectedUserId]
+  );
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -385,22 +409,91 @@ export default function AdminManualBooking() {
                 </div>
 
                 {customerType === "existing" ? (
-                  <div>
-                    <label className="block text-sm text-white/60 mb-2">Select Customer</label>
-                    <select
-                      value={selectedUserId}
-                      onChange={(e) => setSelectedUserId(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
-                    >
-                      <option value="" className="bg-cyan-950">
-                        -- Select Customer --
-                      </option>
-                      {users.map((u) => (
-                        <option key={u._id} value={u._id} className="bg-cyan-950">
-                          {u.name} ({u.phone || u.email})
-                        </option>
-                      ))}
-                    </select>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm text-white/60 mb-2">Search customer</label>
+                      <input
+                        type="search"
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        placeholder="Type name, phone, or email…"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white placeholder:text-white/35 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    {selectedCustomer ? (
+                      <div className="flex items-start justify-between gap-3 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 py-2.5">
+                        <div className="min-w-0">
+                          <div className="text-[10px] uppercase tracking-wider text-teal-300/80 font-bold">
+                            Selected
+                          </div>
+                          <div className="text-sm font-bold text-white truncate">
+                            {selectedCustomer.name}
+                          </div>
+                          <div className="text-xs text-slate-400 truncate">
+                            {selectedCustomer.phone || "No phone"}
+                            {selectedCustomer.email ? ` · ${selectedCustomer.email}` : ""}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedUserId("");
+                            setCustomerSearch("");
+                          }}
+                          className="shrink-0 text-xs font-semibold text-slate-300 hover:text-white px-2 py-1 rounded-lg border border-white/10 hover:bg-white/5"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    ) : null}
+
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <label className="block text-sm text-white/60">
+                          {customerSearch.trim() ? "Matching customers" : "All customers"}
+                        </label>
+                        <span className="text-[11px] text-slate-500">
+                          {filteredCustomers.length} shown
+                          {users.length !== filteredCustomers.length
+                            ? ` of ${users.length}`
+                            : ""}
+                        </span>
+                      </div>
+                      <div className="max-h-56 overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-slate-950/50 divide-y divide-white/5">
+                        {filteredCustomers.length === 0 ? (
+                          <div className="px-4 py-6 text-center text-sm text-slate-500">
+                            No customer matches “{customerSearch.trim()}”
+                          </div>
+                        ) : (
+                          filteredCustomers.map((u) => {
+                            const active = selectedUserId === u._id;
+                            return (
+                              <button
+                                key={u._id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedUserId(u._id);
+                                  setCustomerSearch("");
+                                }}
+                                className={`w-full text-left px-4 py-2.5 transition-colors ${
+                                  active
+                                    ? "bg-teal-500/20 text-teal-100"
+                                    : "text-slate-200 hover:bg-white/5"
+                                }`}
+                              >
+                                <div className="text-sm font-semibold truncate">{u.name}</div>
+                                <div className="text-xs text-slate-400 truncate">
+                                  {u.phone || "No phone"}
+                                  {u.email ? ` · ${u.email}` : ""}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-3">

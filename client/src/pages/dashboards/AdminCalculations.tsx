@@ -67,9 +67,9 @@ export default function AdminCalculations() {
       description="See Fish Friendly bookings, cash delivered, costs (purchases, partner salary, petrol, expenses), and real earn. Family/sister-brother customers are listed separately so fake admin-collect does not inflate profit."
       navLinks={ADMIN_NAV_LINKS}
     >
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 sm:p-5 space-y-4">
-          <div className="flex flex-wrap gap-2">
+      <div className="space-y-5 sm:space-y-6 min-w-0">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-5 space-y-4">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 -mx-0.5 px-0.5">
             {(
               [
                 ["today", "Today"],
@@ -83,7 +83,7 @@ export default function AdminCalculations() {
                 key={id}
                 type="button"
                 onClick={() => setPeriod(id)}
-                className={`px-3 py-2 rounded-lg text-sm font-bold border transition-colors ${
+                className={`shrink-0 px-3 py-2.5 rounded-lg text-sm font-bold border transition-colors whitespace-nowrap ${
                   period === id
                     ? "bg-teal-500/20 text-teal-200 border-teal-500/40"
                     : "bg-slate-950 text-slate-400 border-slate-700 hover:border-slate-500"
@@ -95,29 +95,29 @@ export default function AdminCalculations() {
           </div>
 
           {period === "custom" ? (
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
+            <div className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3">
+              <div className="min-w-0 sm:min-w-[9rem]">
                 <label className="block text-[10px] uppercase text-slate-500 mb-1">From</label>
                 <input
                   type="date"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white"
                 />
               </div>
-              <div>
+              <div className="min-w-0 sm:min-w-[9rem]">
                 <label className="block text-[10px] uppercase text-slate-500 mb-1">To</label>
                 <input
                   type="date"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white"
                 />
               </div>
               <button
                 type="button"
                 onClick={load}
-                className="px-4 py-2 rounded-lg text-sm font-bold bg-teal-500 text-slate-950 hover:bg-teal-400"
+                className="w-full sm:w-auto px-4 py-2.5 rounded-lg text-sm font-bold bg-teal-500 text-slate-950 hover:bg-teal-400"
               >
                 Apply range
               </button>
@@ -141,7 +141,7 @@ export default function AdminCalculations() {
           <div className="text-center text-slate-400 py-16 text-sm">Loading calculations…</div>
         ) : summary ? (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
               <Stat
                 label="Real bookings (delivered)"
                 value={money(summary.bookingsReal)}
@@ -168,8 +168,8 @@ export default function AdminCalculations() {
               />
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 space-y-2 text-sm">
+            <div className="grid gap-3 md:grid-cols-2 min-w-0">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-3 sm:p-4 space-y-2 text-sm min-w-0">
                 <h3 className="text-white font-bold text-sm">Bookings &amp; delivered cash</h3>
                 <Row label="All delivered bookings" value={money(summary.bookingsAll)} />
                 <Row label="Real customers bookings" value={money(summary.bookingsReal)} />
@@ -194,7 +194,7 @@ export default function AdminCalculations() {
                 />
               </div>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 space-y-2 text-sm">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-3 sm:p-4 space-y-2 text-sm min-w-0">
                 <h3 className="text-white font-bold text-sm">Costs &amp; ledger</h3>
                 <Row label="Vendor purchases" value={money(summary.totalPurchases)} />
                 <Row label="Vendor settlements paid" value={money(summary.totalVendorSettled)} />
@@ -393,9 +393,9 @@ function Stat({
         ? "text-amber-200"
         : "text-teal-200";
   return (
-    <div className={`rounded-2xl border p-4 ${wrap}`}>
+    <div className={`rounded-2xl border p-3 sm:p-4 min-w-0 ${wrap}`}>
       <div className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">{label}</div>
-      <div className={`text-2xl font-black mt-1 ${valueColor}`}>{value}</div>
+      <div className={`text-xl sm:text-2xl font-black mt-1 break-all ${valueColor}`}>{value}</div>
       <div className="text-[11px] text-slate-500 mt-2 leading-snug">{hint}</div>
     </div>
   );
@@ -411,9 +411,11 @@ function Row({
   muted?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3">
-      <span className={muted ? "text-slate-500" : "text-slate-300"}>{label}</span>
-      <span className={`font-semibold shrink-0 ${muted ? "text-slate-500" : "text-white"}`}>
+    <div className="flex items-start justify-between gap-3 min-w-0">
+      <span className={`min-w-0 leading-snug ${muted ? "text-slate-500" : "text-slate-300"}`}>
+        {label}
+      </span>
+      <span className={`font-semibold shrink-0 tabular-nums ${muted ? "text-slate-500" : "text-white"}`}>
         {value}
       </span>
     </div>

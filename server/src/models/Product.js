@@ -86,6 +86,18 @@ const productSchema = new mongoose.Schema(
       trim: true,
       default: ""
     },
+    /** Optional GST overrides (falls back to shop category defaults) */
+    hsnCode: {
+      type: String,
+      trim: true,
+      default: ""
+    },
+    gstRatePercent: {
+      type: Number,
+      min: 0,
+      max: 28,
+      default: null
+    },
     isActive: {
       type: Boolean,
       default: true

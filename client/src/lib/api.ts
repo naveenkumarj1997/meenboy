@@ -21,14 +21,22 @@ interface AuthPayload {
 
 export const request = async <T>(url: string, options?: RequestInit): Promise<T> => {
   const { headers, ...restOptions } = options || {};
-  const response = await fetch(`${API_BASE}${url}`, {
-    cache: "no-store",
-    ...restOptions,
-    headers: {
-      "Content-Type": "application/json",
-      ...headers
-    }
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}${url}`, {
+      cache: "no-store",
+      ...restOptions,
+      headers: {
+        "Content-Type": "application/json",
+        ...headers
+      }
+    });
+  } catch {
+    throw new ApiError(
+      "Cannot reach the server. Check that the API is running, then refresh.",
+      0
+    );
+  }
 
   const raw = await response.text();
   let data: any = {};
@@ -1240,6 +1248,73 @@ export const getCalculations = async (
   }>(`/finance/calculations?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
+};
+
+// ─── GST API ──────────────────────────────────────────────────────────────────
+
+export const getGstSettings = async (token: string) =>
+  request<{ settings: any }>("/gst/settings", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const updateGstSettings = async (token: string, payload: Record<string, unknown>) =>
+  request<{ message: string; settings: any }>("/gst/settings", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const getGstReport = async (
+  token: string,
+  params: {
+    period?: "today" | "week" | "month" | "all" | "custom";
+    from?: string;
+    to?: string;
+  } = {}
+) => {
+  const qs = new URLSearchParams();
+  qs.set("period", params.period || "month");
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  return request<any>(`/gst/report?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const downloadGstSalesRegisterPdf = async (
+  token: string,
+  params: { period?: string; from?: string; to?: string } = {}
+) => {
+  const qs = new URLSearchParams();
+  qs.set("period", params.period || "month");
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  const response = await fetch(`${API_BASE}/gst/report/sales-register.pdf?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message || "Failed to download sales register PDF");
+  }
+  return response.blob();
+};
+
+export const downloadGstSummaryPdf = async (
+  token: string,
+  params: { period?: string; from?: string; to?: string } = {}
+) => {
+  const qs = new URLSearchParams();
+  qs.set("period", params.period || "month");
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  const response = await fetch(`${API_BASE}/gst/report/summary.pdf?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message || "Failed to download GST summary PDF");
+  }
+  return response.blob();
 };
 
 export const getTransactions = async (token: string, query: string = "") =>

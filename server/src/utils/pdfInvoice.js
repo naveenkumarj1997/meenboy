@@ -15,6 +15,7 @@ const { resolvePdfFonts } = require("./pdfFonts");
 const WEIGHT_QTY_LABELS = {
   0.25: "250 gram",
   0.5: "500 gram",
+  0.75: "750 gram",
   1: "1 kg",
   1.5: "1.5 kg",
   2: "2 kg"

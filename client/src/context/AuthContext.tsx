@@ -57,6 +57,9 @@ const readStoredUser = (): User | null => {
   }
 };
 
+/** Cached user for UI that must not blank (e.g. admin sidebar) while auth hydrates. */
+export const peekStoredUser = (): User | null => readStoredUser();
+
 const clearSession = () => {
   localStorage.removeItem(STORAGE_KEY);
   localStorage.removeItem(USER_KEY);

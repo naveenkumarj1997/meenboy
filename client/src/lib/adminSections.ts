@@ -24,6 +24,7 @@ export type AdminSectionId =
   | "petrol_allowance"
   | "earnings"
   | "calculations"
+  | "gst"
   | "users"
   | "money_management"
   | "expenses"
@@ -102,6 +103,7 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   },
   { id: "earnings", label: "Admin Earnings", href: "/dashboard/admin/earnings" },
   { id: "calculations", label: "Calculations", href: "/dashboard/admin/calculations" },
+  { id: "gst", label: "GST", href: "/dashboard/admin/gst" },
   { id: "users", label: "Users", href: "/dashboard/admin/users" },
   {
     id: "money_management",
@@ -154,6 +156,10 @@ export const hasAdminSection = (
   );
   // Limited admins always keep Profile only; Overview is assignable
   allowed.add("profile");
+  if (allowed.has("earnings") || allowed.has("finance") || allowed.has("expenses")) {
+    allowed.add("calculations");
+    allowed.add("gst");
+  }
   return sectionIds.some((id) => allowed.has(id));
 };
 
@@ -169,6 +175,11 @@ export const getAdminNavLinksForUser = (user: {
   const allowed = new Set(
     Array.isArray(user.adminSections) ? user.adminSections.map(String) : []
   );
+  // Finance cluster: older limited-admin lists may predate Calculations / GST
+  if (allowed.has("earnings") || allowed.has("finance") || allowed.has("expenses")) {
+    allowed.add("calculations");
+    allowed.add("gst");
+  }
   return ADMIN_SECTION_DEFS.filter(
     (s) => s.always || (!s.fullOnly && allowed.has(s.id))
   ).map(({ label, href }) => ({ label, href }));

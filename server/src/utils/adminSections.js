@@ -25,6 +25,7 @@ const ADMIN_SECTIONS = [
   { id: "petrol_allowance", label: "Petrol Allowance" },
   { id: "earnings", label: "Admin Earnings" },
   { id: "calculations", label: "Calculations" },
+  { id: "gst", label: "GST" },
   { id: "users", label: "Users" },
   { id: "money_management", label: "Money Management" },
   { id: "expenses", label: "Expenses" },
@@ -58,6 +59,11 @@ const hasAdminSection = (user, ...sectionIds) => {
   const allowed = new Set(user.adminSections || []);
   // Limited admins always keep Profile; Overview is assignable via Manage Admins
   allowed.add("profile");
+  // Finance cluster companions (same as client nav)
+  if (allowed.has("earnings") || allowed.has("finance") || allowed.has("expenses")) {
+    allowed.add("calculations");
+    allowed.add("gst");
+  }
   return sectionIds.some((id) => allowed.has(id));
 };
 

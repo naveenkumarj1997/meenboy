@@ -23,6 +23,7 @@ import AdminPartnerSalary from "./pages/dashboards/AdminPartnerSalary";
 import AdminPetrolAllowance from "./pages/dashboards/AdminPetrolAllowance";
 import AdminEarnings from "./pages/dashboards/AdminEarnings";
 import AdminCalculations from "./pages/dashboards/AdminCalculations";
+import AdminGst from "./pages/dashboards/AdminGst";
 import AdminUsers from "./pages/dashboards/AdminUsers";
 import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
 import AdminMoneyManagement from "./pages/dashboards/AdminMoneyManagement";
@@ -139,6 +140,7 @@ function App() {
           <Route path="/dashboard/admin/petrol-allowance" element={<AdminPetrolAllowance />} />
           <Route path="/dashboard/admin/earnings" element={<AdminEarnings />} />
           <Route path="/dashboard/admin/calculations" element={<AdminCalculations />} />
+          <Route path="/dashboard/admin/gst" element={<AdminGst />} />
           <Route path="/dashboard/admin/users" element={<AdminUsers />} />
           <Route path="/dashboard/admin/finance" element={<AdminFinancePage />} />
           <Route path="/dashboard/admin/money-management" element={<AdminMoneyManagement />} />

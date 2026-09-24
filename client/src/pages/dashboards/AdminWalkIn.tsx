@@ -169,12 +169,30 @@ export default function AdminWalkIn() {
     (async () => {
       try {
         setLoading(true);
-        const [prodRes] = await Promise.all([
+        setError("");
+        const results = await Promise.allSettled([
           getAdminProducts(token),
           refreshStats(),
           refreshCatchStock()
         ]);
-        setProducts((prodRes.data?.products || []).filter((p: any) => p.isActive !== false));
+
+        const productsResult = results[0];
+        if (productsResult.status === "fulfilled") {
+          setProducts(
+            (productsResult.value.data?.products || []).filter(
+              (p: any) => p.isActive !== false
+            )
+          );
+        }
+
+        const failures = results.filter((r) => r.status === "rejected") as PromiseRejectedResult[];
+        if (failures.length === results.length) {
+          const msg = failures[0]?.reason?.message || "Failed to load walk-in data";
+          setError(msg);
+        } else if (failures.length > 0) {
+          const msg = failures.map((f) => f.reason?.message).filter(Boolean).join(" · ");
+          setError(msg || "Some walk-in data failed to load. Try refresh.");
+        }
       } catch (err: any) {
         setError(err.message || "Failed to load walk-in data");
       } finally {
@@ -334,7 +352,16 @@ export default function AdminWalkIn() {
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && (
-        <div className="mb-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>
+        <div className="mb-4 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-sm break-words">{error}</span>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="shrink-0 px-3 py-2 rounded-lg text-xs font-bold bg-rose-500/20 border border-rose-500/30 text-rose-200 hover:bg-rose-500/30"
+          >
+            Refresh page
+          </button>
+        </div>
       )}
       {success && (
         <div className="mb-4 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300">{success}</div>

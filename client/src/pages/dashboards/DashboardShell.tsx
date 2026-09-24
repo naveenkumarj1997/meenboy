@@ -1,8 +1,13 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext";
+import { peekStoredUser, useAuth } from "../../context/AuthContext";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getAdminNavLinksForUser, hasAdminSection } from "../../lib/adminSections";
+import {
+  ADMIN_SECTION_DEFS,
+  getAdminNavLinksForUser,
+  hasAdminSection
+} from "../../lib/adminSections";
+import { getAllAdminNavLinks } from "../../lib/adminNavLinks";
 import {
   getDueDatesAttentionCount,
   getNewCustomersCount,
@@ -48,7 +53,7 @@ const SidebarContent = ({
         <span className="text-xs text-slate-500 font-medium uppercase tracking-widest">Workspace</span>
       </div>
 
-      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-1.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y py-4 px-3 space-y-1.5 [-webkit-overflow-scrolling:touch]">
         {links.map((link) => {
           const isActive = location.pathname === link.href;
           const badge = Number(link.badgeCount) || 0;
@@ -217,13 +222,25 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     refreshDueDatesCount
   ]);
 
-  const resolvedNavLinks = useMemo(() => {
-    let links: NavLink[] =
-      user?.role === "admin"
-        ? getAdminNavLinksForUser(user)
-        : navLinks || [];
+  // Include section count so new menu items (Calculations, GST, …) appear after
+  // code updates without needing a full remount / waiting on a stale useMemo.
+  const adminSectionCount = ADMIN_SECTION_DEFS.length;
 
-    links = links.map((link) => {
+  const resolvedNavLinks = useMemo(() => {
+    const stored = !user ? peekStoredUser() : null;
+    const adminUser =
+      user?.role === "admin" ? user : stored?.role === "admin" ? stored : null;
+
+    let links: NavLink[] = adminUser
+      ? getAdminNavLinksForUser(adminUser)
+      : navLinks || [];
+
+    // Never blank the admin sidebar while a session exists (auth HMR / brief null user)
+    if (links.length === 0 && (adminUser || (token && peekStoredUser()?.role === "admin"))) {
+      links = getAllAdminNavLinks();
+    }
+
+    return links.map((link) => {
       if (canSeeNewCustomers && newCustomersCount > 0 && link.href === "/dashboard/admin/new-customers") {
         return { ...link, badgeCount: newCustomersCount };
       }
@@ -243,11 +260,11 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
       }
       return link;
     });
-
-    return links;
   }, [
     user,
+    token,
     navLinks,
+    adminSectionCount,
     canSeeNewCustomers,
     newCustomersCount,
     canSeeDeliveries,
@@ -255,6 +272,8 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     canSeeDueDates,
     dueDatesAttentionCount
   ]);
+
+  const navLinksKey = resolvedNavLinks.map((l) => l.href).join("|");
 
   useEffect(() => {
     setIsMobileMenuOpen(false);
@@ -279,15 +298,15 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
 
   const sidebarProps = {
     links: resolvedNavLinks,
-    userName: user?.name,
-    userRole: user?.role,
+    userName: user?.name || peekStoredUser()?.name,
+    userRole: user?.role || peekStoredUser()?.role,
     onLogout,
     onNavigate: () => setIsMobileMenuOpen(false)
   };
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row font-sans">
-      <div className="md:hidden flex items-center justify-between border-b border-slate-800 bg-slate-900/95 backdrop-blur px-4 py-3 sticky top-0 z-50">
+      <div className="md:hidden flex items-center justify-between border-b border-slate-800 bg-slate-900/95 backdrop-blur px-4 py-3 sticky top-0 z-50 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <BrandLogo size="sm" />
         <button
           type="button"
@@ -326,19 +345,20 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.aside
+            key={`mobile-nav-${navLinksKey}`}
             initial={{ x: "-100%" }}
             animate={{ x: 0 }}
             exit={{ x: "-100%" }}
             transition={{ type: "tween", duration: 0.25 }}
-            className="fixed top-0 left-0 z-50 flex h-dvh max-h-dvh w-[min(18rem,85vw)] flex-col overflow-hidden bg-slate-900 border-r border-slate-800 shadow-2xl md:hidden"
+            className="fixed top-0 left-0 z-50 flex h-dvh max-h-dvh w-[min(18rem,85vw)] flex-col overflow-hidden bg-slate-900 border-r border-slate-800 shadow-2xl md:hidden pb-[env(safe-area-inset-bottom)]"
           >
-            <SidebarContent {...sidebarProps} />
+            <SidebarContent key={navLinksKey} {...sidebarProps} />
           </motion.aside>
         )}
       </AnimatePresence>
 
       <aside className="hidden md:flex flex-col w-72 shrink-0 sticky top-0 h-screen max-h-screen overflow-hidden bg-slate-900/50 border-r border-slate-800">
-        <SidebarContent {...sidebarProps} />
+        <SidebarContent key={navLinksKey} {...sidebarProps} />
       </aside>
 
       <main className="flex-1 w-full min-w-0 flex flex-col min-h-screen overflow-x-hidden">

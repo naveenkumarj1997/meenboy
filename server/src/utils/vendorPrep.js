@@ -70,8 +70,8 @@ const buildTotals = (rows) => {
 };
 
 /**
- * Same order with repeated note text → show note once across item rows (merged cell).
- * Different notes per item in one order → each row keeps its own note.
+ * Special notes stay on the item they were booked with.
+ * Only merge the notes cell when every row in the same order has the exact same non-empty note.
  */
 const annotateVendorNoteGroups = (rows) => {
   if (!rows?.length) return [];
@@ -88,14 +88,14 @@ const annotateVendorNoteGroups = (rows) => {
 
     const groupSize = j - i;
     const noteTexts = annotated.slice(i, j).map((r) => String(r.notes || "").trim());
-    const firstNonEmpty = noteTexts.find((n) => n);
-    const allShareSameNote =
-      firstNonEmpty &&
-      noteTexts.every((n) => !n || n === firstNonEmpty);
+    const firstNote = noteTexts[0] || "";
+    const allSameNonEmpty =
+      Boolean(firstNote) &&
+      noteTexts.every((n) => n === firstNote);
 
-    if (allShareSameNote && groupSize > 1) {
+    if (allSameNonEmpty && groupSize > 1) {
       for (let k = i; k < j; k++) {
-        annotated[k].displayNotes = k === i ? firstNonEmpty : "";
+        annotated[k].displayNotes = k === i ? firstNote : "";
         annotated[k].notesRowSpan = k === i ? groupSize : 0;
       }
     } else {
@@ -174,7 +174,9 @@ const buildVendorRowsForDate = async (date, categoryFilterInput) => {
         cutName: item.cutName || "",
         quantity: item.quantity,
         unit: item.unit || unitByProduct[productId] || "kg",
-        notes: item.notes || order.customerNotes || "",
+        // Only this line-item's booking note — never order.customerNotes (avoids
+        // mutton/fish notes leaking across categories and stacking on the first row)
+        notes: String(item.notes || "").trim(),
         orderId: order._id,
         customerName: order.customer?.name || "Guest",
         bookingSource: order.bookingSource || "website"
