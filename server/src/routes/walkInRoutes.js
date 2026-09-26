@@ -5,7 +5,9 @@ const {
   listWalkInSales,
   getWalkInSale,
   getWalkInStats,
-  downloadWalkInBill
+  downloadWalkInBill,
+  updateWalkInSale,
+  cancelWalkInSale
 } = require("../controllers/walkInController");
 
 const router = express.Router();
@@ -17,5 +19,7 @@ router.get("/", listWalkInSales);
 router.post("/", createWalkInSale);
 router.get("/:id/bill", downloadWalkInBill);
 router.get("/:id", getWalkInSale);
+router.put("/:id", updateWalkInSale);
+router.post("/:id/cancel", cancelWalkInSale);
 
 module.exports = router;

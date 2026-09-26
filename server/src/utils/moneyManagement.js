@@ -70,7 +70,9 @@ const finalizeDay = (stat) => {
   stat.totalSales = stat.deliverySales + stat.walkInSales;
   stat.totalCollected =
     stat.collectedAtDelivery + stat.manualCollections + stat.walkInCollected;
-  stat.amountPending = Math.max(0, stat.deliverySales - stat.collectedAtDelivery);
+  stat.amountPending =
+    Math.max(0, stat.deliverySales - stat.collectedAtDelivery) +
+    Math.max(0, (stat.walkInSales || 0) - (stat.walkInCollected || 0));
   stat.grossProfit = stat.totalSales - stat.totalPurchases - stat.partnerSalaries;
   stat.netCashProfit = stat.totalCollected - stat.totalPurchases - stat.partnerSalaries;
   return stat;
@@ -164,14 +166,21 @@ const buildDailyStats = async () => {
   }
 
   const walkIns = await WalkInSale.find({ saleDate: { $gte: businessStart } }).select(
-    "saleDate total"
+    "saleDate total amountPaid paymentStatus paymentMethod status"
   );
   for (const sale of walkIns) {
+    if (sale.status === "cancelled") continue;
     const stat = ensureDay(statsMap, sale.saleDate);
     if (!stat) continue;
-    const amount = Number(sale.total || 0);
-    stat.walkInSales += amount;
-    stat.walkInCollected += amount;
+    const total = Number(sale.total || 0);
+    let paid = Number(sale.amountPaid);
+    if (!Number.isFinite(paid)) {
+      // Legacy bills without amountPaid were treated as fully collected
+      paid = sale.paymentStatus === "pending" ? 0 : total;
+    }
+    paid = Math.min(total, Math.max(0, paid));
+    stat.walkInSales += total;
+    stat.walkInCollected += paid;
     stat.walkInBills += 1;
   }
 

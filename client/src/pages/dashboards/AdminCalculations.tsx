@@ -185,7 +185,13 @@ export default function AdminCalculations() {
                   muted
                 />
                 <Row label="Pending on these orders (real)" value={money(summary.pendingOnOrdersReal)} />
-                <Row label="Walk-in sales" value={money(summary.walkInSales)} />
+                <Row label="Walk-in sales (billed)" value={money(summary.walkInSales)} />
+                <Row label="Walk-in collected" value={money(summary.walkInCollected ?? summary.walkInSales)} />
+                <Row
+                  label="Walk-in still due"
+                  value={money(summary.walkInPending || 0)}
+                  muted
+                />
                 <Row label="Admin collect (real)" value={money(summary.manualCollectionsReal)} />
                 <Row
                   label="Admin collect (family / paper)"

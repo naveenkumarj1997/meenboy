@@ -34,6 +34,7 @@ const ADMIN_SECTIONS = [
   { id: "notifications", label: "Notifications" },
   { id: "due_dates", label: "Due Dates" },
   { id: "walk_in", label: "Walk-in" },
+  { id: "walk_in_accounts", label: "Walk-in Accounts" },
   { id: "manual_booking", label: "Manual Booking" },
   { id: "manage_admins", label: "Manage Admins", fullOnly: true }
 ];
@@ -63,6 +64,9 @@ const hasAdminSection = (user, ...sectionIds) => {
   if (allowed.has("earnings") || allowed.has("finance") || allowed.has("expenses")) {
     allowed.add("calculations");
     allowed.add("gst");
+  }
+  if (allowed.has("walk_in")) {
+    allowed.add("walk_in_accounts");
   }
   return sectionIds.some((id) => allowed.has(id));
 };

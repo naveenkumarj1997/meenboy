@@ -1461,11 +1461,26 @@ export const getWalkInStats = async (token: string) =>
 
 export const listWalkInSales = async (
   token: string,
-  params?: { date?: string; phone?: string; page?: number; limit?: number }
+  params?: {
+    date?: string;
+    from?: string;
+    to?: string;
+    phone?: string;
+    q?: string;
+    status?: "active" | "cancelled" | "all";
+    sort?: "newest" | "oldest" | "amount_high" | "amount_low" | "bill";
+    page?: number;
+    limit?: number;
+  }
 ) => {
   const qs = new URLSearchParams();
   if (params?.date) qs.set("date", params.date);
+  if (params?.from) qs.set("from", params.from);
+  if (params?.to) qs.set("to", params.to);
   if (params?.phone) qs.set("phone", params.phone);
+  if (params?.q) qs.set("q", params.q);
+  if (params?.status) qs.set("status", params.status);
+  if (params?.sort) qs.set("sort", params.sort);
   if (params?.page) qs.set("page", String(params.page));
   if (params?.limit) qs.set("limit", String(params.limit));
   const query = qs.toString() ? `?${qs.toString()}` : "";
@@ -1476,6 +1491,28 @@ export const listWalkInSales = async (
     headers: { Authorization: `Bearer ${token}` }
   });
 };
+
+export const updateWalkInSale = async (
+  token: string,
+  saleId: string,
+  payload: { customerName?: string; customerPhone?: string; notes?: string }
+) =>
+  request<{ message: string; sale: any }>(`/walk-in/${saleId}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const cancelWalkInSale = async (
+  token: string,
+  saleId: string,
+  payload?: { reason?: string }
+) =>
+  request<{ message: string; sale: any; todayCatch?: any }>(`/walk-in/${saleId}/cancel`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload || {})
+  });
 
 export const createWalkInSale = async (
   token: string,
@@ -1503,6 +1540,73 @@ export const downloadWalkInBill = async (token: string, saleId: string) => {
   }
   return response.blob();
 };
+
+// ─── Walk-in Accounts (cashier) ─────────────────────────────────────────────
+
+export const getWalkInAccountsDaySummary = async (token: string, date?: string) => {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+  return request<{
+    date: string;
+    summary: any;
+    sales: any[];
+    expenses: any[];
+    drawer: any;
+    cashierCategories: Array<{ id: string; label: string }>;
+  }>(`/walk-in-accounts/day-summary${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const collectWalkInPayment = async (
+  token: string,
+  billId: string,
+  payload: { amount?: number; paymentMethod: string; notes?: string }
+) =>
+  request<{ message: string; sale: any }>(`/walk-in-accounts/bills/${billId}/collect`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const createWalkInCashierExpense = async (
+  token: string,
+  payload: {
+    date?: string;
+    category: string;
+    amount: number;
+    title?: string;
+    notes?: string;
+    paymentMethod?: string;
+  }
+) =>
+  request<{ message: string; expense: any }>("/walk-in-accounts/expenses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const deleteWalkInCashierExpense = async (token: string, expenseId: string) =>
+  request<{ message: string }>(`/walk-in-accounts/expenses/${expenseId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const updateWalkInDrawer = async (
+  token: string,
+  payload: {
+    date?: string;
+    openingCash?: number;
+    closingCashCounted?: number | null;
+    cashToManager?: number;
+    notes?: string;
+    close?: boolean;
+  }
+) =>
+  request<{ message: string; drawer: any }>("/walk-in-accounts/drawer", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
 
 // ─── Due Dates API ─────────────────────────────────────────────────────────────
 

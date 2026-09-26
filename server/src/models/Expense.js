@@ -13,6 +13,11 @@ const EXPENSE_CATEGORIES = [
   "fuel",
   "salary_misc",
   "maintenance",
+  "food",
+  "cleaning",
+  "purchases_petty",
+  "tea_coffee",
+  "change_shortage",
   "other"
 ];
 
@@ -51,6 +56,13 @@ const expenseSchema = new mongoose.Schema(
       enum: ["cash", "upi", "bank", "card", "other"],
       default: "cash"
     },
+    /** admin = Expenses page; cashier = Walk-in Accounts petty spends */
+    source: {
+      type: String,
+      enum: ["admin", "cashier"],
+      default: "admin",
+      index: true
+    },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
@@ -62,6 +74,7 @@ const expenseSchema = new mongoose.Schema(
 );
 
 expenseSchema.index({ date: -1, category: 1 });
+expenseSchema.index({ date: 1, source: 1 });
 
 const Expense = mongoose.model("Expense", expenseSchema);
 
@@ -79,5 +92,20 @@ module.exports.CATEGORY_LABELS = {
   fuel: "Fuel / vehicle",
   salary_misc: "Staff / helper pay (misc)",
   maintenance: "Maintenance / repair",
+  food: "Food / meals (staff)",
+  cleaning: "Cleaning materials",
+  purchases_petty: "Small purchases (petty)",
+  tea_coffee: "Tea / coffee / water",
+  change_shortage: "Change shortage / till adjust",
   other: "Other"
 };
+module.exports.CASHIER_CATEGORIES = [
+  "food",
+  "cleaning",
+  "purchases_petty",
+  "packaging",
+  "tea_coffee",
+  "change_shortage",
+  "shop_supplies",
+  "other"
+];

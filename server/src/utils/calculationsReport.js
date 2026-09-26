@@ -146,15 +146,26 @@ const getCalculationsData = async (query = {}) => {
     });
   }
 
-  // Walk-in (always real cash)
+  // Walk-in: billed vs cash actually collected (pending bills excluded from cash-in)
   const walkIns = await WalkInSale.find({
-    saleDate: { $gte: from, $lte: to }
+    saleDate: { $gte: from, $lte: to },
+    status: { $ne: "cancelled" }
   })
-    .select("saleDate total paymentMethod billNumber customerName")
+    .select("saleDate total amountPaid paymentStatus paymentMethod billNumber customerName")
     .lean();
   let walkInSales = 0;
+  let walkInCollected = 0;
+  let walkInPending = 0;
   for (const sale of walkIns) {
-    walkInSales += round2(sale.total);
+    const total = round2(sale.total);
+    let paid = Number(sale.amountPaid);
+    if (!Number.isFinite(paid)) {
+      paid = sale.paymentStatus === "pending" ? 0 : total;
+    }
+    paid = round2(Math.min(total, Math.max(0, paid)));
+    walkInSales += total;
+    walkInCollected += paid;
+    walkInPending += round2(total - paid);
   }
 
   // Manual admin collections in range — split family vs real
@@ -221,7 +232,7 @@ const getCalculationsData = async (query = {}) => {
   for (const e of expenses) otherExpenses += round2(e.amount);
 
   const realCashIn =
-    collectedReal + walkInSales + manualReal;
+    collectedReal + walkInCollected + manualReal;
   const paperFamilyCash = collectedFamily + manualFamily;
   const totalCosts =
     totalPurchases + partnerSalaries + petrolAllowances + otherExpenses;
@@ -276,6 +287,8 @@ const getCalculationsData = async (query = {}) => {
       pendingOnOrdersReal: round2(pendingOnOrdersReal),
       pendingOnOrdersFamily: round2(pendingOnOrdersFamily),
       walkInSales: round2(walkInSales),
+      walkInCollected: round2(walkInCollected),
+      walkInPending: round2(walkInPending),
       walkInBills: walkIns.length,
       manualCollectionsReal: round2(manualReal),
       manualCollectionsFamily: round2(manualFamily),
@@ -302,18 +315,30 @@ const getCalculationsData = async (query = {}) => {
       pendingBalance: round2(u.pendingBalance)
     })),
     manualCollections: manualList,
-    walkIns: walkIns.map((w) => ({
-      id: w._id,
-      saleDate: w.saleDate,
-      total: round2(w.total),
-      billNumber: w.billNumber || "",
-      customerName: w.customerName || ""
-    })),
+    walkIns: walkIns.map((w) => {
+      const total = round2(w.total);
+      let paid = Number(w.amountPaid);
+      if (!Number.isFinite(paid)) {
+        paid = w.paymentStatus === "pending" ? 0 : total;
+      }
+      paid = round2(Math.min(total, Math.max(0, paid)));
+      return {
+        id: w._id,
+        saleDate: w.saleDate,
+        total,
+        amountPaid: paid,
+        amountDue: round2(total - paid),
+        paymentStatus: w.paymentStatus || (paid >= total ? "paid" : "pending"),
+        billNumber: w.billNumber || "",
+        customerName: w.customerName || ""
+      };
+    }),
     formula: {
-      realCashIn: "COD/UPI from non-family deliveries + walk-in + admin collect (non-family)",
-      totalCosts: "Purchases + partner salaries + petrol allowance + expenses",
+      realCashIn:
+        "COD/UPI from non-family deliveries + walk-in collected + admin collect (non-family)",
+      totalCosts: "Purchases + partner salaries + petrol allowance + expenses (incl. cashier petty)",
       actualFishFriendlyEarn: "realCashIn − totalCosts",
-      note: "Mark sister/brother customers as Family in Users so their admin-collect does not count as real earn."
+      note: "Mark sister/brother customers as Family in Users so their admin-collect does not count as real earn. Unpaid walk-in bills stay in walk-in pending until Walk-in Accounts collects them."
     }
   };
 };

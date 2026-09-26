@@ -276,11 +276,56 @@ const deductTodayCatchForWalkIn = async (lines) => {
   return shapeAdmin(doc);
 };
 
+/**
+ * Restore walk-in quantities back into Today's Catch (on bill cancel).
+ * Best-effort: if an item is missing from catch, skip that line.
+ */
+const restoreTodayCatchForWalkIn = async (lines) => {
+  if (!Array.isArray(lines) || lines.length === 0) {
+    return shapeAdmin(await getOrCreate());
+  }
+
+  const doc = await getOrCreate();
+  const items = doc.items || [];
+  let changed = false;
+
+  for (const line of lines) {
+    const qty = Number(line.quantity);
+    if (!(qty > 0)) continue;
+
+    let idx = -1;
+    const catchId = line.catchItemId ? String(line.catchItemId) : "";
+    if (catchId) {
+      idx = items.findIndex((it) => String(it._id) === catchId);
+    }
+    if (idx < 0 && line.product) {
+      idx = items.findIndex(
+        (it) => it.productId && String(it.productId) === String(line.product)
+      );
+    }
+    if (idx < 0 && line.productName) {
+      const name = String(line.productName).trim().toLowerCase();
+      idx = items.findIndex((it) => String(it.name || "").trim().toLowerCase() === name);
+    }
+    if (idx < 0) continue;
+
+    items[idx].availableQty = roundQty((items[idx].availableQty || 0) + qty);
+    changed = true;
+  }
+
+  if (changed) {
+    doc.markModified("items");
+    await doc.save();
+  }
+  return shapeAdmin(doc);
+};
+
 module.exports = {
   getPublicTodayCatch,
   getAdminTodayCatch,
   updateTodayCatch,
   getOrCreate,
   shapeAdmin,
-  deductTodayCatchForWalkIn
+  deductTodayCatchForWalkIn,
+  restoreTodayCatchForWalkIn
 };

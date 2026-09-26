@@ -33,6 +33,7 @@ import AdminNotifications from "./pages/dashboards/AdminNotifications";
 import AdminDueDates from "./pages/dashboards/AdminDueDates";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
 import AdminWalkIn from "./pages/dashboards/AdminWalkIn";
+import AdminWalkInAccounts from "./pages/dashboards/AdminWalkInAccounts";
 import AdminProfile from "./pages/dashboards/AdminProfile";
 import AdminPartnerApprovals from "./pages/dashboards/AdminPartnerApprovals";
 import AdminNewCustomers from "./pages/dashboards/AdminNewCustomers";
@@ -149,6 +150,7 @@ function App() {
           <Route path="/dashboard/admin/notifications" element={<AdminNotifications />} />
           <Route path="/dashboard/admin/due-dates" element={<AdminDueDates />} />
           <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />
+          <Route path="/dashboard/admin/walk-in-accounts" element={<AdminWalkInAccounts />} />
           <Route path="/dashboard/admin/manual-booking" element={<AdminManualBooking />} />
           <Route path="/dashboard/admin/manage-admins" element={<AdminManageAdmins />} />
         </Route>

@@ -33,6 +33,7 @@ export type AdminSectionId =
   | "notifications"
   | "due_dates"
   | "walk_in"
+  | "walk_in_accounts"
   | "manual_booking"
   | "manage_admins";
 
@@ -116,6 +117,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   { id: "notifications", label: "Notifications", href: "/dashboard/admin/notifications" },
   { id: "due_dates", label: "Due Dates", href: "/dashboard/admin/due-dates" },
   { id: "walk_in", label: "Walk-in", href: "/dashboard/admin/walk-in" },
+  {
+    id: "walk_in_accounts",
+    label: "Walk-in Accounts",
+    href: "/dashboard/admin/walk-in-accounts"
+  },
   { id: "manual_booking", label: "Manual Booking", href: "/dashboard/admin/manual-booking" },
   {
     id: "manage_admins",
@@ -160,6 +166,9 @@ export const hasAdminSection = (
     allowed.add("calculations");
     allowed.add("gst");
   }
+  if (allowed.has("walk_in")) {
+    allowed.add("walk_in_accounts");
+  }
   return sectionIds.some((id) => allowed.has(id));
 };
 
@@ -179,6 +188,9 @@ export const getAdminNavLinksForUser = (user: {
   if (allowed.has("earnings") || allowed.has("finance") || allowed.has("expenses")) {
     allowed.add("calculations");
     allowed.add("gst");
+  }
+  if (allowed.has("walk_in")) {
+    allowed.add("walk_in_accounts");
   }
   return ADMIN_SECTION_DEFS.filter(
     (s) => s.always || (!s.fullOnly && allowed.has(s.id))

@@ -242,7 +242,8 @@ const getGstReportData = async (query = {}) => {
   }
 
   const walkIns = await WalkInSale.find({
-    saleDate: { $gte: from, $lte: to }
+    saleDate: { $gte: from, $lte: to },
+    status: { $ne: "cancelled" }
   }).lean();
 
   for (const sale of walkIns) {
