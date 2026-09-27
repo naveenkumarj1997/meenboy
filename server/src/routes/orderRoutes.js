@@ -31,7 +31,8 @@ const {
   reorderAssignments,
   adminReorderAssignments,
   createAdminOrder,
-  adminUpdateDeliveryPayment
+  adminUpdateDeliveryPayment,
+  adminSetDeliveryStatus
 } = require("../controllers/orderController");
 
 const router = express.Router();
@@ -47,6 +48,7 @@ const orderAdminAccess = authorizeAdminSections(
   "pending_payments",
   "delivery_amount_collection",
   "delivery_status_change",
+  "delivery_trips_control",
   "invoices",
   "manual_booking",
   "new_customers",
@@ -220,6 +222,16 @@ router.patch(
   [body("paymentMethod").notEmpty().withMessage("Payment method is required")],
   validateRequest,
   adminUpdateDeliveryPayment
+);
+
+router.patch(
+  "/assignments/:assignmentId/admin-status",
+  protect,
+  authorizeRoles("admin"),
+  authorizeAdminSections("delivery_trips_control"),
+  [body("status").notEmpty().withMessage("Status is required")],
+  validateRequest,
+  adminSetDeliveryStatus
 );
 
 router.patch(

@@ -947,21 +947,124 @@ export const getPartnerAssignments = async (token: string) =>
 export type DeliveryTripPayload = {
   id: string;
   date: string;
+  tripNumber: number;
   status: "active" | "ended" | "auto_ended";
   startedAt?: string;
   endedAt?: string;
   totalKm: number;
   pointCount: number;
+  lastCapturedAt?: string | null;
+  lastLocationLabel?: string;
+  startedBy?: "partner" | "admin";
+  endedBy?: "partner" | "admin" | "auto" | "";
+  manualKm?: boolean;
+  adminNotes?: string;
+};
+
+export type DeliveryTripWindow = {
+  trackingOpen: boolean;
+  opensAtMinutes: number;
+  autoEndAfterMinutes: number;
+  nowMinutesIst: number;
+};
+
+export type DeliveryTripDaySummary = {
+  trip: DeliveryTripPayload | null;
+  trips: DeliveryTripPayload[];
+  tripsUsed: number;
+  maxTrips: number;
+  hasActiveTrip: boolean;
+  canStartNext: boolean;
+  totalKm: number;
 };
 
 export const getMyDeliveryTripToday = async (token: string) =>
-  request<{
-    date: string;
-    trip: DeliveryTripPayload | null;
-    window: { trackingOpen: boolean; autoEndAfterMinutes: number; nowMinutesIst: number };
-  }>("/delivery-trips/me/today", {
+  request<
+    DeliveryTripDaySummary & {
+      date: string;
+      window: DeliveryTripWindow;
+    }
+  >("/delivery-trips/me/today", {
     headers: { Authorization: `Bearer ${token}` }
   });
+
+export type AdminTripPartnerRow = DeliveryTripDaySummary & {
+  partner: { _id: string; name: string; phone?: string; status?: string };
+};
+
+export const adminGetDeliveryTripsDay = async (token: string, date?: string) =>
+  request<{
+    date: string;
+    isToday: boolean;
+    maxTrips: number;
+    window: DeliveryTripWindow;
+    partners: AdminTripPartnerRow[];
+  }>(`/delivery-trips/admin/day${date ? `?date=${encodeURIComponent(date)}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const adminStartDeliveryTrip = async (token: string, partnerId: string, note?: string) =>
+  request<{ message: string; trip: DeliveryTripPayload }>("/delivery-trips/admin/start", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ partnerId, note })
+  });
+
+export const adminEndDeliveryTrip = async (token: string, tripId: string, note?: string) =>
+  request<{ message: string; trip: DeliveryTripPayload }>(
+    `/delivery-trips/admin/trips/${tripId}/end`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ note })
+    }
+  );
+
+export const adminReopenDeliveryTrip = async (token: string, tripId: string, note?: string) =>
+  request<{ message: string; trip: DeliveryTripPayload }>(
+    `/delivery-trips/admin/trips/${tripId}/reopen`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ note })
+    }
+  );
+
+export const adminUpdateDeliveryTrip = async (
+  token: string,
+  tripId: string,
+  payload: { totalKm?: number; resetKm?: boolean; note?: string }
+) =>
+  request<{ message: string; trip: DeliveryTripPayload }>(`/delivery-trips/admin/trips/${tripId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const adminDeleteDeliveryTrip = async (token: string, tripId: string) =>
+  request<{ message: string }>(`/delivery-trips/admin/trips/${tripId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const adminSetDeliveryStatus = async (
+  token: string,
+  assignmentId: string,
+  payload: {
+    status: "assigned" | "en_route" | "delivered" | "failed";
+    paymentMethod?: string;
+    paymentCollected?: number;
+    adminNote?: string;
+  }
+) =>
+  request<{ assignment: any; message: string }>(
+    `/orders/assignments/${assignmentId}/admin-status`,
+    {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(payload)
+    }
+  );
 
 export const startMyDeliveryTrip = async (
   token: string,
@@ -1313,6 +1416,222 @@ export const downloadGstSummaryPdf = async (
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error((data as { message?: string }).message || "Failed to download GST summary PDF");
+  }
+  return response.blob();
+};
+
+export type PriceProduct = {
+  _id: string;
+  name: string;
+  category: string;
+  unit: string;
+  minPrice: number;
+  maxPrice: number;
+  image: string;
+  cuts: string[];
+};
+
+export const getPriceHistoryProducts = async (token: string) =>
+  request<{ products: PriceProduct[] }>("/price-history/products", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export type PriceGroupRow = {
+  key: string;
+  avg: number | null;
+  min: number | null;
+  max: number | null;
+  days: number;
+  qty: number;
+  amount: number;
+  soldAvg: number | null;
+};
+
+export type PriceHistory = {
+  product: Omit<PriceProduct, "cuts">;
+  range: { from: string; to: string };
+  cut: string;
+  cuts: string[];
+  summary: {
+    days: number;
+    dailyRateDays: number;
+    avg: number | null;
+    min: number | null;
+    max: number | null;
+    spread: number | null;
+    first: { date: string; price: number } | null;
+    last: { date: string; price: number } | null;
+    changePct: number | null;
+    highest: { date: string; price: number } | null;
+    lowest: { date: string; price: number } | null;
+    totalQty: number;
+    totalAmount: number;
+    soldAvg: number | null;
+  };
+  series: Array<{
+    date: string;
+    dailyRate: number | null;
+    rateLow: number | null;
+    rateHigh: number | null;
+    soldAvg: number | null;
+    soldQty: number;
+    soldAmount: number;
+    orderQty: number;
+    walkInQty: number;
+  }>;
+  monthly: PriceGroupRow[];
+  yearly: PriceGroupRow[];
+  weekday: Array<{ key: string; avg: number | null; days: number; qty: number }>;
+  byCut: Array<{ cut: string; avg: number | null; min: number | null; max: number | null; count: number }>;
+};
+
+export const getPriceHistory = async (
+  token: string,
+  params: { productId: string; from?: string; to?: string; cut?: string }
+) => {
+  const qs = new URLSearchParams({ productId: params.productId });
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  if (params.cut) qs.set("cut", params.cut);
+  return request<PriceHistory>(`/price-history?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export type HistoryCustomer = {
+  _id: string;
+  name: string;
+  phone: string;
+  email: string;
+  status?: string;
+  isRealUser: boolean;
+  pendingBalance: number;
+  joinedAt?: string;
+  orderCount: number;
+  totalSpent: number;
+  lastOrderDate: string | null;
+};
+
+export const getHistoryCustomers = async (token: string) =>
+  request<{ customers: HistoryCustomer[] }>("/users/history/customers", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export type CustomerHistoryOrder = {
+  _id: string;
+  orderNo: string;
+  status: string;
+  bookingSource: string;
+  deliveryDate: string;
+  deliveryTime: string;
+  createdAt: string;
+  items: Array<{
+    productName: string;
+    cutName: string;
+    quantity: number;
+    unit: string;
+    unitPrice: number;
+    totalPrice: number;
+    notes: string;
+  }>;
+  subtotal: number;
+  deliveryFee: number;
+  discountAmount: number;
+  discountNote: string;
+  addonAmount: number;
+  addonNote: string;
+  total: number;
+  customerNotes: string;
+  address: { line1?: string; line2?: string; city?: string; postalCode?: string; phone?: string } | null;
+  delivery: {
+    status: string;
+    partnerName: string;
+    partnerPhone: string;
+    paymentMethod: string;
+    paymentCollected: number;
+    deliveredAt: string | null;
+    notes: string;
+  } | null;
+  due: number;
+};
+
+export type CustomerHistory = {
+  customer: {
+    _id: string;
+    name: string;
+    phone: string;
+    alternatePhone: string;
+    email: string;
+    status?: string;
+    isRealUser: boolean;
+    excludeFromEarnings: boolean;
+    address: { line1?: string; line2?: string; city?: string; state?: string; postalCode?: string } | null;
+    mapUrl: string;
+    joinedAt?: string;
+    pendingBalance: number;
+  };
+  stats: {
+    totalOrders: number;
+    deliveredOrders: number;
+    cancelledOrders: number;
+    upcomingOrders: number;
+    totalBilled: number;
+    paidAtDelivery: number;
+    collectedLater: number;
+    totalPaid: number;
+    dueFromOrders: number;
+    pendingBalance: number;
+    avgOrderValue: number;
+    firstOrderDate: string | null;
+    lastOrderDate: string | null;
+    favouritePaymentMethod: string | null;
+    favouriteSlot: string | null;
+    walkInBills: number;
+    walkInBilled: number;
+    walkInPaid: number;
+  };
+  topItems: Array<{ name: string; unit: string; quantity: number; amount: number; times: number }>;
+  orders: CustomerHistoryOrder[];
+  collections: Array<{
+    _id: string;
+    amount: number;
+    paymentMethod: string;
+    notes: string;
+    adminName: string;
+    collectedAt: string;
+  }>;
+  walkIns: Array<{
+    _id: string;
+    billNumber: string;
+    saleDate: string;
+    status: string;
+    total: number;
+    amountPaid: number;
+    paymentStatus: string;
+    paymentMethod: string;
+    items: Array<{ productName: string; quantity: number; unit: string; totalPrice: number }>;
+  }>;
+};
+
+export const getCustomerHistory = async (token: string, customerId: string) =>
+  request<CustomerHistory>(`/users/${customerId}/history`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const downloadGstPurposePdf = async (
+  token: string,
+  params: { period?: string; from?: string; to?: string } = {}
+) => {
+  const qs = new URLSearchParams();
+  qs.set("period", params.period || "month");
+  if (params.from) qs.set("from", params.from);
+  if (params.to) qs.set("to", params.to);
+  const response = await fetch(`${API_BASE}/gst/report/gst-purpose.pdf?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message || "Failed to download GST purpose PDF");
   }
   return response.blob();
 };

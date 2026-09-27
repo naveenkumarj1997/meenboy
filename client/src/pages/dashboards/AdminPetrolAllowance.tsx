@@ -21,6 +21,7 @@ type PetrolStat = {
   stopKm?: number;
   tripKm?: number;
   tripStatus?: string | null;
+  tripCount?: number;
   tripPointCount?: number;
   kmSource?: string;
   amount: number;
@@ -239,7 +240,7 @@ export default function AdminPetrolAllowance() {
                   </div>
                   <div className="text-[10px] text-slate-500 mt-1">
                     {partner.kmSource === "trip_trail"
-                      ? `Trail · ${partner.tripPointCount || 0} pts · ${partner.tripStatus || ""}`
+                      ? `Trail · ${partner.tripCount || 1} trip${(partner.tripCount || 1) > 1 ? "s" : ""} · ${partner.tripPointCount || 0} pts · ${partner.tripStatus || ""}`
                       : partner.kmSource === "stop_fallback"
                         ? `Fallback stop km ${Number(partner.stopKm || 0).toFixed(2)}`
                         : "No trip GPS yet"}

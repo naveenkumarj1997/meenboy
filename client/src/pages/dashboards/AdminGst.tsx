@@ -5,10 +5,12 @@ import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 import {
   downloadGstSalesRegisterPdf,
   downloadGstSummaryPdf,
+  downloadGstPurposePdf,
   getGstReport,
   getGstSettings,
   updateGstSettings
 } from "../../lib/api";
+import { triggerFileDownload } from "../../lib/downloadPdf";
 
 const money = (n: unknown) => {
   const v = Number(n);
@@ -23,14 +25,7 @@ function localToday() {
 type Tab = "overview" | "register" | "settings";
 type Period = "today" | "week" | "month" | "all" | "custom";
 
-const saveBlob = (blob: Blob, filename: string) => {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-};
+const saveBlob = (blob: Blob, filename: string) => triggerFileDownload(blob, filename);
 
 export default function AdminGst() {
   const { token } = useAuth();
@@ -120,6 +115,17 @@ export default function AdminGst() {
       setError("");
       const blob = await downloadGstSummaryPdf(token, queryParams());
       saveBlob(blob, `GST-Summary.pdf`);
+    } catch (err: any) {
+      setError(err.message || "Download failed");
+    }
+  };
+
+  const handleDownloadGstPurpose = async () => {
+    if (!token) return;
+    try {
+      setError("");
+      const blob = await downloadGstPurposePdf(token, queryParams());
+      saveBlob(blob, `GST-Purpose.pdf`);
     } catch (err: any) {
       setError(err.message || "Download failed");
     }
@@ -263,6 +269,13 @@ export default function AdminGst() {
               >
                 Download rate / HSN summary PDF
               </button>
+              <button
+                type="button"
+                onClick={handleDownloadGstPurpose}
+                className="w-full sm:w-auto px-4 py-3 rounded-xl text-sm font-bold border border-slate-500/50 text-slate-100 hover:bg-slate-500/10"
+              >
+                GST Purpose PDF
+              </button>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 min-w-0">
@@ -311,13 +324,22 @@ export default function AdminGst() {
               <h3 className="text-sm font-bold text-white">
                 Sales register · {summary?.lines || 0} lines · {summary?.docs || 0} docs
               </h3>
-              <button
-                type="button"
-                onClick={handleDownloadRegister}
-                className="text-xs font-bold px-3 py-2 rounded-lg bg-teal-500/15 text-teal-300 border border-teal-500/30"
-              >
-                PDF
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDownloadRegister}
+                  className="text-xs font-bold px-3 py-2 rounded-lg bg-teal-500/15 text-teal-300 border border-teal-500/30"
+                >
+                  PDF
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownloadGstPurpose}
+                  className="text-xs font-bold px-3 py-2 rounded-lg bg-slate-500/15 text-slate-100 border border-slate-500/40"
+                >
+                  GST Purpose
+                </button>
+              </div>
             </div>
 
             {/* Mobile cards */}

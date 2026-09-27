@@ -8,6 +8,7 @@ import {
   deletePartnerDocument,
   downloadPartnerNdaPdf
 } from "../../lib/api";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 
 export default function AdminPartnerApprovals() {
@@ -78,17 +79,7 @@ export default function AdminPartnerApprovals() {
       setError("");
       setBusyId(partner._id);
       const blob = await downloadPartnerNdaPdf(token!, { partnerId: partner._id });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `NDA-${String(partner.name || "partner").replace(/\s+/g, "-")}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => {
-        window.open(url, "_blank", "noopener,noreferrer");
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      }, 250);
+      triggerPdfDownload(blob, `NDA-${String(partner.name || "partner").replace(/\s+/g, "-")}.pdf`);
     } catch (err: any) {
       setError(err.message || "Failed to download NDA PDF");
     } finally {

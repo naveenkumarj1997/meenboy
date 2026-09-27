@@ -1811,14 +1811,18 @@ const getTodayDeliveryStatus = async (req, res, next) => {
         .lean(),
       PartnerDeliveryTrip.find({ date })
         .select(
-          "deliveryPartner status lastLat lastLng lastCapturedAt lastStreet lastArea lastLocationLabel lastGeocodedAt points"
+          "deliveryPartner tripNumber status startedAt lastLat lastLng lastCapturedAt lastStreet lastArea lastLocationLabel lastGeocodedAt"
         )
+        .sort({ tripNumber: 1, startedAt: 1 })
         .lean()
     ]);
 
+    // Prefer the running trip; otherwise the latest one of the day.
     const tripByPartner = {};
     for (const t of trips) {
-      tripByPartner[String(t.deliveryPartner)] = t;
+      const pId = String(t.deliveryPartner);
+      if (tripByPartner[pId]?.status === "active") continue;
+      tripByPartner[pId] = t;
     }
 
     const minutesBetween = (a, b) => {
@@ -2131,6 +2135,116 @@ const adminUpdateDeliveryPayment = async (req, res, next) => {
   }
 };
 
+const roundMoney = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+/** Adjust customer pending balance by delta (never below zero). */
+const applyCustomerPendingDelta = async (customerId, delta) => {
+  const change = roundMoney(delta);
+  if (!customerId || change === 0) return;
+  if (change > 0) {
+    await User.findByIdAndUpdate(customerId, { $inc: { pendingBalance: change } });
+    return;
+  }
+  const customer = await User.findById(customerId).select("pendingBalance");
+  if (!customer) return;
+  const current = roundMoney(customer.pendingBalance);
+  customer.pendingBalance = Math.max(0, roundMoney(current + change));
+  await customer.save();
+};
+
+const ADMIN_DELIVERY_STATUSES = ["assigned", "en_route", "delivered", "failed"];
+const PAYMENT_METHODS = ["cash", "upi", "partial_cash", "partial_upi", "pay_later", "none"];
+
+// @desc    Admin override of a delivery's status + payment (Delivery Trips Control)
+// @route   PATCH /api/orders/assignments/:assignmentId/admin-status
+const adminSetDeliveryStatus = async (req, res, next) => {
+  try {
+    const { assignmentId } = req.params;
+    const { status, paymentMethod, paymentCollected, adminNote } = req.body;
+
+    if (!ADMIN_DELIVERY_STATUSES.includes(status)) {
+      return res.status(400).json({ message: "Choose a valid delivery status." });
+    }
+    const noteText = String(adminNote || "").trim();
+    if (status === "failed" && !noteText) {
+      return res.status(400).json({ message: "Reason is required when marking failed." });
+    }
+
+    const assignment = await DeliveryAssignment.findById(assignmentId).populate("order");
+    if (!assignment) return res.status(404).json({ message: "Delivery assignment not found" });
+    const order = assignment.order;
+    if (!order) return res.status(404).json({ message: "Order not found for this delivery" });
+
+    const orderTotal = roundMoney(order.total);
+    const wasDelivered = assignment.status === "delivered";
+    const oldUnpaid = wasDelivered
+      ? roundMoney(Math.max(0, orderTotal - Number(assignment.paymentCollected || 0)))
+      : 0;
+
+    let collected = 0;
+    let method = "none";
+    if (status === "delivered") {
+      method = paymentMethod || assignment.paymentMethod || "pay_later";
+      if (!PAYMENT_METHODS.includes(method)) {
+        return res.status(400).json({ message: "Choose a valid payment method." });
+      }
+      if (method === "cash" || method === "upi") {
+        collected = orderTotal;
+      } else if (method === "partial_cash" || method === "partial_upi") {
+        collected = roundMoney(paymentCollected);
+        if (collected <= 0) {
+          return res.status(400).json({ message: "Enter the partial amount collected." });
+        }
+        if (collected >= orderTotal) {
+          return res.status(400).json({
+            message: "Partial amount must be less than the order total."
+          });
+        }
+      }
+    }
+
+    const newUnpaid =
+      status === "delivered" ? roundMoney(Math.max(0, orderTotal - collected)) : 0;
+    await applyCustomerPendingDelta(order.customer, newUnpaid - oldUnpaid);
+
+    const previousStatus = assignment.status;
+    assignment.status = status;
+    assignment.paymentCollected = collected;
+    assignment.paymentMethod = method;
+    if (status === "delivered" && !assignment.actualArrival) {
+      assignment.actualArrival = new Date();
+    }
+    const tag = `[Admin: ${previousStatus} → ${status}]${noteText ? ` ${noteText}` : ""}`;
+    const existingNotes = String(assignment.notes || "").trim();
+    assignment.notes = (existingNotes ? `${existingNotes} | ${tag}` : tag).slice(-500);
+    await assignment.save();
+
+    const orderStatus =
+      status === "delivered"
+        ? "delivered"
+        : status === "en_route" || status === "failed"
+          ? "out_for_delivery"
+          : "confirmed";
+    if (order.status !== "cancelled") {
+      await Order.findByIdAndUpdate(order._id, { status: orderStatus });
+    }
+
+    const populated = await DeliveryAssignment.findById(assignment._id)
+      .populate({
+        path: "order",
+        populate: { path: "customer", select: "name phone email" }
+      })
+      .populate("deliveryPartner", "name phone email");
+
+    res.json({
+      assignment: populated,
+      message: `Delivery marked ${status.replace("_", " ")} by admin.`
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
@@ -2157,6 +2271,7 @@ module.exports = {
   listAllAssignments,
   getDeliveryStats,
   getTodayDeliveryStatus,
+  adminSetDeliveryStatus,
   reorderAssignments,
   adminReorderAssignments,
   createAdminOrder,

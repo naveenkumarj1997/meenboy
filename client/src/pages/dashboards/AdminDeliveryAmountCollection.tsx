@@ -9,6 +9,7 @@ import {
   getTodayDeliveryStatus,
   savePartnerSalary
 } from "../../lib/api";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
 
@@ -325,12 +326,7 @@ export default function AdminDeliveryAmountCollection() {
       setDownloadingPdf(true);
       setError("");
       const blob = await downloadPartnerCollectionReport(token, { date, partnerId });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Collection-${date}-${selectedPartner?.name || "partner"}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerPdfDownload(blob, `Collection-${date}-${selectedPartner?.name || "partner"}.pdf`);
     } catch (err: any) {
       setError(err.message || "Failed to download PDF");
     } finally {

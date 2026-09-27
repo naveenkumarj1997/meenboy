@@ -4,7 +4,8 @@ const {
 } = require("../utils/gstReport");
 const {
   generateGstSalesRegisterPdf,
-  generateGstSummaryPdf
+  generateGstSummaryPdf,
+  generateGstPurposePdf
 } = require("../utils/pdfGstReports");
 
 const getGstSettings = async (req, res, next) => {
@@ -108,10 +109,24 @@ const downloadGstSummaryPdf = async (req, res, next) => {
   }
 };
 
+const downloadGstPurposePdf = async (req, res, next) => {
+  try {
+    const data = await getGstReportData(req.query);
+    const buffer = await generateGstPurposePdf(data);
+    const name = `GST-Purpose-${data.range.from}_to_${data.range.to}.pdf`;
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${name}"`);
+    res.send(buffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getGstSettings,
   updateGstSettings,
   getGstReport,
   downloadGstSalesRegisterPdf,
-  downloadGstSummaryPdf
+  downloadGstSummaryPdf,
+  downloadGstPurposePdf
 };

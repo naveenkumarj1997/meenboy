@@ -885,13 +885,17 @@ const getPartnerPetrolByDate = async (req, res, next) => {
       });
     }
 
-    for (const trip of trips) {
+    const sortedTrips = [...trips].sort(
+      (a, b) => Number(a.tripNumber || 1) - Number(b.tripNumber || 1)
+    );
+    for (const trip of sortedTrips) {
       const row = ensurePartner(trip.deliveryPartner);
       if (!row) continue;
-      row.tripKm = Number(trip.totalKm || 0);
-      row.tripStatus = trip.status;
-      row.tripPointCount = Array.isArray(trip.points) ? trip.points.length : 0;
-      row.tripStartedAt = trip.startedAt;
+      row.tripKm = Math.round((row.tripKm + Number(trip.totalKm || 0)) * 100) / 100;
+      row.tripCount = (row.tripCount || 0) + 1;
+      if (row.tripStatus !== "active") row.tripStatus = trip.status;
+      row.tripPointCount += Array.isArray(trip.points) ? trip.points.length : 0;
+      if (!row.tripStartedAt) row.tripStartedAt = trip.startedAt;
       row.tripEndedAt = trip.endedAt;
     }
 
@@ -1044,7 +1048,8 @@ const getMyEarnings = async (req, res, next) => {
     }).lean();
     const tripKmByDate = {};
     trips.forEach((t) => {
-      tripKmByDate[t.date] = Number(t.totalKm || 0);
+      tripKmByDate[t.date] =
+        Math.round(((tripKmByDate[t.date] || 0) + Number(t.totalKm || 0)) * 100) / 100;
     });
 
     const deliveredByDate = {};

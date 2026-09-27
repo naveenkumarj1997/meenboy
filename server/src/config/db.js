@@ -27,6 +27,13 @@ const connectDB = async () => {
       console.warn(`Real user sync skipped: ${syncErr.message}`);
     }
 
+    try {
+      await require("../models/PartnerDeliveryTrip").migrateLegacyIndexes();
+    } catch (idxErr) {
+      // eslint-disable-next-line no-console
+      console.warn(`Delivery trip index migration skipped: ${idxErr.message}`);
+    }
+
     return true;
   } catch (error) {
     // eslint-disable-next-line no-console

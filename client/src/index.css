@@ -29,6 +29,17 @@ body {
   box-sizing: border-box;
 }
 
+/* Native <select> popups and date pickers render as solid dark lists instead of see-through */
+:root {
+  color-scheme: dark;
+}
+
+select option,
+select optgroup {
+  background-color: #083344;
+  color: #f8fafc;
+}
+
 /* Improve touch scrolling for admin sidebars/menus on mobile */
 .overscroll-contain {
   overscroll-behavior: contain;

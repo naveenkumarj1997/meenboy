@@ -30,6 +30,10 @@ const {
   updateAdmin,
   deleteAdmin
 } = require("../controllers/adminManageController");
+const {
+  listHistoryCustomers,
+  getCustomerHistory
+} = require("../controllers/customerHistoryController");
 
 const router = express.Router();
 
@@ -53,6 +57,13 @@ router.get(
   authorizeAdminSections("new_customers"),
   getNewCustomersCount
 );
+
+router.get(
+  "/history/customers",
+  authorizeAdminSections("users_history"),
+  listHistoryCustomers
+);
+router.get("/:id/history", authorizeAdminSections("users_history"), getCustomerHistory);
 
 // Manage Admins (full admin only) — register before /:id routes
 router.get("/admin-sections", requireFullAdmin, listAdminSectionDefs);

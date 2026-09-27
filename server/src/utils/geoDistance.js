@@ -127,8 +127,10 @@ const istMinutesNow = (d = new Date()) => {
   return hour * 60 + minute;
 };
 
-/** Auto-end active trips after 1:00 PM IST (13:00). */
-const AUTO_END_AFTER_MINUTES = 13 * 60;
+/** Auto-end active trips after 10:00 PM IST (22:00). */
+const AUTO_END_AFTER_MINUTES = 22 * 60;
+const TRACKING_OPENS_MINUTES = 5 * 60;
+const MAX_TRIPS_PER_DAY = 3;
 
 module.exports = {
   haversineKm,
@@ -137,5 +139,7 @@ module.exports = {
   computeTrailKm,
   istYmd,
   istMinutesNow,
-  AUTO_END_AFTER_MINUTES
+  AUTO_END_AFTER_MINUTES,
+  TRACKING_OPENS_MINUTES,
+  MAX_TRIPS_PER_DAY
 };

@@ -14,6 +14,7 @@ import {
   downloadPartnerNdaPdf,
   type DeliveryTripPayload
 } from "../../lib/api";
+import { triggerPdfDownload } from "../../lib/downloadPdf";
 import { formatQuantityLabel } from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
 import {
@@ -95,22 +96,10 @@ function PartnerNdaForm({
       setDownloading(true);
       setError("");
       const blob = await downloadPartnerNdaPdf(token, draft);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "FishFriendly-Partner-NDA.pdf";
-      a.rel = "noopener";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      // Mobile browsers often ignore download= — open PDF so partner can save/share/print
-      window.setTimeout(() => {
-        window.open(url, "_blank", "noopener,noreferrer");
-        window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      }, 250);
+      triggerPdfDownload(blob, "FishFriendly-Partner-NDA.pdf");
       setDownloaded(true);
       setInfo(
-        "NDA PDF ready. On phone: open the PDF, save or share to print, sign by hand, and give the copy to admin."
+        "NDA PDF downloaded. Open it from your phone's Downloads, print it, sign by hand, and give the copy to admin."
       );
     } catch (err: any) {
       setError(err.message || "Failed to download NDA PDF");
@@ -449,6 +438,8 @@ export default function DeliveryDashboard() {
   });
 
   const [trip, setTrip] = useState<DeliveryTripPayload | null>(null);
+  const [tripsToday, setTripsToday] = useState<DeliveryTripPayload[]>([]);
+  const [maxTrips, setMaxTrips] = useState(3);
   const [tripBusy, setTripBusy] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(true);
   const [gpsOffWarning, setGpsOffWarning] = useState(false);
@@ -466,11 +457,23 @@ export default function DeliveryDashboard() {
     try {
       const res = await getMyDeliveryTripToday(token);
       setTrip(res.trip);
+      setTripsToday(res.trips || []);
+      if (res.maxTrips) setMaxTrips(res.maxTrips);
       setTrackingOpen(Boolean(res.window?.trackingOpen));
     } catch {
       /* keep last */
     }
   };
+
+  // Pick up trips started / ended by admin (Delivery Trips Control) without a reload
+  useEffect(() => {
+    if (!token || user?.status !== "active") return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") refreshTrip();
+    }, 30000);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, user?.status]);
 
   useEffect(() => {
     if (!token) return;
@@ -585,6 +588,7 @@ export default function DeliveryDashboard() {
       const res = await startMyDeliveryTrip(token, location);
       setTrip(res.trip);
       setSuccess(res.message || "Trip started from hub.");
+      refreshTrip();
     } catch (err: any) {
       setError(err.message || "Could not start trip");
       refreshTrip();
@@ -607,6 +611,7 @@ export default function DeliveryDashboard() {
       const res = await endMyDeliveryTrip(token, location);
       setTrip(res.trip);
       setSuccess(res.message || "Trip ended. Petrol km saved.");
+      refreshTrip();
     } catch (err: any) {
       setError(err.message || "Could not end trip");
       refreshTrip();
@@ -955,11 +960,16 @@ export default function DeliveryDashboard() {
         </div>
       ) : null}
 
-      {/* Hub trip petrol tracking — one trip/day, auto-end after 1 PM IST */}
+      {/* Hub trip petrol tracking — up to maxTrips per day, auto-end after 10 PM IST */}
       <div className="mb-6 rounded-2xl border border-teal-500/30 bg-gradient-to-br from-teal-500/10 to-slate-900/80 p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-white">Petrol trip (hub → deliveries → hub)</h3>
+            <h3 className="text-base sm:text-lg font-bold text-white">
+              Petrol trip (hub → deliveries → hub)
+              <span className="ml-2 align-middle text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300">
+                {tripsToday.length}/{maxTrips} trips today
+              </span>
+            </h3>
             <p className="text-sm text-slate-400 mt-1 leading-relaxed">
               You must tap <span className="text-teal-300 font-semibold">Start from hub</span>, then
               mark <span className="text-teal-300 font-semibold">On the way</span> first. Only after
@@ -967,7 +977,8 @@ export default function DeliveryDashboard() {
               <span className="text-teal-300 font-semibold">Failed</span>.
               Keep this page open — the screen stays on during the trip so GPS can save every 15s.
               Waiting at chicken/mutton shop is OK (same place barely adds km). End when you return
-              to hub. Auto-ends after 1:00 PM if you forget.
+              to hub. If new deliveries are assigned later, start the next trip (up to {maxTrips} per
+              day). Any running trip auto-ends at 10:00 PM.
             </p>
             {trip?.status === "active" ? (
               <p
@@ -993,24 +1004,46 @@ export default function DeliveryDashboard() {
             ) : null}
             {trip ? (
               <p className="text-sm text-teal-300 mt-2 font-medium">
-                Status: {trip.status.replace("_", " ")} · {Number(trip.totalKm || 0).toFixed(2)} km ·{" "}
-                {trip.pointCount} GPS points
+                Trip {trip.tripNumber || 1}: {trip.status.replace("_", " ")} ·{" "}
+                {Number(trip.totalKm || 0).toFixed(2)} km · {trip.pointCount} GPS points
+                {trip.startedBy === "admin" ? " · started by admin" : ""}
               </p>
             ) : (
               <p className="text-sm text-amber-300 mt-2 font-medium">
                 No trip started — Start from hub, then On the way, then Delivered / Failed.
               </p>
             )}
+            {tripsToday.length > 1 ? (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {tripsToday.map((t) => (
+                  <span
+                    key={t.id}
+                    className={`text-[11px] px-2 py-0.5 rounded-full border ${
+                      t.status === "active"
+                        ? "bg-teal-500/15 border-teal-500/40 text-teal-200"
+                        : "bg-slate-800 border-slate-700 text-slate-300"
+                    }`}
+                  >
+                    Trip {t.tripNumber}: {Number(t.totalKm || 0).toFixed(1)} km
+                    {t.status === "active" ? " (running)" : ""}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
-            {!trip && (
+            {trip?.status !== "active" && tripsToday.length < maxTrips && (
               <button
                 type="button"
                 onClick={handleStartTrip}
                 disabled={tripBusy || !trackingOpen}
                 className="px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 disabled:opacity-40 text-white font-bold text-sm"
               >
-                {tripBusy ? "…" : "Start from hub"}
+                {tripBusy
+                  ? "…"
+                  : tripsToday.length === 0
+                    ? "Start from hub"
+                    : `Start trip ${tripsToday.length + 1} from hub`}
               </button>
             )}
             {trip?.status === "active" && (
@@ -1020,19 +1053,19 @@ export default function DeliveryDashboard() {
                 disabled={tripBusy}
                 className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-slate-950 font-bold text-sm"
               >
-                {tripBusy ? "…" : "End at hub (return)"}
+                {tripBusy ? "…" : `End trip ${trip.tripNumber || 1} at hub`}
               </button>
             )}
-            {trip && trip.status !== "active" && (
+            {trip?.status !== "active" && tripsToday.length >= maxTrips && (
               <span className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-sm font-bold">
-                Trip closed for today
+                All {maxTrips} trips done today
               </span>
             )}
           </div>
         </div>
-        {!trackingOpen && !trip && (
+        {!trackingOpen && trip?.status !== "active" && tripsToday.length < maxTrips && (
           <p className="text-xs text-amber-300/90 mt-3">
-            Tracking window is 5:00 AM – 1:00 PM IST.
+            Tracking window is 5:00 AM – 10:00 PM IST.
           </p>
         )}
       </div>

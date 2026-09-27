@@ -83,7 +83,9 @@ const getGstReportData = async (query = {}) => {
   const settings = await getOrCreateGstSettings();
   const { from, to, period, businessStart, today } = resolveRange(query);
 
-  const products = await Product.find({}).select("name category hsnCode gstRatePercent").lean();
+  const products = await Product.find({})
+    .select("name category hsnCode gstRatePercent minPrice")
+    .lean();
   const productById = {};
   const productByName = {};
   products.forEach((p) => {
@@ -144,7 +146,8 @@ const getGstReportData = async (query = {}) => {
       cgst: split.cgst,
       sgst: split.sgst,
       tax: split.tax,
-      gross: round2(gross)
+      gross: round2(gross),
+      minPrice: product && Number(product.minPrice) > 0 ? Number(product.minPrice) : null
     };
     sales.push(row);
 

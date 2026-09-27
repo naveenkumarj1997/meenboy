@@ -5,7 +5,8 @@ const {
   updateGstSettings,
   getGstReport,
   downloadGstSalesRegisterPdf,
-  downloadGstSummaryPdf
+  downloadGstSummaryPdf,
+  downloadGstPurposePdf
 } = require("../controllers/gstController");
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.put("/settings", updateGstSettings);
 router.get("/report", getGstReport);
 router.get("/report/sales-register.pdf", downloadGstSalesRegisterPdf);
 router.get("/report/summary.pdf", downloadGstSummaryPdf);
+router.get("/report/gst-purpose.pdf", downloadGstPurposePdf);
 
 module.exports = router;

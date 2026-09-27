@@ -5,6 +5,7 @@ export type AdminSectionId =
   | "partner_approvals"
   | "products"
   | "daily_prices"
+  | "price_range_graph"
   | "todays_catch"
   | "whatsapp_broadcast"
   | "invoices"
@@ -18,6 +19,7 @@ export type AdminSectionId =
   | "collected_payments"
   | "delivery_amount_collection"
   | "delivery_status_change"
+  | "delivery_trips_control"
   | "purchases"
   | "settlements"
   | "partner_salary"
@@ -26,6 +28,7 @@ export type AdminSectionId =
   | "calculations"
   | "gst"
   | "users"
+  | "users_history"
   | "money_management"
   | "expenses"
   | "finance"
@@ -57,6 +60,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   },
   { id: "products", label: "Products", href: "/dashboard/admin/products" },
   { id: "daily_prices", label: "Daily Prices", href: "/dashboard/admin/daily-prices" },
+  {
+    id: "price_range_graph",
+    label: "Price Range Graph",
+    href: "/dashboard/admin/price-range-graph"
+  },
   { id: "todays_catch", label: "Today's Catch", href: "/dashboard/admin/todays-catch" },
   {
     id: "whatsapp_broadcast",
@@ -94,6 +102,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
     label: "Delivery Status Change",
     href: "/dashboard/admin/delivery-status-change"
   },
+  {
+    id: "delivery_trips_control",
+    label: "Delivery Trips Control",
+    href: "/dashboard/admin/delivery-trips-control"
+  },
   { id: "purchases", label: "Purchases", href: "/dashboard/admin/purchases" },
   { id: "settlements", label: "Settlements", href: "/dashboard/admin/settlements" },
   { id: "partner_salary", label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
@@ -106,6 +119,7 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   { id: "calculations", label: "Calculations", href: "/dashboard/admin/calculations" },
   { id: "gst", label: "GST", href: "/dashboard/admin/gst" },
   { id: "users", label: "Users", href: "/dashboard/admin/users" },
+  { id: "users_history", label: "Users History", href: "/dashboard/admin/users-history" },
   {
     id: "money_management",
     label: "Money Management",
