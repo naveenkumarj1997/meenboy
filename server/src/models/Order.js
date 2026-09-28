@@ -20,6 +20,13 @@ const orderSchema = new mongoose.Schema(
       default: "website",
       index: true
     },
+    /** pre_order = priced later by Daily Prices; shop_stock = same-day, sold from Today's Catch at stock price. */
+    bookingType: {
+      type: String,
+      enum: ["pre_order", "shop_stock"],
+      default: "pre_order",
+      index: true
+    },
     items: [
       {
         product: {
@@ -45,6 +52,9 @@ const orderSchema = new mongoose.Schema(
         cutName: {
           type: String,
           trim: true
+        },
+        catchItemId: {
+          type: String
         },
         notes: {
           type: String,

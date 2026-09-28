@@ -10,6 +10,11 @@ const path = require("path");
 const fs = require("fs");
 const { generateInvoice } = require("../utils/pdfInvoice");
 const { resolveNavUrl } = require("../utils/mapLink");
+const {
+  getOrCreate: getTodayCatchDoc,
+  deductTodayCatchForWalkIn,
+  restoreTodayCatchForWalkIn
+} = require("./todayCatchController");
 const { generatePartnerDayReport } = require("../utils/pdfDeliveryReport");
 const { generatePartnerCollectionReport } = require("../utils/pdfPartnerCollectionReport");
 const {
@@ -92,6 +97,52 @@ const snapshotOrderItems = (items = []) =>
     estimatedUnitPrice: item.estimatedUnitPrice ?? item.unitPrice,
     estimatedTotalPrice: item.estimatedTotalPrice ?? item.totalPrice
   }));
+
+/** Price and name come from Today's Catch, never from the client. Throws with .statusCode on bad input. */
+const buildShopStockItems = async (items) => {
+  const fail = (message) => {
+    const err = new Error(message);
+    err.statusCode = 400;
+    return err;
+  };
+  const catchDoc = await getTodayCatchDoc();
+  const stock = catchDoc.items || [];
+  const needById = new Map();
+  const lines = items.map((item) => {
+    const catchId = String(item.catchItemId || "");
+    const stockItem = stock.find((s) => String(s._id) === catchId);
+    if (!stockItem) throw fail(`"${item.productName || "Item"}" is no longer in shop stock.`);
+    if (!stockItem.productId) {
+      throw fail(`Link "${stockItem.name}" to a product in Today's Catch before booking it.`);
+    }
+    const quantity = Math.round(Number(item.quantity) * 100) / 100;
+    if (!(quantity > 0)) throw fail(`Enter a quantity for "${stockItem.name}".`);
+    needById.set(catchId, (needById.get(catchId) || 0) + quantity);
+    const unitPrice = Number(stockItem.price) || 0;
+    return {
+      product: String(stockItem.productId),
+      catchItemId: catchId,
+      productName: stockItem.name,
+      productImage: stockItem.imageUrl || item.productImage || "",
+      quantity,
+      unit: stockItem.unit || "kg",
+      cutName: String(item.cutName || "").trim() || undefined,
+      notes: String(item.notes || "").trim(),
+      unitPrice,
+      totalPrice: Math.round(unitPrice * quantity * 100) / 100
+    };
+  });
+  for (const [catchId, need] of needById.entries()) {
+    const stockItem = stock.find((s) => String(s._id) === catchId);
+    const available = Number(stockItem.availableQty) || 0;
+    if (need > available + 0.001) {
+      throw fail(
+        `Not enough stock for "${stockItem.name}". Available ${available} ${stockItem.unit || "kg"}, needed ${need}.`
+      );
+    }
+  }
+  return lines;
+};
 
 const createOrder = async (req, res, next) => {
   try {
@@ -411,6 +462,16 @@ const updateOrderStatus = async (req, res, next) => {
 
     if (status === "cancelled") {
       await DeliveryAssignment.updateMany({ order: orderId }, { status: "cancelled" });
+      if (existing.bookingType === "shop_stock") {
+        await restoreTodayCatchForWalkIn(
+          existing.items.map((item) => ({
+            catchItemId: item.catchItemId,
+            product: item.product,
+            productName: item.productName,
+            quantity: item.quantity
+          }))
+        ).catch((err) => console.error("Restore shop stock on cancel:", err.message));
+      }
     }
 
     await createNotification({
@@ -469,8 +530,31 @@ const updateAdminOrder = async (req, res, next) => {
     if (deliveryFee != null && deliveryFee !== "") {
       order.deliveryFee = parseNonNegativeAmount(deliveryFee);
     }
+    const oldTotal = roundMoney(order.total);
     applyOrderAdjustments(order, adjustmentFields);
     recalculateOrderTotal(order);
+    const newTotal = roundMoney(order.total);
+
+    // A delivered order's unpaid part already sits in the customer's pending balance,
+    // so a total change must move that balance by the same difference.
+    if (newTotal !== oldTotal) {
+      const deliveredAssignment = await DeliveryAssignment.findOne({
+        order: order._id,
+        status: "delivered"
+      });
+      if (deliveredAssignment) {
+        const oldCollected = roundMoney(deliveredAssignment.paymentCollected);
+        const oldUnpaid = roundMoney(Math.max(0, oldTotal - oldCollected));
+        const paidInFull = ["cash", "upi"].includes(deliveredAssignment.paymentMethod);
+        const newCollected = paidInFull ? newTotal : Math.min(oldCollected, newTotal);
+        const newUnpaid = roundMoney(Math.max(0, newTotal - newCollected));
+        if (newCollected !== oldCollected) {
+          deliveredAssignment.paymentCollected = newCollected;
+          await deliveredAssignment.save();
+        }
+        await applyCustomerPendingDelta(order.customer, newUnpaid - oldUnpaid);
+      }
+    }
 
     if (address) {
       order.address = order.address || {};
@@ -822,7 +906,8 @@ const getProductsForDailyPrice = async (req, res, next) => {
 
     const orders = await Order.find({
       deliveryDate,
-      status: { $nin: ["cancelled"] }
+      status: { $nin: ["cancelled"] },
+      bookingType: { $ne: "shop_stock" }
     }).lean();
 
     let { products, changes } = buildDailyPriceSummary(orders);
@@ -851,7 +936,8 @@ const updateDailyPrices = async (req, res, next) => {
 
     const orders = await Order.find({
       deliveryDate,
-      status: { $in: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"] }
+      status: { $in: ["pending", "confirmed", "preparing", "out_for_delivery", "delivered"] },
+      bookingType: { $ne: "shop_stock" }
     });
 
     const savedRates = (priceUpdates || []).map((pu) => ({
@@ -953,7 +1039,8 @@ const updateDailyPrices = async (req, res, next) => {
 
     const refreshed = await Order.find({
       deliveryDate,
-      status: { $nin: ["cancelled"] }
+      status: { $nin: ["cancelled"] },
+      bookingType: { $ne: "shop_stock" }
     }).lean();
     let { products, changes } = buildDailyPriceSummary(refreshed);
     products = applySavedRatesToProducts(products, savedRates);
@@ -1558,7 +1645,6 @@ const createAdminOrder = async (req, res, next) => {
       items,
       address,
       deliveryFee = 0,
-      deliveryDate,
       deliveryTime,
       mapUrl,
       customerNotes = "",
@@ -1567,8 +1653,12 @@ const createAdminOrder = async (req, res, next) => {
       discountAmount = 0,
       discountNote = "",
       addonAmount = 0,
-      addonNote = ""
+      addonNote = "",
+      bookingType: rawBookingType,
+      deliveryPartnerId
     } = req.body;
+    const bookingType = rawBookingType === "shop_stock" ? "shop_stock" : "pre_order";
+    let deliveryDate = req.body.deliveryDate;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: "Order must contain at least one item" });
@@ -1576,6 +1666,29 @@ const createAdminOrder = async (req, res, next) => {
 
     if (!address?.line1 || !address?.city || !address?.state || !address?.postalCode) {
       return res.status(400).json({ message: "Complete delivery address is required (door/street, city, pincode)" });
+    }
+
+    let partnerDoc = null;
+    if (deliveryPartnerId) {
+      partnerDoc = await User.findOne({
+        _id: deliveryPartnerId,
+        role: "delivery_partner",
+        status: "active"
+      }).select("_id name");
+      if (!partnerDoc) {
+        return res.status(400).json({ message: "Selected delivery partner is not an active partner." });
+      }
+    }
+
+    let stockItems = null;
+    if (bookingType === "shop_stock") {
+      const { istYmd } = require("../utils/geoDistance");
+      deliveryDate = istYmd();
+      try {
+        stockItems = await buildShopStockItems(items);
+      } catch (stockErr) {
+        return res.status(stockErr.statusCode || 400).json({ message: stockErr.message });
+      }
     }
 
     let finalCustomerId = customerId;
@@ -1634,8 +1747,8 @@ const createAdminOrder = async (req, res, next) => {
       }
     }
 
-    // Still perform date availability checks
-    if (deliveryDate) {
+    // Same-day shop stock is already in hand, so pre-order date closures don't apply.
+    if (deliveryDate && bookingType === "pre_order") {
       const availability = await DateAvailability.findOne({ date: deliveryDate }).lean();
       if (availability) {
         if (availability.isClosed) {
@@ -1673,7 +1786,7 @@ const createAdminOrder = async (req, res, next) => {
       }
     }
 
-    const normalizedItems = items.map((item) => ({
+    const normalizedItems = (stockItems || items).map((item) => ({
       ...item,
       notes: String(item.notes || "").trim()
     }));
@@ -1696,12 +1809,25 @@ const createAdminOrder = async (req, res, next) => {
 
     const subtotal = itemsWithNotes.reduce((sum, item) => sum + item.totalPrice, 0);
     const total = computeOrderTotal(subtotal, deliveryFee, parsedDiscount, parsedAddon);
-    const dailyUpdate = deliveryDate
-      ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
-      : null;
+    const dailyUpdate =
+      deliveryDate && bookingType === "pre_order"
+        ? await DailyPriceUpdate.findOne({ deliveryDate }).lean()
+        : null;
+    const priceIsFinal = bookingType === "shop_stock" || Boolean(dailyUpdate);
 
-    const order = await Order.create({
+    if (stockItems) {
+      try {
+        await deductTodayCatchForWalkIn(stockItems);
+      } catch (stockErr) {
+        return res.status(stockErr.statusCode || 400).json({ message: stockErr.message });
+      }
+    }
+
+    let order;
+    try {
+      order = await Order.create({
       customer: finalCustomerId,
+      bookingType,
       items: snapshotOrderItems(itemsWithNotes),
       subtotal,
       deliveryFee: Number(deliveryFee || 0),
@@ -1711,8 +1837,8 @@ const createAdminOrder = async (req, res, next) => {
       addonNote: parsedAddonNote,
       total,
       estimatedTotal: total,
-      dailyPriceUpdated: Boolean(dailyUpdate),
-      dailyPriceUpdatedAt: dailyUpdate ? dailyUpdate.updatedAt : undefined,
+      dailyPriceUpdated: priceIsFinal,
+      dailyPriceUpdatedAt: priceIsFinal ? dailyUpdate?.updatedAt || new Date() : undefined,
       address: {
         line1: address.line1,
         line2: address.line2 || "",
@@ -1731,7 +1857,11 @@ const createAdminOrder = async (req, res, next) => {
       mapUrl: mapUrl || "",
       customerNotes: itemNotesSummary || notesText,
       bookingSource: "manual"
-    });
+      });
+    } catch (createErr) {
+      if (stockItems) await restoreTodayCatchForWalkIn(stockItems).catch(() => {});
+      throw createErr;
+    }
 
     const orderAlternate = String(order.address?.alternatePhone || "").trim();
     if (orderAlternate && orderAlternate !== String(customerDoc.alternatePhone || "").trim()) {
@@ -1762,7 +1892,22 @@ const createAdminOrder = async (req, res, next) => {
       metadata: { orderId: order._id, total: order.total }
     });
 
-    res.status(201).json({ order });
+    let assignment = null;
+    if (partnerDoc) {
+      assignment = await DeliveryAssignment.create({
+        order: order._id,
+        deliveryPartner: partnerDoc._id
+      });
+      await createNotification({
+        user: partnerDoc._id,
+        type: "delivery_assigned",
+        title: "New delivery assignment",
+        message: "You have been assigned a new delivery.",
+        metadata: { orderId: order._id, assignmentId: assignment._id }
+      });
+    }
+
+    res.status(201).json({ order, assignment });
   } catch (error) {
     if (error.code === 11000 && error.keyPattern && error.keyPattern.email) {
        return res.status(400).json({ message: "Email is already in use by another customer." });

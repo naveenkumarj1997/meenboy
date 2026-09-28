@@ -14,7 +14,7 @@ router.get(
   "/admin",
   protect,
   authorizeRoles("admin"),
-  authorizeAdminSections("todays_catch", "products", "daily_prices", "walk_in"),
+  authorizeAdminSections("todays_catch", "products", "daily_prices", "walk_in", "manual_booking"),
   getAdminTodayCatch
 );
 

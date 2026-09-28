@@ -6,7 +6,9 @@ import {
   getAdminProducts,
   createAdminOrder,
   getCustomerLastDelivery,
-  downloadInvoice
+  downloadInvoice,
+  getAdminTodayCatch,
+  type TodayCatchItem
 } from "../../lib/api";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 import {
@@ -46,6 +48,13 @@ const emptyAddressForm = () => ({
   alternatePhone: "",
   mapUrl: ""
 });
+
+type BookingType = "pre_order" | "shop_stock";
+
+const todayIst = () =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+
+const formatQty = (q: number) => String(Math.round(q * 100) / 100);
 
 /** Split saved line1 into door / street / area when possible. */
 const splitLine1 = (line1 = "") => {
@@ -90,6 +99,23 @@ export default function AdminManualBooking() {
   const [lastOrderId, setLastOrderId] = useState<string | null>(null);
   const [adjustments, setAdjustments] = useState<BookingAdjustments>(emptyBookingAdjustments());
 
+  const [bookingType, setBookingType] = useState<BookingType>("pre_order");
+  const [stockItems, setStockItems] = useState<TodayCatchItem[]>([]);
+  const [stockError, setStockError] = useState("");
+  const [partners, setPartners] = useState<any[]>([]);
+  const [partnerId, setPartnerId] = useState("");
+
+  const loadStock = async () => {
+    if (!token) return;
+    try {
+      const res = await getAdminTodayCatch(token);
+      setStockItems(res.todayCatch.items || []);
+      setStockError("");
+    } catch (err: any) {
+      setStockError(err.message || "Could not load shop stock");
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -108,7 +134,50 @@ export default function AdminManualBooking() {
       }
     };
     fetchData();
+    loadStock();
+    if (token) {
+      getAllUsers(token, { role: "delivery_partner" })
+        .then((res) => setPartners((res.users || []).filter((u: any) => u.status === "active")))
+        .catch(() => setPartners([]));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const switchBookingType = (next: BookingType) => {
+    if (next === bookingType) return;
+    setBookingType(next);
+    setCart([]);
+    setPartnerId("");
+    if (next === "shop_stock") {
+      setDeliveryDate(todayIst());
+      loadStock();
+    } else {
+      setDeliveryDate("");
+    }
+  };
+
+  const qtyInCart = (catchItemId: string) =>
+    cart
+      .filter((item) => item.catchItemId === catchItemId)
+      .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
+  const handleAddStockToCart = (stock: TodayCatchItem, qty: number, notes = "") => {
+    if (!stock.id || !stock.productId) return;
+    setCart((prev) => [
+      ...prev,
+      {
+        product: stock.productId,
+        catchItemId: stock.id,
+        productName: stock.name,
+        productImage: stock.imageUrl || "",
+        unitPrice: stock.price,
+        quantity: qty,
+        unit: stock.unit || "kg",
+        notes: String(notes || "").trim(),
+        totalPrice: Math.round(stock.price * qty * 100) / 100
+      }
+    ]);
+  };
 
   useEffect(() => {
     if (customerType === "existing" && selectedUserId) {
@@ -303,8 +372,10 @@ export default function AdminManualBooking() {
           alternatePhone: addressForm.alternatePhone.trim() || undefined
         },
         deliveryFee,
-        deliveryDate,
+        deliveryDate: bookingType === "shop_stock" ? todayIst() : deliveryDate,
         deliveryTime,
+        bookingType,
+        deliveryPartnerId: bookingType === "shop_stock" && partnerId ? partnerId : undefined,
         mapUrl: addressForm.mapUrl.trim() || undefined,
         discountAmount: adjustments.discountAmount,
         discountNote: adjustments.discountNote,
@@ -325,11 +396,18 @@ export default function AdminManualBooking() {
 
       const res = await createAdminOrder(token!, payload);
       const orderId = res.order?._id;
+      const partnerName = partners.find((p) => p._id === partnerId)?.name;
       setSuccess(
-        `Order booked successfully! Same delivery flow as online orders. Invoice is ready.`
+        bookingType === "shop_stock"
+          ? `Shop stock order booked for today${
+              res.assignment && partnerName ? ` and assigned to ${partnerName}` : ""
+            }. Stock updated. Invoice is ready.`
+          : `Order booked successfully! Same delivery flow as online orders. Invoice is ready.`
       );
       setLastOrderId(orderId || null);
       setCart([]);
+      setPartnerId("");
+      if (bookingType === "shop_stock") loadStock();
       setNewCustomer({ name: "", email: "", phone: "", alternatePhone: "" });
       setAddressForm(emptyAddressForm());
       setSelectedUserId("");
@@ -344,6 +422,7 @@ export default function AdminManualBooking() {
       }
     } catch (err: any) {
       setError(err.message || "Failed to book order");
+      if (bookingType === "shop_stock") loadStock();
     } finally {
       setSubmitting(false);
     }
@@ -383,6 +462,53 @@ export default function AdminManualBooking() {
         {loading ? (
           <div className="text-center text-slate-400 py-16">Loading...</div>
         ) : (
+          <>
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5">
+            <p className="text-xs uppercase tracking-wider text-slate-400 font-bold mb-3">Booking type</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(
+                [
+                  {
+                    id: "pre_order",
+                    title: "Pre-order booking",
+                    desc: "Customer books for a future date. Final price is set later in Daily Prices."
+                  },
+                  {
+                    id: "shop_stock",
+                    title: "Walk-in shop stock (today)",
+                    desc: "Deliver today from fish in shop stock. Qty & price come from Today's Catch; stock is reduced."
+                  }
+                ] as const
+              ).map((opt) => {
+                const active = bookingType === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => switchBookingType(opt.id)}
+                    className={`text-left rounded-xl border p-4 transition-colors ${
+                      active
+                        ? "border-teal-400 bg-teal-500/15 ring-1 ring-teal-400/50"
+                        : "border-white/10 bg-white/5 hover:bg-white/10"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`h-4 w-4 rounded-full border-2 shrink-0 ${
+                          active ? "border-teal-300 bg-teal-400" : "border-white/40"
+                        }`}
+                      />
+                      <span className="font-bold text-white">{opt.title}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1.5 pl-6">{opt.desc}</p>
+                  </button>
+                );
+              })}
+            </div>
+            {cart.length > 0 && (
+              <p className="text-[11px] text-slate-500 mt-2">Switching type clears the order items.</p>
+            )}
+          </div>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-6">
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
@@ -548,6 +674,37 @@ export default function AdminManualBooking() {
                 )}
               </div>
 
+              {bookingType === "shop_stock" ? (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h2 className="text-xl font-bold text-white">2. Add from Shop Stock</h2>
+                  <button
+                    type="button"
+                    onClick={loadStock}
+                    className="text-xs font-semibold text-teal-300 hover:text-teal-200 px-2 py-1 rounded-lg border border-teal-500/30"
+                  >
+                    Refresh stock
+                  </button>
+                </div>
+                {stockError && <p className="text-sm text-red-400 mb-3">{stockError}</p>}
+                <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2 custom-scrollbar">
+                  {stockItems.length === 0 ? (
+                    <div className="text-center text-white/40 py-6 text-sm">
+                      No shop stock yet. Add fish, price and quantity in Today&apos;s Catch first.
+                    </div>
+                  ) : (
+                    stockItems.map((stock) => (
+                      <StockAddRow
+                        key={stock.id}
+                        stock={stock}
+                        remaining={Math.max(0, Number(stock.availableQty || 0) - qtyInCart(stock.id || ""))}
+                        onAdd={handleAddStockToCart}
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
+              ) : (
               <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
                 <h2 className="text-xl font-bold text-white mb-4">2. Add Products</h2>
                 <div className="relative mb-4">
@@ -570,6 +727,7 @@ export default function AdminManualBooking() {
                   )}
                 </div>
               </div>
+              )}
             </div>
 
             <div className="space-y-6">
@@ -639,11 +797,15 @@ export default function AdminManualBooking() {
                     <input
                       type="date"
                       required
-                      value={deliveryDate}
+                      value={bookingType === "shop_stock" ? todayIst() : deliveryDate}
                       onChange={(e) => setDeliveryDate(e.target.value)}
-                      min={new Date().toISOString().split("T")[0]}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                      min={todayIst()}
+                      disabled={bookingType === "shop_stock"}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500 disabled:opacity-70"
                     />
+                    {bookingType === "shop_stock" && (
+                      <p className="mt-1 text-xs text-teal-300/80">Shop stock is delivered today.</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm text-white/60 mb-1">Time *</label>
@@ -671,6 +833,30 @@ export default function AdminManualBooking() {
                     ) : null}
                   </div>
                 </div>
+
+                {bookingType === "shop_stock" && (
+                  <div className="mb-4">
+                    <label className="block text-sm text-white/60 mb-1">Assign delivery partner</label>
+                    <select
+                      value={partnerId}
+                      onChange={(e) => setPartnerId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:border-teal-500"
+                    >
+                      <option value="" className="bg-cyan-950">
+                        Assign later (from Deliveries)
+                      </option>
+                      {partners.map((p) => (
+                        <option key={p._id} value={p._id} className="bg-cyan-950">
+                          {p.name}
+                          {p.phone ? ` · ${p.phone}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-xs text-white/40">
+                      The order shows in this partner&apos;s delivery list right away.
+                    </p>
+                  </div>
+                )}
 
                 <div className="space-y-3 mb-4">
                   <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">
@@ -865,7 +1051,7 @@ export default function AdminManualBooking() {
                 </div>
 
                 <div className="flex justify-between text-base font-bold text-white mb-4">
-                  <span>Approx. total</span>
+                  <span>{bookingType === "shop_stock" ? "Total" : "Approx. total"}</span>
                   <span className="text-teal-400">₹{formatPrice(orderTotal)}</span>
                 </div>
 
@@ -879,9 +1065,115 @@ export default function AdminManualBooking() {
               </div>
             </div>
           </form>
+          </>
         )}
       </div>
     </DashboardShell>
+  );
+}
+
+function StockAddRow({
+  stock,
+  remaining,
+  onAdd
+}: {
+  stock: TodayCatchItem;
+  remaining: number;
+  onAdd: (s: TodayCatchItem, q: number, notes?: string) => void;
+}) {
+  const unit = stock.unit || "kg";
+  const isKg = unit.toLowerCase() === "kg";
+  const step = isKg ? 0.25 : 1;
+  const [qtyText, setQtyText] = useState(isKg ? "0.5" : "1");
+  const [itemNotes, setItemNotes] = useState("");
+  const qty = Number(qtyText);
+  const linked = Boolean(stock.productId);
+  const soldOut = remaining <= 0;
+  const qtyError =
+    !(qty > 0) ? "Enter qty" : qty > remaining + 0.001 ? `Only ${formatQty(remaining)} ${unit} left` : "";
+
+  return (
+    <div
+      className={`rounded-xl border p-3 flex flex-col gap-2 ${
+        soldOut || !linked ? "border-white/5 bg-white/[0.02] opacity-60" : "border-white/10 bg-white/5"
+      }`}
+    >
+      <div className="flex justify-between items-start gap-3">
+        <div className="min-w-0">
+          <p className="font-semibold text-white text-sm">{stock.name}</p>
+          <p className="text-teal-400 text-xs">
+            ₹{formatPrice(stock.price)} / {unit}
+          </p>
+        </div>
+        <span
+          className={`shrink-0 text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+            soldOut
+              ? "border-red-500/40 bg-red-500/10 text-red-300"
+              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+          }`}
+        >
+          {soldOut ? "Sold out" : `${formatQty(remaining)} ${unit} left`}
+        </span>
+      </div>
+
+      {!linked ? (
+        <p className="text-[11px] text-amber-300/90">
+          Not linked to a product — link it in Today&apos;s Catch to book it.
+        </p>
+      ) : !soldOut ? (
+        <>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input
+              type="number"
+              inputMode="decimal"
+              min={step}
+              step={step}
+              max={remaining}
+              value={qtyText}
+              onChange={(e) => setQtyText(e.target.value)}
+              className="w-24 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white outline-none focus:border-teal-500/60"
+            />
+            <span className="text-xs text-white/60">{unit}</span>
+            {isKg &&
+              [0.5, 1, remaining]
+                .filter((v, i, arr) => v > 0 && v <= remaining + 0.001 && arr.indexOf(v) === i)
+                .map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setQtyText(formatQty(v))}
+                    className="text-[11px] px-2 py-1 rounded-lg border border-white/10 text-slate-300 hover:bg-white/10"
+                  >
+                    {v === remaining ? `All (${formatQty(v)})` : `${formatQty(v)} kg`}
+                  </button>
+                ))}
+            <button
+              type="button"
+              disabled={Boolean(qtyError)}
+              onClick={() => {
+                onAdd(stock, Math.round(qty * 100) / 100, itemNotes);
+                setItemNotes("");
+              }}
+              className="ml-auto bg-teal-500 text-white px-3 py-1.5 rounded-lg hover:bg-teal-400 transition-colors font-bold text-sm disabled:opacity-40"
+            >
+              + Add
+            </button>
+          </div>
+          <div className="flex justify-between text-[11px]">
+            <span className={qtyError ? "text-red-400" : "text-white/45"}>
+              {qtyError || `Line total: ₹${formatPrice(stock.price * qty)}`}
+            </span>
+          </div>
+          <textarea
+            rows={2}
+            value={itemNotes}
+            onChange={(e) => setItemNotes(e.target.value)}
+            placeholder="Cutting / cleaning notes for this item (optional)"
+            className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs outline-none focus:border-teal-500/50 resize-y min-h-[44px]"
+          />
+        </>
+      ) : null}
+    </div>
   );
 }
 

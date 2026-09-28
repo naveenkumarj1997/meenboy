@@ -525,10 +525,13 @@ export interface AdminOrderPayload extends OrderPayload {
     phone: string;
     alternatePhone?: string;
   };
+  /** shop_stock = same-day booking from Today's Catch stock at stock price */
+  bookingType?: "pre_order" | "shop_stock";
+  deliveryPartnerId?: string;
 }
 
 export const createAdminOrder = async (token: string, payload: AdminOrderPayload) =>
-  request<{ order: any }>("/orders/admin-booking", {
+  request<{ order: any; assignment?: any }>("/orders/admin-booking", {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
