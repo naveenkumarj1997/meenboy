@@ -39,24 +39,109 @@ const formatUnitPriceLabel = (item: { unitPrice?: number; unit?: string }) => {
   return `₹${formatMoney(item.unitPrice)}/${label}`;
 };
 
-/** Soft-fail GPS for petrol km tracking (en_route / delivered). */
-const capturePartnerGps = (): Promise<{ lat: number; lng: number } | undefined> =>
+type GpsFailure = "unsupported" | "insecure" | "denied" | "unavailable" | "timeout";
+type GpsResult =
+  | { location: { lat: number; lng: number }; failure?: undefined }
+  | { location?: undefined; failure: GpsFailure };
+
+const isIos = () =>
+  typeof navigator !== "undefined" &&
+  (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+
+const readPosition = (options: PositionOptions): Promise<GpsResult> =>
   new Promise((resolve) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      resolve(undefined);
-      return;
-    }
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      (pos) => resolve({ location: { lat: pos.coords.latitude, lng: pos.coords.longitude } }),
+      (err) =>
         resolve({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        });
-      },
-      () => resolve(undefined),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          failure:
+            err.code === err.PERMISSION_DENIED
+              ? "denied"
+              : err.code === err.TIMEOUT
+                ? "timeout"
+                : "unavailable"
+        }),
+      options
     );
   });
+
+// iPhones often need well over 10s for a first high-accuracy fix, so a slow fix
+// is retried with network/Wi-Fi accuracy before giving up.
+const capturePartnerGpsDetailed = async (): Promise<GpsResult> => {
+  if (typeof window !== "undefined" && window.isSecureContext === false) {
+    return { failure: "insecure" };
+  }
+  if (typeof navigator === "undefined" || !navigator.geolocation) {
+    return { failure: "unsupported" };
+  }
+  const first = await readPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+  if (first.location || first.failure === "denied") return first;
+  return readPosition({ enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 });
+};
+
+/** Soft-fail GPS for petrol km tracking (en_route / delivered). */
+const capturePartnerGps = async (): Promise<{ lat: number; lng: number } | undefined> =>
+  (await capturePartnerGpsDetailed()).location;
+
+const iosLocationSteps = (): string[] => {
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const standalone =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(display-mode: standalone)").matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true);
+  const steps = [
+    "Open iPhone Settings → Privacy & Security → Location Services and make sure it is ON."
+  ];
+  if (/CriOS/.test(ua)) {
+    steps.push("In the same list tap Chrome → choose \"While Using the App\" and turn on Precise Location.");
+  } else if (/FxiOS|EdgiOS/.test(ua)) {
+    steps.push("In the same list tap your browser app → choose \"While Using the App\" and turn on Precise Location.");
+  } else {
+    steps.push("In the same list tap Safari Websites → choose \"While Using the App\" (or \"Ask Next Time\") and turn on Precise Location.");
+    steps.push("Then go to Settings → Safari (Settings → Apps → Safari on iOS 18+) → Location and set it to \"Ask\" or \"Allow\".");
+    steps.push("In Safari, tap the \"aA\" icon in the address bar → Website Settings → Location → Allow.");
+  }
+  if (standalone) {
+    steps.push("If you opened the site from the Home Screen icon, try once in Safari too.");
+  }
+  steps.push("Come back to this page, pull down to reload, and tap Start trip again. Tap \"Allow\" when asked.");
+  return steps;
+};
+
+const gpsHelpFor = (failure: GpsFailure): { title: string; steps: string[] } => {
+  if (failure === "insecure") {
+    return {
+      title: "Location only works on the secure (https://) site.",
+      steps: ["Open the site with https:// in the address bar and try again."]
+    };
+  }
+  if (failure === "unsupported") {
+    return {
+      title: "This browser can't share location.",
+      steps: ["Open the site in Safari (iPhone) or Chrome (Android) and try again."]
+    };
+  }
+  if (failure === "denied") {
+    return isIos()
+      ? { title: "Location is blocked for this site on your iPhone.", steps: iosLocationSteps() }
+      : {
+          title: "Location permission is blocked for this site.",
+          steps: [
+            "Tap the lock / tune icon next to the address → Permissions → Location → Allow.",
+            "Make sure phone Location (GPS) is ON, then tap Start trip again."
+          ]
+        };
+  }
+  return {
+    title: "Couldn't get your GPS position.",
+    steps: [
+      "Make sure phone Location / GPS is ON and you are not in Low Power Mode.",
+      "Step outside or near a window for a better signal, then tap Start trip again.",
+      ...(isIos() ? ["If it keeps failing, check the iPhone steps: Settings → Privacy & Security → Location Services → Safari Websites → While Using the App."] : [])
+    ]
+  };
+};
 
 function PartnerNdaForm({
   token,
@@ -443,6 +528,7 @@ export default function DeliveryDashboard() {
   const [tripBusy, setTripBusy] = useState(false);
   const [trackingOpen, setTrackingOpen] = useState(true);
   const [gpsOffWarning, setGpsOffWarning] = useState(false);
+  const [gpsHelp, setGpsHelp] = useState<{ title: string; steps: string[] } | null>(null);
   const [wakeLockState, setWakeLockState] = useState<WakeLockState>("off");
   const pingLock = useRef(false);
   const wakeLockRef = useRef<{
@@ -580,12 +666,14 @@ export default function DeliveryDashboard() {
     try {
       setTripBusy(true);
       setError("");
-      const location = await capturePartnerGps();
-      if (!location) {
+      const gps = await capturePartnerGpsDetailed();
+      if (!gps.location) {
+        setGpsHelp(gpsHelpFor(gps.failure));
         setError("Turn on location / GPS to start from hub.");
         return;
       }
-      const res = await startMyDeliveryTrip(token, location);
+      setGpsHelp(null);
+      const res = await startMyDeliveryTrip(token, gps.location);
       setTrip(res.trip);
       setSuccess(res.message || "Trip started from hub.");
       refreshTrip();
@@ -1068,6 +1156,33 @@ export default function DeliveryDashboard() {
             Tracking window is 5:00 AM – 10:00 PM IST.
           </p>
         )}
+        {gpsHelp && trip?.status !== "active" && (
+          <div className="mt-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-50">
+            <div className="flex items-start justify-between gap-3">
+              <div className="font-bold text-amber-200">{gpsHelp.title}</div>
+              <button
+                type="button"
+                onClick={() => setGpsHelp(null)}
+                className="shrink-0 text-amber-200/80 hover:text-white text-sm px-2"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <ol className="mt-2 space-y-1.5 text-sm list-decimal pl-5 text-amber-50/90">
+              {gpsHelp.steps.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="mt-3 px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm"
+            >
+              I've allowed location — reload
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 sm:gap-4 mb-8 overflow-x-auto overscroll-contain pb-1 -mx-1 px-1">
@@ -1186,7 +1301,7 @@ export default function DeliveryDashboard() {
                       </div>
 
                       {(order.mapUrl || order.customer?.mapUrl) && (
-                        <a href={order.mapUrl || order.customer?.mapUrl} target="_blank" rel="noreferrer" className="text-teal-400 text-sm flex items-center gap-1 hover:underline mb-3 inline-flex">
+                        <a href={order.mapNavUrl || order.mapUrl || order.customer?.mapUrl} target="_blank" rel="noreferrer" className="text-teal-400 text-sm flex items-center gap-1 hover:underline mb-3 inline-flex">
                           📍 Open in Google Maps
                         </a>
                       )}

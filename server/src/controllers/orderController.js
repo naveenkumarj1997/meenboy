@@ -9,6 +9,7 @@ const DailyPriceUpdate = require("../models/DailyPriceUpdate");
 const path = require("path");
 const fs = require("fs");
 const { generateInvoice } = require("../utils/pdfInvoice");
+const { resolveNavUrl } = require("../utils/mapLink");
 const { generatePartnerDayReport } = require("../utils/pdfDeliveryReport");
 const { generatePartnerCollectionReport } = require("../utils/pdfPartnerCollectionReport");
 const {
@@ -365,6 +366,18 @@ const listAssignmentsForPartner = async (req, res, next) => {
         }
       };
     });
+
+    const uniqueMapUrls = [
+      ...new Set(assignmentsWithMap.map((a) => a.order?.mapUrl).filter(Boolean))
+    ];
+    const navByUrl = new Map(
+      await Promise.all(uniqueMapUrls.map(async (url) => [url, await resolveNavUrl(url)]))
+    );
+    for (const assignment of assignmentsWithMap) {
+      if (assignment.order?.mapUrl) {
+        assignment.order.mapNavUrl = navByUrl.get(assignment.order.mapUrl) || assignment.order.mapUrl;
+      }
+    }
 
     res.json({ assignments: assignmentsWithMap });
   } catch (error) {
