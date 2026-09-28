@@ -134,6 +134,10 @@ const generateAllOrdersReport = ({ date, orders, stats }) => {
       const borderColor = "#334155";
       const headerBg = "#0f766e";
       const altRowBg = "#f1f5f9";
+      const cancelledBg = "#fde2e2";
+      const cancelledAccent = "#dc2626";
+      const cancelledText = "#b91c1c";
+      const cancelledCount = orderRows.filter((o) => o.status === "cancelled").length;
       const padX = 3;
       const padY = 4;
 
@@ -162,6 +166,24 @@ const generateAllOrdersReport = ({ date, orders, stats }) => {
           `Orders: ${stats?.orderCount || 0} · Line items: ${stats?.itemCount || 0} · One row per customer order`
         )
         .text(`Generated: ${new Date().toLocaleString("en-IN")}`);
+      const headerBottom = doc.y;
+
+      if (cancelledCount > 0) {
+        const legendY = 96;
+        const legendX = right - 190;
+        doc.rect(legendX, legendY, 14, 10).fill(cancelledBg);
+        doc.rect(legendX, legendY, 3, 10).fill(cancelledAccent);
+        doc
+          .strokeColor(cancelledAccent)
+          .lineWidth(0.6)
+          .rect(legendX, legendY, 14, 10)
+          .stroke();
+        doc
+          .font("ReportBold")
+          .fontSize(9)
+          .fillColor(cancelledText)
+          .text(`Cancelled order (${cancelledCount})`, legendX + 20, legendY + 1, { width: 170 });
+      }
 
       const cols = [
         { key: "sno", label: "#", width: 22 },
@@ -179,7 +201,7 @@ const generateAllOrdersReport = ({ date, orders, stats }) => {
         { key: "total", label: "Total", width: 38 }
       ];
 
-      let y = 118;
+      let y = Math.max(118, headerBottom + 8);
 
       const drawTableHeader = (yPos) => {
         const headerH = 20;
@@ -241,7 +263,9 @@ const generateAllOrdersReport = ({ date, orders, stats }) => {
             String(order.deliveryTime || "-"),
             itemsBlock,
             notesBlock,
-            String(order.status || "-").replace(/_/g, " "),
+            order.status === "cancelled"
+              ? "CANCELLED"
+              : String(order.status || "-").replace(/_/g, " "),
             String(order.partnerName || "-"),
             `₹${Number(order.total || 0).toFixed(0)}`
           ];
@@ -253,16 +277,29 @@ const generateAllOrdersReport = ({ date, orders, stats }) => {
           const rowHeight = Math.max(...heights, 16) + padY * 2;
           ensureSpace(rowHeight + 2);
 
-          if (index % 2 === 0) {
+          const isCancelled = order.status === "cancelled";
+          if (isCancelled) {
+            doc.rect(left, y, contentWidth, rowHeight).fill(cancelledBg);
+            doc.rect(left, y, 3, rowHeight).fill(cancelledAccent);
+          } else if (index % 2 === 0) {
             doc.rect(left, y, contentWidth, rowHeight).fill(altRowBg);
           }
 
           let x = left;
           values.forEach((val, i) => {
             const isMap = cols[i].key === "map";
+            const emphasize = isCancelled && (cols[i].key === "status" || cols[i].key === "total");
             doc
-              .fillColor(isMap && val !== "-" ? "#0f766e" : "#0f172a")
-              .font("ReportRegular")
+              .fillColor(
+                emphasize
+                  ? cancelledText
+                  : isMap && val !== "-"
+                    ? "#0f766e"
+                    : isCancelled
+                      ? "#7f1d1d"
+                      : "#0f172a"
+              )
+              .font(emphasize ? "ReportBold" : "ReportRegular")
               .fontSize(7)
               .text(val, x + padX, y + padY, {
                 width: cols[i].width - padX * 2,
