@@ -35,12 +35,14 @@ const downloadBuySellPdf = async (req, res, next) => {
     const label = String(req.query.label || "").slice(0, 40);
     const buffer = await generateBuySellPdf(report, {
       periodLabel: label,
-      onlySold: req.query.onlySold === "true"
+      onlySold: req.query.onlySold === "true",
+      byCategory: req.query.layout === "category"
     });
+    const suffix = req.query.layout === "category" ? "-CategoryWise" : "";
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="BuySell-${range.from}_to_${range.to}.pdf"`
+      `attachment; filename="BuySell${suffix}-${range.from}_to_${range.to}.pdf"`
     );
     res.send(buffer);
   } catch (error) {

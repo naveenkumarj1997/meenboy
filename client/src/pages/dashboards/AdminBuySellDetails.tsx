@@ -75,7 +75,7 @@ export default function AdminBuySellDetails() {
   const [anchor, setAnchor] = useState(todayIst());
   const [report, setReport] = useState<BuySellReport | null>(null);
   const [loading, setLoading] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading] = useState<"" | "all" | "category">("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("all");
@@ -135,16 +135,25 @@ export default function AdminBuySellDetails() {
     };
   }, [rows]);
 
-  const handlePdf = async () => {
+  const handlePdf = async (kind: "all" | "category") => {
     if (!token) return;
     try {
-      setDownloading(true);
-      const blob = await downloadBuySellPdf(token, { ...range, label: periodLabel, onlySold });
-      triggerPdfDownload(blob, `BuySell-${range.from}_to_${range.to}.pdf`);
+      setDownloading(kind);
+      const byCategory = kind === "category";
+      const blob = await downloadBuySellPdf(token, {
+        ...range,
+        label: periodLabel,
+        onlySold,
+        byCategory
+      });
+      triggerPdfDownload(
+        blob,
+        `BuySell${byCategory ? "-CategoryWise" : ""}-${range.from}_to_${range.to}.pdf`
+      );
     } catch (err: any) {
       setError(err.message || "Failed to download PDF");
     } finally {
-      setDownloading(false);
+      setDownloading("");
     }
   };
 
@@ -214,14 +223,24 @@ export default function AdminBuySellDetails() {
                   : `${prettyDate(range.from)} – ${prettyDate(range.to)}`}
               </span>
             </div>
-            <button
-              type="button"
-              onClick={handlePdf}
-              disabled={downloading || !report}
-              className="sm:ml-auto h-10 px-4 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 text-cyan-950 font-bold text-sm disabled:opacity-50"
-            >
-              {downloading ? "Preparing PDF…" : "Download PDF"}
-            </button>
+            <div className="flex flex-wrap gap-2 sm:ml-auto">
+              <button
+                type="button"
+                onClick={() => handlePdf("all")}
+                disabled={Boolean(downloading) || !report}
+                className="h-10 px-4 rounded-xl bg-gradient-to-r from-teal-400 to-emerald-400 text-cyan-950 font-bold text-sm disabled:opacity-50"
+              >
+                {downloading === "all" ? "Preparing PDF…" : "Download PDF"}
+              </button>
+              <button
+                type="button"
+                onClick={() => handlePdf("category")}
+                disabled={Boolean(downloading) || !report}
+                className="h-10 px-4 rounded-xl border border-teal-400/60 bg-teal-500/15 text-teal-100 font-bold text-sm hover:bg-teal-500/25 disabled:opacity-50"
+              >
+                {downloading === "category" ? "Preparing PDF…" : "Category-wise PDF"}
+              </button>
+            </div>
           </div>
         </div>
 

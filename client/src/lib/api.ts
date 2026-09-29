@@ -1702,11 +1702,12 @@ export const getBuySellReport = async (token: string, params: { from: string; to
 
 export const downloadBuySellPdf = async (
   token: string,
-  params: { from: string; to: string; label?: string; onlySold?: boolean }
+  params: { from: string; to: string; label?: string; onlySold?: boolean; byCategory?: boolean }
 ) => {
   const qs = new URLSearchParams({ from: params.from, to: params.to });
   if (params.label) qs.set("label", params.label);
   if (params.onlySold) qs.set("onlySold", "true");
+  if (params.byCategory) qs.set("layout", "category");
   const response = await fetch(`${API_BASE}/buy-sell/pdf?${qs.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
