@@ -22,6 +22,7 @@ export type AdminSectionId =
   | "delivery_trips_control"
   | "purchases"
   | "settlements"
+  | "buy_sell_details"
   | "partner_salary"
   | "petrol_allowance"
   | "earnings"
@@ -109,6 +110,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   },
   { id: "purchases", label: "Purchases", href: "/dashboard/admin/purchases" },
   { id: "settlements", label: "Settlements", href: "/dashboard/admin/settlements" },
+  {
+    id: "buy_sell_details",
+    label: "Buy & Sell Details",
+    href: "/dashboard/admin/buy-sell-details"
+  },
   { id: "partner_salary", label: "Partner Salary", href: "/dashboard/admin/partner-salary" },
   {
     id: "petrol_allowance",

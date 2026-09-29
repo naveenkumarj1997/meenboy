@@ -214,7 +214,7 @@ const drawSignature = (doc, y, tradeName) => {
 };
 
 /** Page X of Y + generated date on every page (margins zeroed so text doesn't spawn pages). */
-const stampFooters = (doc) => {
+const stampFooters = (doc, { showGenerated = true } = {}) => {
   const range = doc.bufferedPageRange();
   const generated = new Date().toLocaleString("en-IN", {
     timeZone: "Asia/Kolkata",
@@ -232,7 +232,9 @@ const stampFooters = (doc) => {
     const y = doc.page.height - savedBottom - 12;
     const width = doc.page.width - m.left - m.right;
     doc.font("Gst").fontSize(7.5).fillColor(BLACK);
-    doc.text(`Generated: ${generated}`, m.left, y, { width, align: "left", lineBreak: false });
+    if (showGenerated) {
+      doc.text(`Generated: ${generated}`, m.left, y, { width, align: "left", lineBreak: false });
+    }
     doc.text(`Page ${i - range.start + 1} of ${range.count}`, m.left, y, {
       width,
       align: "right",
@@ -506,5 +508,6 @@ const generateGstPurposePdf = async (report) => {
 module.exports = {
   generateGstSalesRegisterPdf,
   generateGstSummaryPdf,
-  generateGstPurposePdf
+  generateGstPurposePdf,
+  pdfTableKit: { createDoc, collect, contentBox, drawTable, drawNote, stampFooters, amount, qtyText, dmy }
 };

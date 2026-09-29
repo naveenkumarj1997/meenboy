@@ -23,6 +23,7 @@ const ADMIN_SECTIONS = [
   { id: "delivery_trips_control", label: "Delivery Trips Control" },
   { id: "purchases", label: "Purchases" },
   { id: "settlements", label: "Settlements" },
+  { id: "buy_sell_details", label: "Buy & Sell Details" },
   { id: "partner_salary", label: "Partner Salary" },
   { id: "petrol_allowance", label: "Petrol Allowance" },
   { id: "earnings", label: "Admin Earnings" },

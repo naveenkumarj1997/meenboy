@@ -1639,6 +1639,84 @@ export const downloadGstPurposePdf = async (
   return response.blob();
 };
 
+export type BuySellProductRow = {
+  productId: string;
+  name: string;
+  category: string;
+  unit: string;
+  minPrice: number;
+  maxPrice: number;
+  isActive: boolean;
+  orderQty: number;
+  walkInQty: number;
+  soldQty: number;
+  billedAmount: number;
+  minValue: number;
+};
+
+export type BuySellVendorTotal = {
+  key: string;
+  label: string;
+  purchased: number;
+  settled: number;
+  balance: number;
+};
+
+export type BuySellReport = {
+  range: { from: string; to: string };
+  products: BuySellProductRow[];
+  unmatched: { name: string; unit: string; soldQty: number; billedAmount: number }[];
+  summary: {
+    totalProducts: number;
+    activeProducts: number;
+    productsSold: number;
+    totalKgSold: number;
+    totalPiecesSold: number;
+    totalMinValue: number;
+    totalBilled: number;
+    deliveredOrders: number;
+    walkInBills: number;
+  };
+  vendors: {
+    list: { key: string; label: string }[];
+    totals: BuySellVendorTotal[];
+    days: {
+      date: string;
+      vendors: { key: string; purchased: number; settled: number }[];
+      purchased: number;
+      settled: number;
+      balance: number;
+    }[];
+    totalPurchased: number;
+    totalSettled: number;
+    totalBalance: number;
+    marginAtMinPrice: number;
+  };
+};
+
+export const getBuySellReport = async (token: string, params: { from: string; to: string }) =>
+  request<BuySellReport>(
+    `/buy-sell?${new URLSearchParams({ from: params.from, to: params.to }).toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+export const downloadBuySellPdf = async (
+  token: string,
+  params: { from: string; to: string; label?: string; onlySold?: boolean }
+) => {
+  const qs = new URLSearchParams({ from: params.from, to: params.to });
+  if (params.label) qs.set("label", params.label);
+  if (params.onlySold) qs.set("onlySold", "true");
+  const response = await fetch(`${API_BASE}/buy-sell/pdf?${qs.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message || "Failed to download Buy & Sell PDF");
+  }
+  return response.blob();
+};
+
 export const getTransactions = async (token: string, query: string = "") =>
   request<any[]>(`/finance${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` }
