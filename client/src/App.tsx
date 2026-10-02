@@ -21,6 +21,7 @@ import AdminDeliveryTripsControl from "./pages/dashboards/AdminDeliveryTripsCont
 import AdminUsersHistory from "./pages/dashboards/AdminUsersHistory";
 import AdminPriceRangeGraph from "./pages/dashboards/AdminPriceRangeGraph";
 import AdminBuySellDetails from "./pages/dashboards/AdminBuySellDetails";
+import AdminTools from "./pages/dashboards/AdminTools";
 import AdminPurchases from "./pages/dashboards/AdminPurchases";
 import AdminSettlements from "./pages/dashboards/AdminSettlements";
 import AdminPartnerSalary from "./pages/dashboards/AdminPartnerSalary";
@@ -145,6 +146,7 @@ function App() {
           <Route path="/dashboard/admin/purchases" element={<AdminPurchases />} />
           <Route path="/dashboard/admin/settlements" element={<AdminSettlements />} />
           <Route path="/dashboard/admin/buy-sell-details" element={<AdminBuySellDetails />} />
+          <Route path="/dashboard/admin/tools" element={<AdminTools />} />
           <Route path="/dashboard/admin/partner-salary" element={<AdminPartnerSalary />} />
           <Route path="/dashboard/admin/petrol-allowance" element={<AdminPetrolAllowance />} />
           <Route path="/dashboard/admin/earnings" element={<AdminEarnings />} />

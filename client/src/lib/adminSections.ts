@@ -39,6 +39,7 @@ export type AdminSectionId =
   | "walk_in"
   | "walk_in_accounts"
   | "manual_booking"
+  | "tools"
   | "manage_admins";
 
 export interface AdminSectionDef {
@@ -143,6 +144,7 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
     href: "/dashboard/admin/walk-in-accounts"
   },
   { id: "manual_booking", label: "Manual Booking", href: "/dashboard/admin/manual-booking" },
+  { id: "tools", label: "Tools", href: "/dashboard/admin/tools" },
   {
     id: "manage_admins",
     label: "Manage Admins",

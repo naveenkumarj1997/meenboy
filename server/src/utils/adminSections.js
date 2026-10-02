@@ -40,6 +40,7 @@ const ADMIN_SECTIONS = [
   { id: "walk_in", label: "Walk-in" },
   { id: "walk_in_accounts", label: "Walk-in Accounts" },
   { id: "manual_booking", label: "Manual Booking" },
+  { id: "tools", label: "Tools" },
   { id: "manage_admins", label: "Manage Admins", fullOnly: true }
 ];
 

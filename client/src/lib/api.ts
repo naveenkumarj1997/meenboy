@@ -1718,6 +1718,201 @@ export const downloadBuySellPdf = async (
   return response.blob();
 };
 
+// ─── Tools ────────────────────────────────────────────────────────────────────
+
+export type ToolsSettings = {
+  upiId: string;
+  payeeName: string;
+  reminderTemplate: string;
+  yields: Array<{ productId: string; percent: number }>;
+};
+
+export type ToolProduct = {
+  _id: string;
+  name: string;
+  category: string;
+  unit: string;
+  minPrice: number;
+  maxPrice: number;
+  isActive: boolean;
+};
+
+export type ToolDayOrder = {
+  orderId: string;
+  shortId: string;
+  customerName: string;
+  phone: string;
+  address: string;
+  area: string;
+  mapUrl: string;
+  deliveryTime: string;
+  status: string;
+  bookingSource: string;
+  bookingType: string;
+  dailyPriceUpdated: boolean;
+  total: number;
+  items: Array<{ productName: string; cutName: string; quantity: number; unit: string; notes: string }>;
+  customerNotes: string;
+  partnerId: string;
+  partnerName: string;
+  sequence: number | null;
+  assignmentStatus: string;
+};
+
+export type ToolPendingCustomer = {
+  _id: string;
+  name: string;
+  phone: string;
+  pendingBalance: number;
+  lastOrderDate: string;
+};
+
+export type PurchasePlanRow = {
+  productId: string;
+  name: string;
+  category: string;
+  unit: string;
+  isActive: boolean;
+  bookedQty: number;
+  bookedOrders: number;
+  walkInAvg: number;
+  cleanedNeed: number;
+  yieldPercent: number | null;
+  suggestedBuy: number;
+};
+
+export type ToolRouteStop = {
+  orderId: string;
+  shortId: string;
+  customerName: string;
+  phone: string;
+  address: string;
+  deliveryTime: string;
+  sequence: number | null;
+  assignmentStatus: string;
+  location: string;
+  hasPin: boolean;
+  mapLink: string;
+};
+
+export type ToolRoute = {
+  partnerId: string;
+  partnerName: string;
+  stops: ToolRouteStop[];
+  pendingCount: number;
+  links: Array<{ label: string; url: string }>;
+  pendingLinks: Array<{ label: string; url: string }>;
+};
+
+export type DuplicateCustomer = {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  customerSource: string;
+  isRealUser: boolean;
+  pendingBalance: number;
+  area: string;
+  createdAt: string;
+  orderCount: number;
+  lastOrderDate: string;
+};
+
+export type QuotationPayload = {
+  customerName: string;
+  phone?: string;
+  address?: string;
+  eventName?: string;
+  eventDate?: string;
+  validDays?: number;
+  items: Array<{ name: string; qty: number; unit: string; rate: number }>;
+  discount?: number;
+  deliveryCharge?: number;
+  notes?: string;
+  contactPhone?: string;
+};
+
+export type ToolsExportType = "orders" | "customers" | "walkins" | "collections";
+
+const authHeader = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+export const getToolsSettings = async (token: string) =>
+  request<{ settings: ToolsSettings }>("/tools/settings", { headers: authHeader(token) });
+
+export const updateToolsSettings = async (token: string, payload: Partial<ToolsSettings>) =>
+  request<{ settings: ToolsSettings; message: string }>("/tools/settings", {
+    method: "PUT",
+    headers: authHeader(token),
+    body: JSON.stringify(payload)
+  });
+
+export const getToolProducts = async (token: string) =>
+  request<{ products: ToolProduct[] }>("/tools/products", { headers: authHeader(token) });
+
+export const getToolDayOrders = async (token: string, date: string) =>
+  request<{ date: string; orders: ToolDayOrder[] }>(
+    `/tools/day-orders?date=${encodeURIComponent(date)}`,
+    { headers: authHeader(token) }
+  );
+
+export const getToolPendingCustomers = async (token: string) =>
+  request<{ customers: ToolPendingCustomer[] }>("/tools/pending-customers", {
+    headers: authHeader(token)
+  });
+
+export const getPurchasePlan = async (token: string, date: string) =>
+  request<{ date: string; weeksOfHistory: number; orderCount: number; plan: PurchasePlanRow[] }>(
+    `/tools/purchase-plan?date=${encodeURIComponent(date)}`,
+    { headers: authHeader(token) }
+  );
+
+export const getToolRoutes = async (token: string, date: string) =>
+  request<{ date: string; stopsPerLink: number; unassigned: number; routes: ToolRoute[] }>(
+    `/tools/routes?date=${encodeURIComponent(date)}`,
+    { headers: authHeader(token) }
+  );
+
+export const getDuplicateCustomers = async (token: string) =>
+  request<{ groups: Array<{ phone: string; customers: DuplicateCustomer[] }> }>("/tools/duplicates", {
+    headers: authHeader(token)
+  });
+
+export const mergeDuplicateCustomers = async (token: string, keepId: string, mergeIds: string[]) =>
+  request<{ message: string; moved: Record<string, number>; pendingBalance: number }>(
+    "/tools/duplicates/merge",
+    { method: "POST", headers: authHeader(token), body: JSON.stringify({ keepId, mergeIds }) }
+  );
+
+const readFileResponse = async (response: Response, fallback: string) => {
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error((data as { message?: string }).message || fallback);
+  }
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const filename = /filename="([^"]+)"/.exec(disposition)?.[1] || "";
+  return { blob: await response.blob(), filename };
+};
+
+export const downloadToolsExport = async (
+  token: string,
+  params: { type: ToolsExportType; from: string; to: string }
+) => {
+  const qs = new URLSearchParams(params);
+  const response = await fetch(`${API_BASE}/tools/export?${qs.toString()}`, {
+    headers: authHeader(token)
+  });
+  return readFileResponse(response, "Failed to export");
+};
+
+export const downloadQuotationPdf = async (token: string, payload: QuotationPayload) => {
+  const response = await fetch(`${API_BASE}/tools/quotation/pdf`, {
+    method: "POST",
+    headers: { ...authHeader(token), "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  return readFileResponse(response, "Failed to create quotation");
+};
+
 export const getTransactions = async (token: string, query: string = "") =>
   request<any[]>(`/finance${query ? `?${query}` : ""}`, {
     headers: { Authorization: `Bearer ${token}` }

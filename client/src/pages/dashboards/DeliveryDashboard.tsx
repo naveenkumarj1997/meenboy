@@ -1278,6 +1278,15 @@ export default function DeliveryDashboard() {
                         {isNext && <span className="bg-teal-500 text-teal-950 text-xs font-bold px-2 py-0.5 rounded animate-pulse">UP NEXT</span>}
                         <span className="text-white font-bold">Order #{String(order._id).slice(-6).toUpperCase()}</span>
                         <BookingSourceBadge source={order.bookingSource} />
+                        {order.dailyPriceUpdated ? (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-500/15 text-emerald-300">
+                            ✓ Daily price updated
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full border border-amber-500/50 bg-amber-500/15 text-amber-300">
+                            ⏳ Daily price not updated
+                          </span>
+                        )}
                         <span className="text-slate-400 text-sm">{order.deliveryDate} • {order.deliveryTime}</span>
                       </div>
 
@@ -1313,6 +1322,11 @@ export default function DeliveryDashboard() {
                             <span className="text-emerald-400 font-bold">
                               ₹{formatMoney(order.total)}
                             </span>
+                            {!order.dailyPriceUpdated && (
+                              <span className="ml-1 text-xs font-semibold text-amber-300">
+                                (approx — may change after daily price update)
+                              </span>
+                            )}
                           </div>
                           {(Number(order.subtotal) > 0 || Number(order.deliveryFee) > 0) && (
                             <div className="text-xs text-slate-400 space-y-0.5">

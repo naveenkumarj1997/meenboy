@@ -96,6 +96,7 @@ app.use("/api/due-dates", require("./routes/dueDateRoutes"));
 app.use("/api/gst", require("./routes/gstRoutes"));
 app.use("/api/price-history", require("./routes/priceHistoryRoutes"));
 app.use("/api/buy-sell", require("./routes/buySellRoutes"));
+app.use("/api/tools", require("./routes/toolsRoutes"));
 
 app.use(notFound);
 app.use(errorHandler);
