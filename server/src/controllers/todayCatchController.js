@@ -197,7 +197,7 @@ const updateTodayCatch = async (req, res, next) => {
   }
 };
 
-const roundQty = (q) => Math.round(Number(q) * 100) / 100;
+const roundQty = (q) => Math.round(Number(q) * 1000) / 1000;
 
 /**
  * Deduct walk-in sale quantities from Today's Catch stock.

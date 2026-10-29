@@ -34,18 +34,6 @@ const { generateCategoryOrdersReport } = require("../utils/pdfCategoryOrdersRepo
 const { generateAllOrdersReport } = require("../utils/pdfAllOrdersReport");
 const { computeOrderTotal, parseNonNegativeAmount } = require("../utils/orderTotals");
 
-const syncCustomerBookingAdjustments = async (customerId, adjustments = {}) => {
-  if (!customerId) return;
-  await User.findByIdAndUpdate(customerId, {
-    bookingAdjustments: {
-      discountAmount: parseNonNegativeAmount(adjustments.discountAmount),
-      discountNote: String(adjustments.discountNote || "").trim(),
-      addonAmount: parseNonNegativeAmount(adjustments.addonAmount),
-      addonNote: String(adjustments.addonNote || "").trim()
-    }
-  });
-};
-
 const applyOrderAdjustments = (order, body = {}) => {
   if (body.discountAmount != null && body.discountAmount !== "") {
     order.discountAmount = parseNonNegativeAmount(body.discountAmount);
@@ -115,7 +103,7 @@ const buildShopStockItems = async (items) => {
     if (!stockItem.productId) {
       throw fail(`Link "${stockItem.name}" to a product in Today's Catch before booking it.`);
     }
-    const quantity = Math.round(Number(item.quantity) * 100) / 100;
+    const quantity = Math.round(Number(item.quantity) * 1000) / 1000;
     if (!(quantity > 0)) throw fail(`Enter a quantity for "${stockItem.name}".`);
     needById.set(catchId, (needById.get(catchId) || 0) + quantity);
     const unitPrice = Number(stockItem.price) || 0;
@@ -574,13 +562,6 @@ const updateAdminOrder = async (req, res, next) => {
     if (mapUrl !== undefined) order.mapUrl = mapUrl;
 
     await order.save();
-
-    await syncCustomerBookingAdjustments(order.customer, {
-      discountAmount: order.discountAmount,
-      discountNote: order.discountNote,
-      addonAmount: order.addonAmount,
-      addonNote: order.addonNote
-    });
 
     try {
       await regenerateOrderInvoice(order);
@@ -1867,13 +1848,6 @@ const createAdminOrder = async (req, res, next) => {
     if (orderAlternate && orderAlternate !== String(customerDoc.alternatePhone || "").trim()) {
       await User.findByIdAndUpdate(finalCustomerId, { alternatePhone: orderAlternate });
     }
-
-    await syncCustomerBookingAdjustments(finalCustomerId, {
-      discountAmount: parsedDiscount,
-      discountNote: parsedDiscountNote,
-      addonAmount: parsedAddon,
-      addonNote: parsedAddonNote
-    });
 
     // Generate invoice immediately (same as online order invoice flow)
     try {

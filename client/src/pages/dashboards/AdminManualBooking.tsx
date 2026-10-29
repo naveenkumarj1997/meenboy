@@ -21,12 +21,17 @@ import {
   isMaduraiDeliveryAllowed
 } from "../../lib/maduraiDelivery";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
-import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG } from "../../lib/weightOptions";
+import {
+  WEIGHT_OPTIONS,
+  DEFAULT_WEIGHT_KG,
+  CUSTOM_WEIGHT_MAX_KG,
+  parseCustomWeightKg,
+  formatQuantityLabel
+} from "../../lib/weightOptions";
 import { DELIVERY_TIMES, DEFAULT_DELIVERY_TIME } from "../../lib/deliveryTimes";
 import {
   computeOrderTotal,
   emptyBookingAdjustments,
-  bookingAdjustmentsFromUser,
   parseNonNegativeAmount,
   type BookingAdjustments
 } from "../../lib/orderTotals";
@@ -54,7 +59,10 @@ type BookingType = "pre_order" | "shop_stock";
 const todayIst = () =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
 
-const formatQty = (q: number) => String(Math.round(q * 100) / 100);
+const formatQty = (q: number) => {
+  const n = Math.round(Number(q) * 1000) / 1000;
+  return String(n);
+};
 
 /** Split saved line1 into door / street / area when possible. */
 const splitLine1 = (line1 = "") => {
@@ -171,7 +179,7 @@ export default function AdminManualBooking() {
         productName: stock.name,
         productImage: stock.imageUrl || "",
         unitPrice: stock.price,
-        quantity: qty,
+        quantity: Math.round(qty * 1000) / 1000,
         unit: stock.unit || "kg",
         notes: String(notes || "").trim(),
         totalPrice: Math.round(stock.price * qty * 100) / 100
@@ -195,10 +203,14 @@ export default function AdminManualBooking() {
           alternatePhone: user.alternatePhone || "",
           mapUrl: user.mapUrl || ""
         });
-        setAdjustments(bookingAdjustmentsFromUser(user));
       }
     }
   }, [customerType, selectedUserId, users]);
+
+  // Discount / addon is for this booking only — never copy a previous amount.
+  useEffect(() => {
+    setAdjustments(emptyBookingAdjustments());
+  }, [selectedUserId]);
 
   // Prefill delivery time from customer's last order (many keep the same slot)
   useEffect(() => {
@@ -271,11 +283,11 @@ export default function AdminManualBooking() {
         productName: product.name,
         productImage: product.image || "",
         unitPrice: price,
-        quantity: qty,
+        quantity: Math.round(qty * 1000) / 1000,
         unit: product.unit || "kg",
         cutName,
         notes: String(notes || "").trim(),
-        totalPrice: price * qty
+        totalPrice: Math.round(price * qty * 100) / 100
       }
     ]);
   };
@@ -753,7 +765,7 @@ export default function AdminManualBooking() {
                           <div className="min-w-0">
                             <p className="font-semibold text-white text-sm">{item.productName}</p>
                             <p className="text-xs text-white/60">
-                              {item.quantity} {item.unit}
+                              {formatQuantityLabel(item.quantity, item.unit)}
                               {item.cutName ? ` • ${item.cutName}` : ""}
                             </p>
                           </div>
@@ -981,7 +993,7 @@ export default function AdminManualBooking() {
 
                 <div className="border border-white/10 rounded-xl p-4 mb-4 space-y-3 bg-black/20">
                   <p className="text-xs uppercase tracking-wider text-slate-400 font-bold">
-                    Discount / Addon (saved for future bookings)
+                    Discount / Addon (this booking only)
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
@@ -1045,7 +1057,7 @@ export default function AdminManualBooking() {
                   </div>
                   {(Number(adjustments.discountAmount) > 0 || Number(adjustments.addonAmount) > 0) && (
                     <p className="text-[11px] text-amber-300/80">
-                      These amounts apply to this order and auto-fill for this customer&apos;s next manual booking.
+                      These amounts apply to this booking only. The next booking starts at ₹0.
                     </p>
                   )}
                 </div>
@@ -1083,14 +1095,20 @@ function StockAddRow({
 }) {
   const unit = stock.unit || "kg";
   const isKg = unit.toLowerCase() === "kg";
-  const step = isKg ? 0.25 : 1;
+  const [qtyUnit, setQtyUnit] = useState<"kg" | "gram">("kg");
   const [qtyText, setQtyText] = useState(isKg ? "0.5" : "1");
   const [itemNotes, setItemNotes] = useState("");
-  const qty = Number(qtyText);
+  const qty =
+    isKg && qtyUnit === "gram" ? Math.round(Number(qtyText) || 0) / 1000 : Number(qtyText);
   const linked = Boolean(stock.productId);
   const soldOut = remaining <= 0;
-  const qtyError =
-    !(qty > 0) ? "Enter qty" : qty > remaining + 0.001 ? `Only ${formatQty(remaining)} ${unit} left` : "";
+  const qtyError = !(qty > 0)
+    ? qtyUnit === "gram"
+      ? "Enter grams"
+      : "Enter qty"
+    : qty > remaining + 0.0005
+      ? `Only ${formatQty(remaining)} ${unit} left`
+      : "";
 
   return (
     <div
@@ -1123,35 +1141,67 @@ function StockAddRow({
       ) : !soldOut ? (
         <>
           <div className="flex items-center gap-2 flex-wrap">
+            {isKg && (
+              <div className="flex rounded-lg border border-white/10 overflow-hidden text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQtyUnit("kg");
+                    setQtyText("0.5");
+                  }}
+                  className={`px-2 py-1.5 ${qtyUnit === "kg" ? "bg-teal-500 text-slate-950" : "bg-white/5 text-slate-300"}`}
+                >
+                  kg
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQtyUnit("gram");
+                    setQtyText("");
+                  }}
+                  className={`px-2 py-1.5 ${qtyUnit === "gram" ? "bg-teal-500 text-slate-950" : "bg-white/5 text-slate-300"}`}
+                >
+                  gram
+                </button>
+              </div>
+            )}
             <input
               type="number"
-              inputMode="decimal"
-              min={step}
-              step={step}
-              max={remaining}
+              inputMode={qtyUnit === "gram" ? "numeric" : "decimal"}
+              min={isKg && qtyUnit === "gram" ? 1 : isKg ? 0.1 : 1}
+              step={isKg && qtyUnit === "gram" ? 1 : isKg ? 0.001 : 1}
+              max={isKg && qtyUnit === "gram" ? Math.round(remaining * 1000) : remaining}
               value={qtyText}
               onChange={(e) => setQtyText(e.target.value)}
+              placeholder={isKg && qtyUnit === "gram" ? "575" : ""}
               className="w-24 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white outline-none focus:border-teal-500/60"
             />
-            <span className="text-xs text-white/60">{unit}</span>
+            <span className="text-xs text-white/60">{isKg && qtyUnit === "gram" ? "gram" : unit}</span>
             {isKg &&
-              [0.5, 1, remaining]
-                .filter((v, i, arr) => v > 0 && v <= remaining + 0.001 && arr.indexOf(v) === i)
+              (qtyUnit === "gram" ? [500, 1000, Math.round(remaining * 1000)] : [0.5, 1, remaining])
+                .filter((v, i, arr) => v > 0 && arr.indexOf(v) === i)
+                .filter((v) => (qtyUnit === "gram" ? v / 1000 : v) <= remaining + 0.0005)
                 .map((v) => (
                   <button
-                    key={v}
+                    key={`${qtyUnit}-${v}`}
                     type="button"
-                    onClick={() => setQtyText(formatQty(v))}
+                    onClick={() => setQtyText(String(v))}
                     className="text-[11px] px-2 py-1 rounded-lg border border-white/10 text-slate-300 hover:bg-white/10"
                   >
-                    {v === remaining ? `All (${formatQty(v)})` : `${formatQty(v)} kg`}
+                    {qtyUnit === "gram"
+                      ? v === Math.round(remaining * 1000)
+                        ? `All (${v} g)`
+                        : `${v} g`
+                      : v === remaining
+                        ? `All (${formatQty(v)})`
+                        : `${formatQty(v)} kg`}
                   </button>
                 ))}
             <button
               type="button"
               disabled={Boolean(qtyError)}
               onClick={() => {
-                onAdd(stock, Math.round(qty * 100) / 100, itemNotes);
+                onAdd(stock, Math.round(qty * 1000) / 1000, itemNotes);
                 setItemNotes("");
               }}
               className="ml-auto bg-teal-500 text-white px-3 py-1.5 rounded-lg hover:bg-teal-400 transition-colors font-bold text-sm disabled:opacity-40"
@@ -1161,7 +1211,10 @@ function StockAddRow({
           </div>
           <div className="flex justify-between text-[11px]">
             <span className={qtyError ? "text-red-400" : "text-white/45"}>
-              {qtyError || `Line total: ₹${formatPrice(stock.price * qty)}`}
+              {qtyError ||
+                `Line total: ₹${formatPrice(stock.price * qty)}${
+                  isKg && qtyUnit === "gram" && qty > 0 ? ` · ${formatQuantityLabel(qty, "kg")}` : ""
+                }`}
             </span>
           </div>
           <textarea
@@ -1185,7 +1238,9 @@ function ProductAddRow({
   onAdd: (p: any, c: any, q: number, notes?: string) => void;
 }) {
   const isKg = !product.unit || product.unit.toLowerCase() === "kg";
+  const [weightMode, setWeightMode] = useState<"preset" | "custom">("preset");
   const [qty, setQty] = useState(isKg ? DEFAULT_WEIGHT_KG : 1);
+  const [gramText, setGramText] = useState("");
   const [selectedCutIdx, setSelectedCutIdx] = useState(0);
   const [itemNotes, setItemNotes] = useState("");
 
@@ -1193,6 +1248,19 @@ function ProductAddRow({
   const selectedCut = cuts.length > 0 ? cuts[selectedCutIdx] : null;
   const unitPrice =
     selectedCut && selectedCut.price > 0 ? selectedCut.price : product.minPrice;
+
+  const customKg = isKg && weightMode === "custom" ? parseCustomWeightKg(gramText, "gram") : null;
+  const billedQty = isKg && weightMode === "custom" ? customKg : qty;
+  const gramError =
+    isKg && weightMode === "custom"
+      ? !String(gramText).trim()
+        ? "Type the scale weight in grams"
+        : customKg == null
+          ? `Enter 100 gram to ${CUSTOM_WEIGHT_MAX_KG} kg (e.g. 575 or 980)`
+          : ""
+      : "";
+
+  const addDisabled = isKg && weightMode === "custom" ? !customKg : !(billedQty && billedQty > 0);
 
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col gap-2">
@@ -1222,15 +1290,25 @@ function ProductAddRow({
 
         {isKg ? (
           <select
-            value={qty}
-            onChange={(e) => setQty(Number(e.target.value))}
-            className="min-w-[110px] bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
+            value={weightMode === "custom" ? "custom" : String(qty)}
+            onChange={(e) => {
+              if (e.target.value === "custom") {
+                setWeightMode("custom");
+                return;
+              }
+              setWeightMode("preset");
+              setQty(Number(e.target.value));
+            }}
+            className="min-w-[150px] bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-xs text-white outline-none"
           >
             {WEIGHT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value} className="bg-cyan-950">
                 {opt.label}
               </option>
             ))}
+            <option value="custom" className="bg-cyan-950">
+              Exact grams (whole fish)
+            </option>
           </select>
         ) : (
           <input
@@ -1245,15 +1323,44 @@ function ProductAddRow({
 
         <button
           type="button"
+          disabled={addDisabled}
           onClick={() => {
-            onAdd(product, selectedCut, qty, itemNotes);
+            if (addDisabled || !billedQty) return;
+            onAdd(product, selectedCut, billedQty, itemNotes);
             setItemNotes("");
           }}
-          className="bg-teal-500 text-white p-1.5 rounded-lg hover:bg-teal-400 transition-colors font-bold shrink-0"
+          className="bg-teal-500 text-white p-1.5 rounded-lg hover:bg-teal-400 transition-colors font-bold shrink-0 disabled:opacity-40"
         >
           +
         </button>
       </div>
+
+      {isKg && weightMode === "custom" && (
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={100}
+              max={CUSTOM_WEIGHT_MAX_KG * 1000}
+              step={1}
+              value={gramText}
+              onChange={(e) => setGramText(e.target.value)}
+              placeholder="e.g. 575"
+              className="w-28 bg-white/10 border border-white/10 rounded-lg px-2 py-1.5 text-sm text-white outline-none focus:border-teal-500/60"
+            />
+            <span className="text-xs text-white/70">gram</span>
+            {customKg != null && (
+              <span className="text-[11px] text-teal-300">
+                = {formatQuantityLabel(customKg, "kg")} · ₹{formatPrice(unitPrice * customKg)}
+              </span>
+            )}
+          </div>
+          <p className={`text-[10px] ${gramError ? "text-red-400" : "text-white/45"}`}>
+            {gramError || `Whole fish: type the scale weight (100 gram to ${CUSTOM_WEIGHT_MAX_KG} kg). Bill uses this exact weight.`}
+          </p>
+        </div>
+      )}
 
       <textarea
         rows={2}
@@ -1263,7 +1370,7 @@ function ProductAddRow({
         className="w-full bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-white text-xs outline-none focus:border-teal-500/50 resize-y min-h-[44px]"
       />
 
-      {isKg && (
+      {isKg && weightMode === "preset" && (
         <p className="text-[10px] text-white/45">
           Selected: ₹{formatPrice(unitPrice * qty)}
         </p>
