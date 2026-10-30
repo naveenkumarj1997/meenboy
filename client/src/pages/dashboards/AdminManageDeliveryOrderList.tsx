@@ -497,7 +497,7 @@ export default function AdminManageDeliveryOrderList() {
           <div className="text-slate-400 text-sm py-12 text-center">Loading delivery order list…</div>
         ) : lanes.length === 0 ? (
           <div className="rounded-2xl border border-slate-800 bg-slate-900/50 px-4 py-12 text-center text-slate-400 text-sm">
-            No assigned deliveries for this date. Assign partners in Order Management first.
+            No assigned deliveries for this date. Assign partners in Assign Delivery Partners first.
           </div>
         ) : (
           <div className="space-y-2">

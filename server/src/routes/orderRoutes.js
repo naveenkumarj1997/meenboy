@@ -40,6 +40,7 @@ const router = express.Router();
 /** Any of these sections may call order admin APIs used by those pages. */
 const orderAdminAccess = authorizeAdminSections(
   "deliveries",
+  "assign_delivery_partners",
   "all_orders",
   "today_delivery_status",
   "manage_delivery_order_list",
@@ -96,7 +97,7 @@ router.get(
   "/admin/unassigned-website-count",
   protect,
   authorizeRoles("admin"),
-  authorizeAdminSections("deliveries"),
+  authorizeAdminSections("deliveries", "assign_delivery_partners"),
   getUnassignedWebsiteOrdersCount
 );
 router.get(

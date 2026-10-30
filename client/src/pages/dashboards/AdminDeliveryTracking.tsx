@@ -113,8 +113,12 @@ const getCategoryColor = (category: string) => {
   }
 };
 
-export default function AdminDeliveryTracking() {
+export default function AdminDeliveryTracking({ assignOnly = false }: { assignOnly?: boolean }) {
   const { token } = useAuth();
+  const pageTitle = assignOnly ? "Assign Delivery Partners" : "Order Management";
+  const pageDescription = assignOnly
+    ? "Assign a delivery partner to orders that are waiting."
+    : "Track deliveries and view analytics.";
   
   const [orders, setOrders] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -143,7 +147,7 @@ export default function AdminDeliveryTracking() {
   const [editSaving, setEditSaving] = useState(false);
   const [ordersSearch, setOrdersSearch] = useState("");
   const [ordersPage, setOrdersPage] = useState(1);
-  const [addProductId, setAddProductId] = useState("");
+  const [addProductSearch, setAddProductSearch] = useState("");
 
   const [categoryListDate, setCategoryListDate] = useState(todayLocal());
   const [categoryListGroup, setCategoryListGroup] = useState<string>("fish_seafood");
@@ -182,7 +186,7 @@ export default function AdminDeliveryTracking() {
   }, [categorySearch, categorySortConfig, categoryListDate, categoryListGroup]);
 
   useEffect(() => {
-    if (!token || !categoryListDate || !categoryListGroup) {
+    if (assignOnly || !token || !categoryListDate || !categoryListGroup) {
       setCategoryListData(null);
       return;
     }
@@ -211,7 +215,7 @@ export default function AdminDeliveryTracking() {
     return () => {
       cancelled = true;
     };
-  }, [token, categoryListDate, categoryListGroup]);
+  }, [assignOnly, token, categoryListDate, categoryListGroup]);
 
   const handleDownloadCategoryPdf = async () => {
     if (!token || !categoryListDate || !categoryListGroup) return;
@@ -290,6 +294,7 @@ export default function AdminDeliveryTracking() {
     const assignedPartnerId = String(
       order.deliveryPartner?._id || order.deliveryPartner || partnerIdFromAssignment(assignments, order._id) || ""
     );
+    setAddProductSearch("");
     setEditingOrder({
       _id: order._id,
       status: order.status,
@@ -329,7 +334,6 @@ export default function AdminDeliveryTracking() {
         };
       })
     });
-    setAddProductId("");
   };
 
   const handleCancelOrder = async (order: any) => {
@@ -405,8 +409,8 @@ export default function AdminDeliveryTracking() {
     setEditingOrder((prev: any) => prev ? { ...prev, items: prev.items.filter((_: any, i: number) => i !== idx) } : prev);
   };
 
-  const addCatalogProduct = () => {
-    const product = catalogProducts.find((p) => p._id === addProductId);
+  const addCatalogProduct = (productId: string) => {
+    const product = catalogProducts.find((p) => p._id === productId);
     if (!product || !editingOrder) return;
     const unit = product.unit || "kg";
     const quantity = isKgUnit(unit) ? DEFAULT_WEIGHT_KG : 1;
@@ -428,7 +432,6 @@ export default function AdminDeliveryTracking() {
         }
       ]
     });
-    setAddProductId("");
   };
 
   const ActionButtons = ({ order }: { order: any }) => {
@@ -459,7 +462,7 @@ export default function AdminDeliveryTracking() {
 
   if (loading) {
     return (
-      <DashboardShell title="Order Management" description="Loading tracking and analytics..." navLinks={ADMIN_NAV_LINKS}>
+      <DashboardShell title={pageTitle} description="Loading..." navLinks={ADMIN_NAV_LINKS}>
         <div className="flex justify-center py-20">
           <div className="w-10 h-10 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin" />
         </div>
@@ -587,15 +590,15 @@ export default function AdminDeliveryTracking() {
 
   return (
     <DashboardShell
-      title="Order Management"
-      description="Track deliveries, assign partners, and view analytics."
+      title={pageTitle}
+      description={pageDescription}
       navLinks={ADMIN_NAV_LINKS}
     >
       {error && <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400">{error}</div>}
       {success && <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-400">{success}</div>}
 
       {/* Analytics Section */}
-      {stats && stats.total > 0 && (
+      {!assignOnly && stats && stats.total > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="col-span-1 bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex flex-col justify-center items-center">
             <h3 className="text-slate-400 text-sm font-medium mb-2">Overall Completion</h3>
@@ -631,6 +634,7 @@ export default function AdminDeliveryTracking() {
       )}
 
       {/* Assignment Section */}
+      {assignOnly && (
       <div className="mb-8">
         <h2 className="text-xl font-bold text-white mb-4">Assign Delivery Partners</h2>
         {unassignedOrders.length === 0 ? (
@@ -779,8 +783,11 @@ export default function AdminDeliveryTracking() {
           </>
         )}
       </div>
+      )}
 
       {/* Tracking Section */}
+      {!assignOnly && (
+      <>
       <div>
         {(() => {
           const filteredAssignments = assignments.filter(a => {
@@ -983,7 +990,7 @@ export default function AdminDeliveryTracking() {
           </div>
         </>
       )}
-      </>
+            </>
         );
       })()}
       </div>
@@ -1326,6 +1333,8 @@ export default function AdminDeliveryTracking() {
           </div>
         );
       })()}
+      </>
+      )}
 
       {editingOrder && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-6">
@@ -1335,7 +1344,16 @@ export default function AdminDeliveryTracking() {
                 <h3 className="text-lg font-bold text-white">Edit order #{String(editingOrder._id).slice(-6).toUpperCase()}</h3>
                 <p className="text-xs text-slate-400 mt-1">Changes apply immediately. The original order record is kept.</p>
               </div>
-              <button type="button" onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-white">Close</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditingOrder(null);
+                  setAddProductSearch("");
+                }}
+                className="text-slate-400 hover:text-white"
+              >
+                Close
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
@@ -1569,18 +1587,61 @@ export default function AdminDeliveryTracking() {
               })}
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 mb-6">
-              <select
-                value={addProductId}
-                onChange={(e) => setAddProductId(e.target.value)}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
-              >
-                <option value="">Add product...</option>
-                {catalogProducts.map((p) => (
-                  <option key={p._id} value={p._id}>{p.name}</option>
-                ))}
-              </select>
-              <button type="button" onClick={addCatalogProduct} className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm">Add item</button>
+            <div className="mb-6 rounded-xl border border-slate-800 bg-slate-900/50 p-3 sm:p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Add product</p>
+              <div className="relative mb-3">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm pointer-events-none">
+                  🔍
+                </span>
+                <input
+                  type="search"
+                  enterKeyHint="search"
+                  autoComplete="off"
+                  placeholder="Search product name..."
+                  value={addProductSearch}
+                  onChange={(e) => setAddProductSearch(e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white text-sm outline-none focus:border-teal-500"
+                />
+              </div>
+              <div className="max-h-52 sm:max-h-64 overflow-y-auto overscroll-contain space-y-1.5 -mx-0.5 px-0.5">
+                {(() => {
+                  const q = addProductSearch.trim().toLowerCase();
+                  const matches = catalogProducts.filter((p) => {
+                    if (!q) return true;
+                    const name = String(p.name || "").toLowerCase();
+                    const category = String(p.category || "").toLowerCase();
+                    return name.includes(q) || category.includes(q);
+                  });
+                  if (matches.length === 0) {
+                    return (
+                      <div className="text-center text-slate-500 text-sm py-6">
+                        No products match “{addProductSearch.trim()}”.
+                      </div>
+                    );
+                  }
+                  return matches.map((p) => (
+                    <div
+                      key={p._id}
+                      className="flex items-center gap-2 sm:gap-3 rounded-lg border border-slate-800 bg-slate-950/80 px-2.5 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm text-white font-medium leading-snug break-words">{p.name}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          {p.category || "Product"}
+                          {p.minPrice != null ? ` · ₹${Number(p.minPrice).toFixed(0)}/${p.unit || "kg"}` : ""}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => addCatalogProduct(p._id)}
+                        className="shrink-0 min-h-10 min-w-[4.5rem] px-3 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs sm:text-sm"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ));
+                })()}
+              </div>
             </div>
 
             <div className="flex flex-col sm:flex-row gap-2 justify-end">

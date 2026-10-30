@@ -10,6 +10,7 @@ export type AdminSectionId =
   | "whatsapp_broadcast"
   | "invoices"
   | "deliveries"
+  | "assign_delivery_partners"
   | "all_orders"
   | "today_delivery_status"
   | "manage_delivery_order_list"
@@ -34,6 +35,8 @@ export type AdminSectionId =
   | "expenses"
   | "finance"
   | "availability"
+  | "customer_reviews"
+  | "sourcing_photos"
   | "notifications"
   | "due_dates"
   | "walk_in"
@@ -75,6 +78,11 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   },
   { id: "invoices", label: "Invoices", href: "/dashboard/admin/invoices" },
   { id: "deliveries", label: "Order Management", href: "/dashboard/admin/deliveries" },
+  {
+    id: "assign_delivery_partners",
+    label: "Assign Delivery Partners",
+    href: "/dashboard/admin/assign-delivery-partners"
+  },
   { id: "all_orders", label: "ALL Orders", href: "/dashboard/admin/all-orders" },
   {
     id: "today_delivery_status",
@@ -135,6 +143,16 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
   { id: "expenses", label: "Expenses", href: "/dashboard/admin/expenses" },
   { id: "finance", label: "Manual Ledger", href: "/dashboard/admin/finance" },
   { id: "availability", label: "Availability", href: "/dashboard/admin/availability" },
+  {
+    id: "customer_reviews",
+    label: "Customer Reviews",
+    href: "/dashboard/admin/customer-reviews"
+  },
+  {
+    id: "sourcing_photos",
+    label: "Sourcing Photos",
+    href: "/dashboard/admin/sourcing-photos"
+  },
   { id: "notifications", label: "Notifications", href: "/dashboard/admin/notifications" },
   { id: "due_dates", label: "Due Dates", href: "/dashboard/admin/due-dates" },
   { id: "walk_in", label: "Walk-in", href: "/dashboard/admin/walk-in" },
@@ -191,6 +209,9 @@ export const hasAdminSection = (
   if (allowed.has("walk_in")) {
     allowed.add("walk_in_accounts");
   }
+  if (allowed.has("deliveries")) {
+    allowed.add("assign_delivery_partners");
+  }
   return sectionIds.some((id) => allowed.has(id));
 };
 
@@ -213,6 +234,9 @@ export const getAdminNavLinksForUser = (user: {
   }
   if (allowed.has("walk_in")) {
     allowed.add("walk_in_accounts");
+  }
+  if (allowed.has("deliveries")) {
+    allowed.add("assign_delivery_partners");
   }
   return ADMIN_SECTION_DEFS.filter(
     (s) => s.always || (!s.fullOnly && allowed.has(s.id))

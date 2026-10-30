@@ -27,6 +27,8 @@ type Shortcut = {
 const SHORTCUTS: Shortcut[] = [
   { label: "Manual Booking", href: "/dashboard/admin/manual-booking", section: "manual_booking" },
   { label: "Availability / Banner", href: "/dashboard/admin/availability", section: "availability" },
+  { label: "Customer Reviews", href: "/dashboard/admin/customer-reviews", section: "customer_reviews" },
+  { label: "Sourcing Photos", href: "/dashboard/admin/sourcing-photos", section: "sourcing_photos" },
   { label: "Daily Prices", href: "/dashboard/admin/daily-prices", section: "daily_prices" },
   {
     label: "Today Delivery Status",
@@ -35,6 +37,11 @@ const SHORTCUTS: Shortcut[] = [
   },
   { label: "Today's Catch", href: "/dashboard/admin/todays-catch", section: "todays_catch" },
   { label: "Order Management", href: "/dashboard/admin/deliveries", section: "deliveries" },
+  {
+    label: "Assign Delivery Partners",
+    href: "/dashboard/admin/assign-delivery-partners",
+    section: "assign_delivery_partners"
+  },
   { label: "Pending Payments", href: "/dashboard/admin/pending-payments", section: "pending_payments" },
   { label: "Money Management", href: "/dashboard/admin/money-management", section: "money_management" },
   { label: "Partner Salary", href: "/dashboard/admin/partner-salary", section: "partner_salary" },
@@ -144,8 +151,8 @@ const AdminDashboard = () => {
         label: "Unassigned today",
         value: String(a.unassignedToday),
         hint: "Orders without partner",
-        href: "/dashboard/admin/deliveries",
-        section: "deliveries",
+        href: "/dashboard/admin/assign-delivery-partners",
+        section: "assign_delivery_partners",
         hot: a.unassignedToday > 0
       },
       {

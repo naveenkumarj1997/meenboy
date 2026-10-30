@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import AnimatedOceanScene from "../components/AnimatedOceanScene";
 import FishMessageBanner from "../components/FishMessageBanner";
 import TodayCatchSection, { StockUnavailableSection } from "../components/TodayCatchSection";
+import HomeReviews from "../components/HomeReviews";
+import HomeSourcingGallery from "../components/HomeSourcingGallery";
 import {
   getPublicTodayCatch,
   getPublicBookingBanner,
@@ -176,6 +178,8 @@ const HomePage = () => {
         </div>
       </section>
 
+      <HomeReviews />
+
       {/* Enhanced Why Choose Us Section */}
       <section className="w-full py-24 px-4 sm:px-6 lg:px-8 bg-cyan-50">
         <div className="max-w-7xl mx-auto">
@@ -219,6 +223,8 @@ const HomePage = () => {
           </div>
         </div>
       </section>
+
+      <HomeSourcingGallery />
 
       {/* Customer Benefits Section */}
       <section className="w-full py-24 px-4 sm:px-6 lg:px-8 bg-cyan-950 text-white relative overflow-hidden">

@@ -34,6 +34,8 @@ import AdminFinancePage from "./pages/dashboards/AdminFinancePage";
 import AdminMoneyManagement from "./pages/dashboards/AdminMoneyManagement";
 import AdminExpenses from "./pages/dashboards/AdminExpenses";
 import AdminAvailability from "./pages/dashboards/AdminAvailability";
+import AdminCustomerReviews from "./pages/dashboards/AdminCustomerReviews";
+import AdminSourcingPhotos from "./pages/dashboards/AdminSourcingPhotos";
 import AdminNotifications from "./pages/dashboards/AdminNotifications";
 import AdminDueDates from "./pages/dashboards/AdminDueDates";
 import AdminManualBooking from "./pages/dashboards/AdminManualBooking";
@@ -131,6 +133,7 @@ function App() {
           <Route path="/dashboard/admin/broadcast-whatsapp" element={<AdminWhatsAppBroadcast />} />
           <Route path="/dashboard/admin/invoices" element={<AdminInvoices />} />
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
+          <Route path="/dashboard/admin/assign-delivery-partners" element={<AdminDeliveryTracking assignOnly />} />
           <Route path="/dashboard/admin/all-orders" element={<AdminAllOrders />} />
           <Route path="/dashboard/admin/today-delivery-status" element={<AdminTodayDeliveryStatus />} />
           <Route path="/dashboard/admin/manage-delivery-order-list" element={<AdminManageDeliveryOrderList />} />
@@ -157,6 +160,8 @@ function App() {
           <Route path="/dashboard/admin/money-management" element={<AdminMoneyManagement />} />
           <Route path="/dashboard/admin/expenses" element={<AdminExpenses />} />
           <Route path="/dashboard/admin/availability" element={<AdminAvailability />} />
+          <Route path="/dashboard/admin/customer-reviews" element={<AdminCustomerReviews />} />
+          <Route path="/dashboard/admin/sourcing-photos" element={<AdminSourcingPhotos />} />
           <Route path="/dashboard/admin/notifications" element={<AdminNotifications />} />
           <Route path="/dashboard/admin/due-dates" element={<AdminDueDates />} />
           <Route path="/dashboard/admin/walk-in" element={<AdminWalkIn />} />

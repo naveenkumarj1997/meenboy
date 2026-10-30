@@ -11,6 +11,7 @@ const ADMIN_SECTIONS = [
   { id: "whatsapp_broadcast", label: "Broadcast WhatsApp" },
   { id: "invoices", label: "Invoices" },
   { id: "deliveries", label: "Order Management" },
+  { id: "assign_delivery_partners", label: "Assign Delivery Partners" },
   { id: "all_orders", label: "ALL Orders" },
   { id: "today_delivery_status", label: "Today Delivery Status" },
   { id: "manage_delivery_order_list", label: "Manage Delivery Order List" },
@@ -35,6 +36,8 @@ const ADMIN_SECTIONS = [
   { id: "expenses", label: "Expenses" },
   { id: "finance", label: "Manual Ledger" },
   { id: "availability", label: "Availability" },
+  { id: "customer_reviews", label: "Customer Reviews" },
+  { id: "sourcing_photos", label: "Sourcing Photos" },
   { id: "notifications", label: "Notifications" },
   { id: "due_dates", label: "Due Dates" },
   { id: "walk_in", label: "Walk-in" },
@@ -72,6 +75,9 @@ const hasAdminSection = (user, ...sectionIds) => {
   }
   if (allowed.has("walk_in")) {
     allowed.add("walk_in_accounts");
+  }
+  if (allowed.has("deliveries")) {
+    allowed.add("assign_delivery_partners");
   }
   return sectionIds.some((id) => allowed.has(id));
 };

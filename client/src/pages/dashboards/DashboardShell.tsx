@@ -129,8 +129,8 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
 
   const canSeeNewCustomers =
     user?.role === "admin" && hasAdminSection(user, "new_customers");
-  const canSeeDeliveries =
-    user?.role === "admin" && hasAdminSection(user, "deliveries");
+  const canSeeAssignPartners =
+    user?.role === "admin" && hasAdminSection(user, "assign_delivery_partners");
   const canSeeDueDates =
     user?.role === "admin" && hasAdminSection(user, "due_dates");
 
@@ -148,7 +148,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   }, [token, canSeeNewCustomers]);
 
   const refreshUnassignedWebsiteCount = useCallback(async () => {
-    if (!token || !canSeeDeliveries) {
+    if (!token || !canSeeAssignPartners) {
       setUnassignedWebsiteCount(0);
       return;
     }
@@ -158,7 +158,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     } catch {
       /* keep last known count */
     }
-  }, [token, canSeeDeliveries]);
+  }, [token, canSeeAssignPartners]);
 
   const refreshDueDatesCount = useCallback(async () => {
     if (!token || !canSeeDueDates) {
@@ -192,11 +192,11 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   }, [canSeeNewCustomers, refreshNewCustomersCount]);
 
   useEffect(() => {
-    if (!canSeeDeliveries) return;
+    if (!canSeeAssignPartners) return;
     const onRefresh = () => refreshUnassignedWebsiteCount();
     window.addEventListener("ff:unassigned-website-count", onRefresh);
     return () => window.removeEventListener("ff:unassigned-website-count", onRefresh);
-  }, [canSeeDeliveries, refreshUnassignedWebsiteCount]);
+  }, [canSeeAssignPartners, refreshUnassignedWebsiteCount]);
 
   useEffect(() => {
     if (!canSeeDueDates) return;
@@ -206,7 +206,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
   }, [canSeeDueDates, refreshDueDatesCount]);
 
   useEffect(() => {
-    if (!canSeeNewCustomers && !canSeeDeliveries && !canSeeDueDates) return;
+    if (!canSeeNewCustomers && !canSeeAssignPartners && !canSeeDueDates) return;
     const id = window.setInterval(() => {
       refreshNewCustomersCount();
       refreshUnassignedWebsiteCount();
@@ -215,7 +215,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     return () => window.clearInterval(id);
   }, [
     canSeeNewCustomers,
-    canSeeDeliveries,
+    canSeeAssignPartners,
     canSeeDueDates,
     refreshNewCustomersCount,
     refreshUnassignedWebsiteCount,
@@ -245,9 +245,9 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
         return { ...link, badgeCount: newCustomersCount };
       }
       if (
-        canSeeDeliveries &&
+        canSeeAssignPartners &&
         unassignedWebsiteCount > 0 &&
-        link.href === "/dashboard/admin/deliveries"
+        link.href === "/dashboard/admin/assign-delivery-partners"
       ) {
         return { ...link, badgeCount: unassignedWebsiteCount };
       }
@@ -267,7 +267,7 @@ const DashboardShell = ({ title, description, navLinks, children }: DashboardShe
     adminSectionCount,
     canSeeNewCustomers,
     newCustomersCount,
-    canSeeDeliveries,
+    canSeeAssignPartners,
     unassignedWebsiteCount,
     canSeeDueDates,
     dueDatesAttentionCount

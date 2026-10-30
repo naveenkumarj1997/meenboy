@@ -272,6 +272,109 @@ export interface BookingBannerPayload {
 export const getPublicBookingBanner = async () =>
   request<{ banner: BookingBannerPayload }>("/booking-banner");
 
+export interface CustomerReviewPayload {
+  _id: string;
+  name: string;
+  place?: string;
+  review: string;
+  rating: number;
+  isPublished: boolean;
+  sortOrder: number;
+  createdAt?: string;
+}
+
+export interface SourcingPhotoPayload {
+  _id: string;
+  imageUrl: string;
+  caption?: string;
+  category: "fishing" | "sourcing" | "cutting";
+  isPublished: boolean;
+  sortOrder: number;
+  createdAt?: string;
+}
+
+export const getPublicCustomerReviews = async () =>
+  request<{ reviews: CustomerReviewPayload[] }>("/homepage/reviews");
+
+export const getPublicSourcingPhotos = async () =>
+  request<{ photos: SourcingPhotoPayload[] }>("/homepage/photos");
+
+export const getAdminCustomerReviews = async (token: string) =>
+  request<{ reviews: CustomerReviewPayload[] }>("/homepage/reviews/admin", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createCustomerReview = async (
+  token: string,
+  payload: { name: string; place?: string; review: string; rating: number; isPublished?: boolean; sortOrder?: number }
+) =>
+  request<{ review: CustomerReviewPayload; message: string }>("/homepage/reviews/admin", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const updateCustomerReview = async (
+  token: string,
+  id: string,
+  payload: Partial<{ name: string; place: string; review: string; rating: number; isPublished: boolean; sortOrder: number }>
+) =>
+  request<{ review: CustomerReviewPayload; message: string }>(`/homepage/reviews/admin/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const deleteCustomerReview = async (token: string, id: string) =>
+  request<{ message: string }>(`/homepage/reviews/admin/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const getAdminSourcingPhotos = async (token: string) =>
+  request<{ photos: SourcingPhotoPayload[] }>("/homepage/photos/admin", {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+export const createSourcingPhoto = async (
+  token: string,
+  payload: {
+    imageUrl: string;
+    caption?: string;
+    category: SourcingPhotoPayload["category"];
+    isPublished?: boolean;
+    sortOrder?: number;
+  }
+) =>
+  request<{ photo: SourcingPhotoPayload; message: string }>("/homepage/photos/admin", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const updateSourcingPhoto = async (
+  token: string,
+  id: string,
+  payload: Partial<{
+    imageUrl: string;
+    caption: string;
+    category: SourcingPhotoPayload["category"];
+    isPublished: boolean;
+    sortOrder: number;
+  }>
+) =>
+  request<{ photo: SourcingPhotoPayload; message: string }>(`/homepage/photos/admin/${id}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload)
+  });
+
+export const deleteSourcingPhoto = async (token: string, id: string) =>
+  request<{ message: string }>(`/homepage/photos/admin/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
 export const getAdminBookingBanner = async (token: string) =>
   request<{ banner: BookingBannerPayload }>("/booking-banner/admin", {
     headers: { Authorization: `Bearer ${token}` }
