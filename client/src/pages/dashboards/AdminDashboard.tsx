@@ -2,9 +2,16 @@ import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import DashboardShell from "./DashboardShell";
 import { useAuth } from "../../context/AuthContext";
-import { getAdminOverview, type AdminOverviewPayload } from "../../lib/api";
+import {
+  getAdminOverview,
+  getOverviewOrders,
+  type AdminOverviewPayload,
+  type OverviewOrderKind,
+  type OverviewOrderRow
+} from "../../lib/api";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 import { hasAdminSection, type AdminSectionId } from "../../lib/adminSections";
+import { formatQuantityLabel } from "../../lib/weightOptions";
 
 const money = (n: number) => `₹${Number(n || 0).toFixed(2)}`;
 
@@ -37,6 +44,7 @@ const SHORTCUTS: Shortcut[] = [
   },
   { label: "Today's Catch", href: "/dashboard/admin/todays-catch", section: "todays_catch" },
   { label: "Order Management", href: "/dashboard/admin/deliveries", section: "deliveries" },
+  { label: "Orders List", href: "/dashboard/admin/orders-list", section: "orders_list" },
   {
     label: "Assign Delivery Partners",
     href: "/dashboard/admin/assign-delivery-partners",
@@ -98,12 +106,26 @@ const emptyOverview = (): AdminOverviewPayload => ({
   }
 });
 
+const DRILL_TITLES: Record<OverviewOrderKind, string> = {
+  open: "Open orders",
+  lifetime: "Lifetime all-time (delivered)",
+  today_revenue: "Revenue today (delivered)"
+};
+
 const AdminDashboard = () => {
   const { token, user } = useAuth();
   const [data, setData] = useState<AdminOverviewPayload>(emptyOverview());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [drillKind, setDrillKind] = useState<OverviewOrderKind | null>(null);
+  const [drillPage, setDrillPage] = useState(1);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [drillError, setDrillError] = useState("");
+  const [drillOrders, setDrillOrders] = useState<OverviewOrderRow[]>([]);
+  const [drillTotalCount, setDrillTotalCount] = useState(0);
+  const [drillTotalPages, setDrillTotalPages] = useState(1);
+  const [drillTotalAmount, setDrillTotalAmount] = useState(0);
 
   useEffect(() => {
     if (!token) return;
@@ -127,6 +149,37 @@ const AdminDashboard = () => {
 
   const can = (section?: AdminSectionId) =>
     !section || hasAdminSection(user, section);
+
+  const openDrill = (kind: OverviewOrderKind) => {
+    setDrillKind(kind);
+    setDrillPage(1);
+    setDrillOrders([]);
+    setDrillError("");
+  };
+
+  useEffect(() => {
+    if (!token || !drillKind) return;
+    let cancelled = false;
+    setDrillLoading(true);
+    setDrillError("");
+    getOverviewOrders(token, drillKind, { date: selectedDate, page: drillPage })
+      .then((res) => {
+        if (cancelled) return;
+        setDrillOrders(res.orders || []);
+        setDrillTotalCount(res.totalCount || 0);
+        setDrillTotalPages(res.totalPages || 1);
+        setDrillTotalAmount(res.totalAmount || 0);
+      })
+      .catch((err: any) => {
+        if (!cancelled) setDrillError(err.message || "Failed to load orders");
+      })
+      .finally(() => {
+        if (!cancelled) setDrillLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, drillKind, drillPage, selectedDate]);
 
   const attentionCards: AttentionCard[] = useMemo(() => {
     const a = data.attention;
@@ -214,38 +267,63 @@ const AdminDashboard = () => {
 
       {/* Snapshot */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+        <Link
+          to="/dashboard/admin/products"
+          className={`rounded-2xl border border-slate-800 bg-slate-900/50 p-5 hover:border-teal-500/40 transition-colors ${
+            can("products") ? "" : "pointer-events-none"
+          }`}
+        >
           <p className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-1">Active products</p>
           <p className="text-3xl font-black text-teal-400">
             {loading ? "…" : s.activeProducts}
           </p>
           <p className="text-xs text-slate-500 mt-1">
             {loading ? "" : `${s.totalProducts} total in catalog`}
+            <span className="block text-teal-400/80 mt-1">Tap to view catalog →</span>
           </p>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+        </Link>
+        <button
+          type="button"
+          onClick={() => openDrill("open")}
+          className="text-left rounded-2xl border border-slate-800 bg-slate-900/50 p-5 hover:border-amber-500/40 transition-colors"
+        >
           <p className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-1">Open orders</p>
           <p className="text-3xl font-black text-amber-400">
             {loading ? "…" : s.activeOrders}
           </p>
-          <p className="text-xs text-slate-500 mt-1">All dates · not yet delivered</p>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+          <p className="text-xs text-slate-500 mt-1">
+            All dates · not yet delivered
+            <span className="block text-amber-400/80 mt-1">Tap to view list →</span>
+          </p>
+        </button>
+        <button
+          type="button"
+          onClick={() => openDrill("today_revenue")}
+          className="text-left rounded-2xl border border-slate-800 bg-slate-900/50 p-5 hover:border-emerald-500/40 transition-colors"
+        >
           <p className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-1">Revenue today</p>
           <p className="text-3xl font-black text-emerald-400">
             {loading ? "…" : money(s.revenueToday)}
           </p>
           <p className="text-xs text-slate-500 mt-1">
             {loading ? "" : `Week ${money(s.revenueWeek)}`}
+            <span className="block text-emerald-400/80 mt-1">Tap to view delivered orders →</span>
           </p>
-        </div>
-        <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+        </button>
+        <button
+          type="button"
+          onClick={() => openDrill("lifetime")}
+          className="text-left rounded-2xl border border-slate-800 bg-slate-900/50 p-5 hover:border-cyan-500/40 transition-colors"
+        >
           <p className="text-xs uppercase tracking-wider text-slate-500 font-bold mb-1">Lifetime all-time</p>
           <p className="text-3xl font-black text-cyan-400">
             {loading ? "…" : money(s.revenueAllTime)}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Delivered orders only</p>
-        </div>
+          <p className="text-xs text-slate-500 mt-1">
+            Delivered orders only
+            <span className="block text-cyan-400/80 mt-1">Tap to view list →</span>
+          </p>
+        </button>
       </div>
 
       {/* Needs attention */}
@@ -435,6 +513,92 @@ const AdminDashboard = () => {
           ))}
         </div>
       </section>
+
+      {drillKind && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-6">
+          <div className="bg-slate-950 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-3xl h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 sm:px-6 shrink-0 border-b border-slate-800">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-white">{DRILL_TITLES[drillKind]}</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  {drillLoading
+                    ? "Loading…"
+                    : `${drillTotalCount} order${drillTotalCount === 1 ? "" : "s"} · ${money(
+                        drillKind === "lifetime" ? s.revenueAllTime : drillTotalAmount
+                      )}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrillKind(null)}
+                className="shrink-0 min-h-11 px-3 rounded-xl bg-slate-800 text-slate-200 text-sm font-semibold"
+              >
+                Close
+              </button>
+            </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-3">
+              {drillError && (
+                <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
+                  {drillError}
+                </div>
+              )}
+              {!drillLoading && !drillError && drillOrders.length === 0 && (
+                <p className="text-sm text-slate-500 py-8 text-center">No orders in this list.</p>
+              )}
+              {drillOrders.map((order) => (
+                <div key={order._id} className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white leading-snug">{order.customerName}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        #{String(order._id).slice(-6).toUpperCase()} · {order.deliveryDate} {order.deliveryTime}
+                      </p>
+                      {order.phone ? <p className="text-xs text-slate-500">{order.phone}</p> : null}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-black text-teal-300">{money(order.total)}</p>
+                      <p className="text-[10px] uppercase tracking-wider text-slate-500 mt-1">
+                        {String(order.status || "").replace(/_/g, " ")}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-1">
+                    {order.items.map((item, i) => (
+                      <p key={`${order._id}-${i}`} className="text-xs text-slate-300">
+                        {formatQuantityLabel(item.quantity, item.unit)} · {item.productName}
+                        {item.cutName ? ` (${item.cutName})` : ""}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {drillTotalPages > 1 && (
+              <div className="shrink-0 border-t border-slate-800 px-4 sm:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  disabled={drillPage <= 1 || drillLoading}
+                  onClick={() => setDrillPage((p) => Math.max(1, p - 1))}
+                  className="min-h-11 px-4 rounded-xl bg-slate-800 text-white text-sm disabled:opacity-40"
+                >
+                  Prev
+                </button>
+                <span className="text-xs text-slate-400">
+                  Page {drillPage} of {drillTotalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={drillPage >= drillTotalPages || drillLoading}
+                  onClick={() => setDrillPage((p) => p + 1)}
+                  className="min-h-11 px-4 rounded-xl bg-slate-800 text-white text-sm disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </DashboardShell>
   );
 };

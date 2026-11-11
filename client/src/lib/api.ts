@@ -19,23 +19,34 @@ interface AuthPayload {
   role?: "customer" | "admin" | "delivery_partner";
 }
 
+const fetchApi = (url: string, init: RequestInit) =>
+  fetch(`${API_BASE}${url}`, {
+    cache: "no-store",
+    ...init
+  });
+
 export const request = async <T>(url: string, options?: RequestInit): Promise<T> => {
   const { headers, ...restOptions } = options || {};
+  const init: RequestInit = {
+    ...restOptions,
+    headers: {
+      "Content-Type": "application/json",
+      ...headers
+    }
+  };
   let response: Response;
   try {
-    response = await fetch(`${API_BASE}${url}`, {
-      cache: "no-store",
-      ...restOptions,
-      headers: {
-        "Content-Type": "application/json",
-        ...headers
-      }
-    });
+    response = await fetchApi(url, init);
   } catch {
-    throw new ApiError(
-      "Cannot reach the server. Check that the API is running, then refresh.",
-      0
-    );
+    await new Promise((r) => setTimeout(r, 600));
+    try {
+      response = await fetchApi(url, init);
+    } catch {
+      throw new ApiError(
+        "Cannot reach the server. Check that the API is running, then refresh.",
+        0
+      );
+    }
   }
 
   const raw = await response.text();
@@ -163,6 +174,42 @@ export interface ProductPayload {
 export const getAdminOverview = async (token: string, date?: string) => {
   const qs = date ? `?date=${encodeURIComponent(date)}` : "";
   return request<AdminOverviewPayload>(`/dashboard/admin${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export type OverviewOrderKind = "open" | "lifetime" | "today_revenue";
+
+export interface OverviewOrderRow {
+  _id: string;
+  customerName: string;
+  phone: string;
+  deliveryDate: string;
+  deliveryTime: string;
+  status: string;
+  total: number;
+  bookingSource: string;
+  items: { productName: string; quantity: number; unit: string; cutName?: string }[];
+}
+
+export const getOverviewOrders = async (
+  token: string,
+  kind: OverviewOrderKind,
+  opts?: { date?: string; page?: number }
+) => {
+  const params = new URLSearchParams({ kind });
+  if (opts?.date) params.set("date", opts.date);
+  if (opts?.page) params.set("page", String(opts.page));
+  return request<{
+    kind: OverviewOrderKind;
+    date: string;
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+    totalAmount: number;
+    orders: OverviewOrderRow[];
+  }>(`/dashboard/admin/orders?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 };
@@ -336,38 +383,76 @@ export const getAdminSourcingPhotos = async (token: string) =>
     headers: { Authorization: `Bearer ${token}` }
   });
 
+const saveSourcingPhotoForm = async (
+  token: string,
+  path: string,
+  method: "POST" | "PUT",
+  payload: {
+    file?: File | null;
+    caption?: string;
+    category?: SourcingPhotoPayload["category"];
+    isPublished?: boolean;
+    sortOrder?: number;
+  }
+) => {
+  const formData = new FormData();
+  if (payload.file) formData.append("image", payload.file);
+  if (payload.caption !== undefined) formData.append("caption", payload.caption);
+  if (payload.category) formData.append("category", payload.category);
+  if (payload.isPublished !== undefined) formData.append("isPublished", String(payload.isPublished));
+  if (payload.sortOrder !== undefined) formData.append("sortOrder", String(payload.sortOrder));
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData
+  });
+  const raw = await response.text();
+  let data: any = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = {};
+    }
+  }
+  if (!response.ok) {
+    throw new Error(data?.message || "Could not save photo");
+  }
+  return data as { photo: SourcingPhotoPayload; message: string };
+};
+
 export const createSourcingPhoto = async (
   token: string,
   payload: {
-    imageUrl: string;
+    file: File;
     caption?: string;
     category: SourcingPhotoPayload["category"];
     isPublished?: boolean;
     sortOrder?: number;
   }
-) =>
-  request<{ photo: SourcingPhotoPayload; message: string }>("/homepage/photos/admin", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify(payload)
-  });
+) => saveSourcingPhotoForm(token, "/homepage/photos/admin", "POST", payload);
 
 export const updateSourcingPhoto = async (
   token: string,
   id: string,
   payload: Partial<{
-    imageUrl: string;
+    file: File | null;
     caption: string;
     category: SourcingPhotoPayload["category"];
     isPublished: boolean;
     sortOrder: number;
   }>
-) =>
-  request<{ photo: SourcingPhotoPayload; message: string }>(`/homepage/photos/admin/${id}`, {
+) => {
+  if (payload.file) {
+    return saveSourcingPhotoForm(token, `/homepage/photos/admin/${id}`, "PUT", payload);
+  }
+  return request<{ photo: SourcingPhotoPayload; message: string }>(`/homepage/photos/admin/${id}`, {
     method: "PUT",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
   });
+};
 
 export const deleteSourcingPhoto = async (token: string, id: string) =>
   request<{ message: string }>(`/homepage/photos/admin/${id}`, {
@@ -521,9 +606,17 @@ export const uploadAdminImage = async (token: string, file: File) => {
     body: formData
   });
 
-  const data = await response.json();
+  const raw = await response.text();
+  let data: any = {};
+  if (raw) {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = {};
+    }
+  }
   if (!response.ok) {
-    throw new Error(data?.message || "Upload failed");
+    throw new Error(data?.message || "Upload failed. Use a JPG or PNG under 8 MB.");
   }
 
   return data as { success: boolean; message: string; url: string };
@@ -1043,6 +1136,36 @@ export const updateAdminOrder = async (token: string, orderId: string, payload: 
     method: "PATCH",
     headers: { Authorization: `Bearer ${token}` },
     body: JSON.stringify(payload)
+  });
+
+export interface DateBoardOrder {
+  _id: string;
+  customerName: string;
+  phone: string;
+  deliveryDate: string;
+  deliveryTime: string;
+  status: string;
+  total: number;
+  bookingSource: string;
+  items: { productName: string; quantity: number; unit: string; cutName?: string }[];
+  itemCount: number;
+}
+
+export const getOrdersDateBoard = async (token: string, from?: string) => {
+  const qs = from ? `?from=${encodeURIComponent(from)}` : "";
+  return request<{
+    from: string;
+    days: { date: string; count: number; orders: DateBoardOrder[] }[];
+  }>(`/orders/admin/date-board${qs}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+};
+
+export const updateOrderDeliveryDate = async (token: string, orderId: string, deliveryDate: string) =>
+  request<{ message: string; order: any }>(`/orders/${orderId}/delivery-date`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ deliveryDate })
   });
 
 export const getPartnerAssignments = async (token: string) =>

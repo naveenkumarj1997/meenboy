@@ -9,6 +9,7 @@ import AdminWhatsAppBroadcast from "./pages/dashboards/AdminWhatsAppBroadcast";
 import AdminInvoices from "./pages/dashboards/AdminInvoices";
 import AdminDeliveryTracking from "./pages/dashboards/AdminDeliveryTracking";
 import AdminAllOrders from "./pages/dashboards/AdminAllOrders";
+import AdminOrdersList from "./pages/dashboards/AdminOrdersList";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
 import AdminTodayDeliveryStatus from "./pages/dashboards/AdminTodayDeliveryStatus";
 import AdminManageDeliveryOrderList from "./pages/dashboards/AdminManageDeliveryOrderList";
@@ -135,6 +136,7 @@ function App() {
           <Route path="/dashboard/admin/deliveries" element={<AdminDeliveryTracking />} />
           <Route path="/dashboard/admin/assign-delivery-partners" element={<AdminDeliveryTracking assignOnly />} />
           <Route path="/dashboard/admin/all-orders" element={<AdminAllOrders />} />
+          <Route path="/dashboard/admin/orders-list" element={<AdminOrdersList />} />
           <Route path="/dashboard/admin/today-delivery-status" element={<AdminTodayDeliveryStatus />} />
           <Route path="/dashboard/admin/manage-delivery-order-list" element={<AdminManageDeliveryOrderList />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />

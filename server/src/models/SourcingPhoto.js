@@ -2,7 +2,10 @@ const mongoose = require("mongoose");
 
 const sourcingPhotoSchema = new mongoose.Schema(
   {
-    imageUrl: { type: String, required: true, trim: true },
+    imageUrl: { type: String, trim: true, default: "" },
+    imageData: { type: Buffer },
+    imageMimeType: { type: String, trim: true, default: "" },
+    imageFileName: { type: String, trim: true, default: "" },
     caption: { type: String, trim: true, maxlength: 160, default: "" },
     category: {
       type: String,

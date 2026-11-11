@@ -13,6 +13,7 @@ const ADMIN_SECTIONS = [
   { id: "deliveries", label: "Order Management" },
   { id: "assign_delivery_partners", label: "Assign Delivery Partners" },
   { id: "all_orders", label: "ALL Orders" },
+  { id: "orders_list", label: "Orders List" },
   { id: "today_delivery_status", label: "Today Delivery Status" },
   { id: "manage_delivery_order_list", label: "Manage Delivery Order List" },
   { id: "partner_report", label: "Partner Report" },
@@ -78,6 +79,10 @@ const hasAdminSection = (user, ...sectionIds) => {
   }
   if (allowed.has("deliveries")) {
     allowed.add("assign_delivery_partners");
+    allowed.add("orders_list");
+  }
+  if (allowed.has("all_orders")) {
+    allowed.add("orders_list");
   }
   return sectionIds.some((id) => allowed.has(id));
 };

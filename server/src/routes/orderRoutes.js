@@ -32,7 +32,9 @@ const {
   adminReorderAssignments,
   createAdminOrder,
   adminUpdateDeliveryPayment,
-  adminSetDeliveryStatus
+  adminSetDeliveryStatus,
+  listOrdersDateBoard,
+  updateOrderDeliveryDate
 } = require("../controllers/orderController");
 
 const router = express.Router();
@@ -54,7 +56,8 @@ const orderAdminAccess = authorizeAdminSections(
   "manual_booking",
   "new_customers",
   "daily_prices",
-  "walk_in"
+  "walk_in",
+  "orders_list"
 );
 
 router.post(
@@ -93,6 +96,13 @@ router.post(
 
 router.get("/me", protect, authorizeRoles("customer"), getMyOrders);
 router.get("/admin", protect, authorizeRoles("admin"), orderAdminAccess, listOrdersForAdmin);
+router.get(
+  "/admin/date-board",
+  protect,
+  authorizeRoles("admin"),
+  authorizeAdminSections("orders_list", "deliveries", "all_orders"),
+  listOrdersDateBoard
+);
 router.get(
   "/admin/unassigned-website-count",
   protect,
@@ -196,6 +206,16 @@ router.patch(
   protect,
   authorizeRoles("admin"), orderAdminAccess,
   updateAdminOrder
+);
+
+router.patch(
+  "/:orderId/delivery-date",
+  protect,
+  authorizeRoles("admin"),
+  authorizeAdminSections("orders_list", "deliveries", "all_orders"),
+  [body("deliveryDate").notEmpty().withMessage("Delivery date is required")],
+  validateRequest,
+  updateOrderDeliveryDate
 );
 
 router.post(

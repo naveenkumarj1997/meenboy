@@ -24,11 +24,16 @@ const shapeReview = (doc) => {
   };
 };
 
+const MAX_SOURCING_PHOTOS = 6;
+const PHOTO_LIST_SELECT = "-imageData";
+
 const shapePhoto = (doc) => {
   const p = doc.toObject ? doc.toObject() : doc;
+  const id = String(p._id);
+  const storedInDb = Boolean(p.imageMimeType);
   return {
-    _id: String(p._id),
-    imageUrl: p.imageUrl,
+    _id: id,
+    imageUrl: storedInDb ? `/api/homepage/photos/file/${id}` : p.imageUrl || "",
     caption: p.caption || "",
     category: p.category || "sourcing",
     isPublished: p.isPublished !== false,
@@ -120,7 +125,11 @@ const deleteReview = async (req, res, next) => {
 
 const getPublicPhotos = async (req, res, next) => {
   try {
-    const rows = await SourcingPhoto.find({ isPublished: true }).sort(listSort).limit(36).lean();
+    const rows = await SourcingPhoto.find({ isPublished: true })
+      .select(PHOTO_LIST_SELECT)
+      .sort(listSort)
+      .limit(MAX_SOURCING_PHOTOS)
+      .lean();
     res.json({ photos: rows.map(shapePhoto) });
   } catch (error) {
     next(error);
@@ -129,26 +138,43 @@ const getPublicPhotos = async (req, res, next) => {
 
 const listAdminPhotos = async (req, res, next) => {
   try {
-    const rows = await SourcingPhoto.find({}).sort(listSort).lean();
+    const rows = await SourcingPhoto.find({}).select(PHOTO_LIST_SELECT).sort(listSort).lean();
     res.json({ photos: rows.map(shapePhoto) });
   } catch (error) {
     next(error);
   }
 };
 
+const applyUploadedFile = (doc, file) => {
+  doc.imageData = file.buffer;
+  doc.imageMimeType = file.mimetype || "image/jpeg";
+  doc.imageFileName = clip(file.originalname, 120);
+};
+
 const createPhoto = async (req, res, next) => {
   try {
-    const imageUrl = clip(req.body?.imageUrl, 500);
-    if (!imageUrl) return res.status(400).json({ message: "Upload a photo first." });
+    const count = await SourcingPhoto.countDocuments();
+    if (count >= MAX_SOURCING_PHOTOS) {
+      return res.status(400).json({ message: `Maximum ${MAX_SOURCING_PHOTOS} sourcing photos. Delete one to add another.` });
+    }
+    if (!req.file?.buffer) {
+      return res.status(400).json({ message: "Choose a JPG or PNG under 250 KB." });
+    }
     const category = PHOTO_CATEGORIES.has(req.body?.category) ? req.body.category : "sourcing";
-    const doc = await SourcingPhoto.create({
-      imageUrl,
+    const doc = new SourcingPhoto({
       caption: clip(req.body?.caption, 160),
       category,
-      isPublished: req.body?.isPublished !== false,
+      isPublished: String(req.body?.isPublished) !== "false",
       sortOrder: Number(req.body?.sortOrder) || 0
     });
-    res.status(201).json({ photo: shapePhoto(doc), message: "Photo added. It will show on the home page if published." });
+    applyUploadedFile(doc, req.file);
+    await doc.save();
+    doc.imageUrl = `/api/homepage/photos/file/${doc._id}`;
+    await doc.save();
+    res.status(201).json({
+      photo: shapePhoto(doc),
+      message: "Photo saved in the database. It will show on the home page if published."
+    });
   } catch (error) {
     next(error);
   }
@@ -158,11 +184,7 @@ const updatePhoto = async (req, res, next) => {
   try {
     const doc = await SourcingPhoto.findById(req.params.id);
     if (!doc) return res.status(404).json({ message: "Photo not found." });
-    if (req.body.imageUrl !== undefined) {
-      const imageUrl = clip(req.body.imageUrl, 500);
-      if (!imageUrl) return res.status(400).json({ message: "Photo is required." });
-      doc.imageUrl = imageUrl;
-    }
+    if (req.file?.buffer) applyUploadedFile(doc, req.file);
     if (req.body.caption !== undefined) doc.caption = clip(req.body.caption, 160);
     if (req.body.category !== undefined) {
       if (!PHOTO_CATEGORIES.has(req.body.category)) {
@@ -170,10 +192,25 @@ const updatePhoto = async (req, res, next) => {
       }
       doc.category = req.body.category;
     }
-    if (req.body.isPublished !== undefined) doc.isPublished = Boolean(req.body.isPublished);
+    if (req.body.isPublished !== undefined) {
+      doc.isPublished = String(req.body.isPublished) !== "false";
+    }
     if (req.body.sortOrder !== undefined) doc.sortOrder = Number(req.body.sortOrder) || 0;
+    if (doc.imageMimeType) doc.imageUrl = `/api/homepage/photos/file/${doc._id}`;
     await doc.save();
     res.json({ photo: shapePhoto(doc), message: "Photo updated." });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getPhotoFile = async (req, res, next) => {
+  try {
+    const doc = await SourcingPhoto.findById(req.params.id).select("imageData imageMimeType");
+    if (!doc?.imageData) return res.status(404).json({ message: "Photo file not found." });
+    res.set("Content-Type", doc.imageMimeType || "image/jpeg");
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(doc.imageData);
   } catch (error) {
     next(error);
   }
@@ -199,5 +236,6 @@ module.exports = {
   listAdminPhotos,
   createPhoto,
   updatePhoto,
-  deletePhoto
+  deletePhoto,
+  getPhotoFile
 };

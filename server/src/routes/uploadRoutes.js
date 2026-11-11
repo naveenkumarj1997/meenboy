@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const multer = require("multer");
 const path = require("path");
 const { protect, authorizeRoles } = require("../middleware/auth");
@@ -9,10 +10,15 @@ const router = express.Router();
 const MAX_DOCUMENT_BYTES = 200 * 1024; // 200 KB
 const ALLOWED_DOC_TYPES = ["aadhaar", "dl", "rc", "voter_id"];
 
+const uploadsDir = path.join(__dirname, "../../uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Image uploads stay on disk (product images)
 const imageStorage = multer.diskStorage({
   destination(req, file, cb) {
-    cb(null, path.join(__dirname, "../../uploads"));
+    cb(null, uploadsDir);
   },
   filename(req, file, cb) {
     cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
@@ -20,14 +26,18 @@ const imageStorage = multer.diskStorage({
 });
 
 function checkFileType(file, cb) {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext === ".heic" || ext === ".heif" || String(file.mimetype || "").includes("heic")) {
+    return cb(new Error("iPhone HEIC photos are not supported. Open the photo, export or share as JPG, then upload."));
+  }
   const filetypes = /jpg|jpeg|png|webp/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  const extname = filetypes.test(ext);
   const mimetype = filetypes.test(file.mimetype);
 
   if (extname && mimetype) {
     return cb(null, true);
   }
-  cb(new Error("Images only! (jpg, jpeg, png, webp)"));
+  cb(new Error("Use a JPG, PNG, or WEBP photo (not HEIC / PDF)."));
 }
 
 const upload = multer({
@@ -35,7 +45,7 @@ const upload = multer({
   fileFilter(req, file, cb) {
     checkFileType(file, cb);
   },
-  limits: { fileSize: 5 * 1024 * 1024 }
+  limits: { fileSize: 8 * 1024 * 1024 }
 });
 
 /**
@@ -43,17 +53,29 @@ const upload = multer({
  * @route   POST /api/upload
  * @access  Private/Admin
  */
-router.post("/", protect, authorizeRoles("admin"), upload.single("image"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "No image provided" });
-  }
+router.post("/", protect, authorizeRoles("admin"), (req, res) => {
+  upload.single("image")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({
+          message: "Photo must be under 8 MB. Compress it or export as JPG, then try again."
+        });
+      }
+      return res.status(400).json({ message: err.message || "Upload failed" });
+    }
+    if (err) {
+      return res.status(400).json({ message: err.message || "Upload failed" });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "No image provided" });
+    }
 
-  const imagePath = `/uploads/${req.file.filename}`;
-
-  res.status(200).json({
-    success: true,
-    message: "Image uploaded successfully",
-    url: imagePath
+    const imagePath = `/uploads/${req.file.filename}`;
+    res.status(200).json({
+      success: true,
+      message: "Image uploaded successfully",
+      url: imagePath
+    });
   });
 });
 

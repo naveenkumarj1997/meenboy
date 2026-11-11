@@ -1,12 +1,20 @@
 const express = require("express");
 const { protect, authorizeRoles, authorizeAdminSections } = require("../middleware/auth");
-const { getAdminOverview } = require("../controllers/dashboardController");
+const { getAdminOverview, listOverviewOrders } = require("../controllers/dashboardController");
 
 const router = express.Router();
 
 router.get("/customer", protect, authorizeRoles("customer"), (req, res) => {
   res.json({ message: `Welcome customer ${req.user.name}` });
 });
+
+router.get(
+  "/admin/orders",
+  protect,
+  authorizeRoles("admin"),
+  authorizeAdminSections("overview"),
+  listOverviewOrders
+);
 
 router.get(
   "/admin",

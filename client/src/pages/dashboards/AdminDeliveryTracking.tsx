@@ -15,7 +15,13 @@ import {
   CATEGORY_ORDER_GROUPS
 } from "../../lib/api";
 import { triggerPdfDownload } from "../../lib/downloadPdf";
-import { WEIGHT_OPTIONS, DEFAULT_WEIGHT_KG, snapToWeightOption, formatQuantityLabel } from "../../lib/weightOptions";
+import {
+  WEIGHT_OPTIONS,
+  DEFAULT_WEIGHT_KG,
+  CUSTOM_WEIGHT_MAX_KG,
+  parseCustomWeightKg,
+  formatQuantityLabel
+} from "../../lib/weightOptions";
 import { BookingSourceBadge } from "../../components/SourceBadges";
 import { DELIVERY_TIMES, DEFAULT_DELIVERY_TIME } from "../../lib/deliveryTimes";
 import { computeOrderTotal, parseNonNegativeAmount } from "../../lib/orderTotals";
@@ -87,7 +93,15 @@ function OrderItemsAndNotes({
 
 const COLORS = ["#14b8a6", "#f59e0b", "#f43f5e", "#6366f1", "#8b5cf6"];
 
-const isKgUnit = (unit?: string) => !unit || unit.toLowerCase() === "kg";
+const isKgUnit = (unit?: string) => {
+  const u = String(unit || "kg").trim().toLowerCase();
+  return !u || u === "kg" || u === "kgs" || u.startsWith("kg");
+};
+
+const roundQtyKg = (n: number) => Math.round(Number(n || 0) * 1000) / 1000;
+
+const qtyIsPreset = (q: number) =>
+  WEIGHT_OPTIONS.some((opt) => Math.abs(opt.value - Number(q)) < 0.0005);
 
 const todayLocal = () => {
   const d = new Date();
@@ -320,7 +334,8 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
         const catalog = catalogProducts.find((p) => String(p._id) === String(item.product));
         const unit = item.unit || catalog?.unit || "kg";
         const unitPrice = Number(item.unitPrice ?? item.unitPrice ?? 0);
-        const quantity = isKgUnit(unit) ? snapToWeightOption(Number(item.quantity)) : Number(item.quantity);
+        const quantity = isKgUnit(unit) ? roundQtyKg(Number(item.quantity)) : Number(item.quantity);
+        const customGrams = isKgUnit(unit) && !qtyIsPreset(quantity);
         return {
           product: item.product,
           productName: item.productName,
@@ -330,7 +345,9 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
           cutName: item.cutName || "",
           notes: item.notes || "",
           unitPrice,
-          totalPrice: quantity * unitPrice
+          totalPrice: quantity * unitPrice,
+          weightMode: customGrams ? "custom" : "preset",
+          gramDraft: customGrams ? String(Math.round(quantity * 1000)) : ""
         };
       })
     });
@@ -360,12 +377,28 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
       setError("Order must have at least one item.");
       return;
     }
+    const itemsForSave = [];
+    for (const item of editingOrder.items) {
+      const { weightMode, gramDraft, ...rest } = item;
+      if (isKgUnit(rest.unit) && weightMode === "custom") {
+        const kg = parseCustomWeightKg(String(gramDraft || ""), "gram");
+        if (!kg) {
+          setError(
+            `Enter exact grams (100 gram to ${CUSTOM_WEIGHT_MAX_KG} kg) for ${rest.productName || "this item"}.`
+          );
+          return;
+        }
+        rest.quantity = kg;
+        rest.totalPrice = kg * Number(rest.unitPrice || 0);
+      }
+      itemsForSave.push(rest);
+    }
     try {
       setEditSaving(true);
       setError("");
       setSuccess("");
       await updateAdminOrder(token!, editingOrder._id, {
-        items: editingOrder.items,
+        items: itemsForSave,
         address: editingOrder.address,
         deliveryDate: editingOrder.deliveryDate,
         deliveryTime: editingOrder.deliveryTime,
@@ -428,7 +461,9 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
           cutName: "",
           notes: "",
           unitPrice,
-          totalPrice: quantity * unitPrice
+          totalPrice: quantity * unitPrice,
+          weightMode: "preset",
+          gramDraft: ""
         }
       ]
     });
@@ -1338,10 +1373,12 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
 
       {editingOrder && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-6">
-          <div className="bg-slate-950 border border-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-4 mb-4">
-              <div>
-                <h3 className="text-lg font-bold text-white">Edit order #{String(editingOrder._id).slice(-6).toUpperCase()}</h3>
+          <div className="bg-slate-950 border-t sm:border border-slate-800 rounded-t-2xl sm:rounded-2xl w-full max-w-3xl h-[100dvh] sm:h-auto sm:max-h-[92vh] flex flex-col overflow-hidden">
+            <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 sm:px-6 sm:pt-5 shrink-0 border-b border-slate-800">
+              <div className="min-w-0">
+                <h3 className="text-base sm:text-lg font-bold text-white leading-snug">
+                  Edit order #{String(editingOrder._id).slice(-6).toUpperCase()}
+                </h3>
                 <p className="text-xs text-slate-400 mt-1">Changes apply immediately. The original order record is kept.</p>
               </div>
               <button
@@ -1350,23 +1387,24 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                   setEditingOrder(null);
                   setAddProductSearch("");
                 }}
-                className="text-slate-400 hover:text-white"
+                className="shrink-0 min-h-11 min-w-11 px-3 rounded-xl bg-slate-800 text-slate-200 text-sm font-semibold"
               >
                 Close
               </button>
             </div>
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4">
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
               <input
                 type="date"
                 value={editingOrder.deliveryDate}
                 onChange={(e) => setEditingOrder({ ...editingOrder, deliveryDate: e.target.value })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm [color-scheme:dark]"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm [color-scheme:dark]"
               />
               <select
                 value={editingOrder.deliveryTime}
                 onChange={(e) => setEditingOrder({ ...editingOrder, deliveryTime: e.target.value })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
               >
                 {DELIVERY_TIMES.map((slot) => (
                   <option key={slot} value={slot}>{slot}</option>
@@ -1380,7 +1418,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                 <select
                   value={editingOrder.deliveryPartnerId || ""}
                   onChange={(e) => setEditingOrder({ ...editingOrder, deliveryPartnerId: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 >
                   <option value="">Select / change partner</option>
                   {partners.map((p) => (
@@ -1392,19 +1430,19 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                 placeholder="Address line 1"
                 value={editingOrder.address.line1}
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, line1: e.target.value } })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm sm:col-span-2"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm sm:col-span-2"
               />
               <input
                 placeholder="Area / line 2"
                 value={editingOrder.address.line2}
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, line2: e.target.value } })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
               />
               <input
                 placeholder="Phone"
                 value={editingOrder.address.phone}
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, phone: e.target.value } })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
               />
               <input
                 placeholder="Alternate number (optional)"
@@ -1415,19 +1453,19 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                     address: { ...editingOrder.address, alternatePhone: e.target.value }
                   })
                 }
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
               />
               <input
                 placeholder="City"
                 value={editingOrder.address.city}
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, city: e.target.value } })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
               />
               <input
                 placeholder="Pincode"
                 value={editingOrder.address.postalCode}
                 onChange={(e) => setEditingOrder({ ...editingOrder, address: { ...editingOrder.address, postalCode: e.target.value } })}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
               />
               <div className="sm:col-span-2">
                 <label className="block text-xs text-slate-400 mb-1">Google Maps location link</label>
@@ -1436,7 +1474,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                   placeholder="https://maps.google.com/..."
                   value={editingOrder.mapUrl || ""}
                   onChange={(e) => setEditingOrder({ ...editingOrder, mapUrl: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 />
               </div>
               <div>
@@ -1448,7 +1486,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                   placeholder="e.g. 0 for free delivery"
                   value={editingOrder.deliveryFee}
                   onChange={(e) => setEditingOrder({ ...editingOrder, deliveryFee: Number(e.target.value) })}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 />
               </div>
               <div>
@@ -1464,7 +1502,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                       discountAmount: parseNonNegativeAmount(e.target.value)
                     })
                   }
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -1476,7 +1514,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                   onChange={(e) =>
                     setEditingOrder({ ...editingOrder, discountNote: e.target.value })
                   }
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 />
               </div>
               <div>
@@ -1492,7 +1530,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                       addonAmount: parseNonNegativeAmount(e.target.value)
                     })
                   }
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 />
               </div>
               <div className="sm:col-span-2">
@@ -1504,7 +1542,7 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                   onChange={(e) =>
                     setEditingOrder({ ...editingOrder, addonNote: e.target.value })
                   }
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-3 sm:py-2 text-white text-base sm:text-sm"
                 />
               </div>
               <div className="sm:col-span-2 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-2 flex justify-between items-center">
@@ -1525,62 +1563,158 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
             </div>
 
             <h4 className="text-sm font-semibold text-white mb-2">Items</h4>
-            <div className="space-y-2 mb-4">
+            <div className="space-y-3 mb-4">
               {editingOrder.items.map((item: any, idx: number) => {
                 const kgItem = isKgUnit(item.unit);
-                const qtyInOptions = WEIGHT_OPTIONS.some((opt) => opt.value === Number(item.quantity));
+                const customMode = kgItem && item.weightMode === "custom";
+                const customKg = customMode ? parseCustomWeightKg(String(item.gramDraft || ""), "gram") : null;
+                const gramError = customMode
+                  ? !String(item.gramDraft || "").trim()
+                    ? "Type the scale weight in grams"
+                    : customKg == null
+                      ? `Enter 100 gram to ${CUSTOM_WEIGHT_MAX_KG} kg (e.g. 575 or 980)`
+                      : ""
+                  : "";
                 return (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-slate-900/60 border border-slate-800 rounded-lg p-2">
-                  <div className="col-span-12 sm:col-span-4 text-sm text-white">
-                    {item.productName}
-                    <div className="text-[10px] text-slate-500 uppercase">{item.unit || "kg"}</div>
+                <div key={idx} className="flex flex-col gap-3 bg-slate-900/60 border border-slate-800 rounded-xl p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-white leading-snug break-words">{item.productName}</p>
+                      <p className="text-[10px] text-slate-500 uppercase mt-0.5">{item.unit || "kg"}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeEditItem(idx)}
+                      className="shrink-0 min-h-10 px-3 rounded-lg border border-rose-500/30 text-rose-300 text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
                   </div>
                   {kgItem ? (
-                    <select
-                      value={Number(item.quantity)}
-                      onChange={(e) => updateEditItem(idx, { quantity: Number(e.target.value) })}
-                      className="col-span-8 sm:col-span-3 bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white text-sm"
-                    >
-                      {WEIGHT_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                      {!qtyInOptions && Number(item.quantity) > 0 && (
-                        <option value={item.quantity}>{item.quantity} kg</option>
+                    <div className="space-y-2">
+                      <div className="flex rounded-xl border border-slate-600 overflow-hidden text-sm font-bold">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const quantity = qtyIsPreset(Number(item.quantity))
+                              ? roundQtyKg(Number(item.quantity))
+                              : DEFAULT_WEIGHT_KG;
+                            updateEditItem(idx, { weightMode: "preset", gramDraft: "", quantity });
+                          }}
+                          className={`flex-1 min-h-11 px-2 ${!customMode ? "bg-teal-500 text-slate-950" : "bg-slate-950 text-slate-300"}`}
+                        >
+                          Preset kg
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const grams = Math.round(Number(item.quantity || 0) * 1000);
+                            updateEditItem(idx, {
+                              weightMode: "custom",
+                              gramDraft: grams > 0 ? String(grams) : ""
+                            });
+                          }}
+                          className={`flex-1 min-h-11 px-2 ${customMode ? "bg-teal-500 text-slate-950" : "bg-slate-950 text-slate-300"}`}
+                        >
+                          Exact grams
+                        </button>
+                      </div>
+                      {customMode ? (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={100}
+                              max={CUSTOM_WEIGHT_MAX_KG * 1000}
+                              step={1}
+                              value={item.gramDraft ?? ""}
+                              onChange={(e) => {
+                                const gramDraft = e.target.value;
+                                const kg = parseCustomWeightKg(gramDraft, "gram");
+                                updateEditItem(idx, kg ? { gramDraft, quantity: kg } : { gramDraft });
+                              }}
+                              placeholder="e.g. 575"
+                              className="flex-1 min-w-0 bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-white text-base sm:text-sm"
+                            />
+                            <span className="text-sm text-slate-400 shrink-0">gram</span>
+                          </div>
+                          {customKg != null ? (
+                            <p className="text-xs text-teal-300">
+                              = {formatQuantityLabel(customKg, "kg")} · ₹
+                              {(Number(item.unitPrice || 0) * customKg).toFixed(2)}
+                            </p>
+                          ) : null}
+                          <p className={`text-[11px] leading-snug ${gramError ? "text-rose-400" : "text-slate-500"}`}>
+                            {gramError ||
+                              `Whole fish: type the scale weight (100 gram to ${CUSTOM_WEIGHT_MAX_KG} kg). Bill uses this exact weight.`}
+                          </p>
+                        </div>
+                      ) : (
+                        <select
+                          value={
+                            WEIGHT_OPTIONS.find((opt) => Math.abs(opt.value - Number(item.quantity)) < 0.0005)
+                              ?.value ?? DEFAULT_WEIGHT_KG
+                          }
+                          onChange={(e) =>
+                            updateEditItem(idx, {
+                              weightMode: "preset",
+                              gramDraft: "",
+                              quantity: Number(e.target.value)
+                            })
+                          }
+                          className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-white text-base sm:text-sm"
+                        >
+                          {WEIGHT_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
                       )}
-                    </select>
+                    </div>
                   ) : (
-                    <div className="col-span-8 sm:col-span-3 flex items-center bg-slate-950 border border-slate-700 rounded">
+                    <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl">
                       <button
                         type="button"
                         onClick={() => updateEditItem(idx, { quantity: Math.max(1, Number(item.quantity) - 1) })}
-                        className="w-8 h-8 text-slate-300 hover:text-white"
+                        className="min-h-11 w-12 text-slate-300 text-lg"
                       >
                         -
                       </button>
-                      <span className="flex-1 text-center text-white text-sm font-semibold">{item.quantity}</span>
+                      <span className="flex-1 text-center text-white text-base font-semibold">{item.quantity}</span>
                       <button
                         type="button"
                         onClick={() => updateEditItem(idx, { quantity: Number(item.quantity) + 1 })}
-                        className="w-8 h-8 text-slate-300 hover:text-white"
+                        className="min-h-11 w-12 text-slate-300 text-lg"
                       >
                         +
                       </button>
                     </div>
                   )}
-                  <input
-                    type="number"
-                    min={0}
-                    value={item.unitPrice}
-                    onChange={(e) => updateEditItem(idx, { unitPrice: Number(e.target.value) })}
-                    className="col-span-4 sm:col-span-2 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-sm"
-                  />
-                  <div className="col-span-8 sm:col-span-2 text-xs text-slate-300">₹{Number(item.totalPrice || 0).toFixed(2)}</div>
-                  <button type="button" onClick={() => removeEditItem(idx)} className="col-span-4 sm:col-span-1 text-rose-300 text-xs">Remove</button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] text-slate-400 font-medium">
+                      Price (₹)
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.unitPrice}
+                        onChange={(e) => updateEditItem(idx, { unitPrice: Number(e.target.value) })}
+                        className="mt-1 w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-white text-base sm:text-sm"
+                      />
+                    </label>
+                    <div className="text-[11px] text-slate-400 font-medium">
+                      Line total
+                      <p className="mt-1 min-h-11 flex items-center text-base font-bold text-teal-300">
+                        ₹{Number(item.totalPrice || 0).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
                   <input
                     placeholder="Notes"
                     value={item.notes}
                     onChange={(e) => updateEditItem(idx, { notes: e.target.value })}
-                    className="col-span-12 bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white text-xs"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-3 text-white text-base sm:text-sm"
                   />
                 </div>
                 );
@@ -1600,10 +1734,10 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
                   placeholder="Search product name..."
                   value={addProductSearch}
                   onChange={(e) => setAddProductSearch(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white text-sm outline-none focus:border-teal-500"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-9 pr-3 py-3 text-white text-base sm:text-sm outline-none focus:border-teal-500"
                 />
               </div>
-              <div className="max-h-52 sm:max-h-64 overflow-y-auto overscroll-contain space-y-1.5 -mx-0.5 px-0.5">
+              <div className="sm:max-h-64 sm:overflow-y-auto overscroll-contain space-y-1.5">
                 {(() => {
                   const q = addProductSearch.trim().toLowerCase();
                   const matches = catalogProducts.filter((p) => {
@@ -1644,9 +1778,21 @@ export default function AdminDeliveryTracking({ assignOnly = false }: { assignOn
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2 justify-end">
-              <button type="button" onClick={() => handleCancelOrder(editingOrder)} className="px-4 py-2 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30 text-sm">Cancel this order</button>
-              <button type="button" disabled={editSaving} onClick={handleSaveEdit} className="px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-400 text-white font-semibold text-sm disabled:opacity-50">
+            </div>
+            <div className="shrink-0 border-t border-slate-800 px-4 sm:px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-col-reverse sm:flex-row gap-2 sm:justify-end bg-slate-950">
+              <button
+                type="button"
+                onClick={() => handleCancelOrder(editingOrder)}
+                className="min-h-11 px-4 rounded-xl bg-rose-500/15 text-rose-300 border border-rose-500/30 text-sm font-semibold"
+              >
+                Cancel this order
+              </button>
+              <button
+                type="button"
+                disabled={editSaving}
+                onClick={handleSaveEdit}
+                className="min-h-11 px-4 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-sm disabled:opacity-50"
+              >
                 {editSaving ? "Saving..." : "Save changes"}
               </button>
             </div>

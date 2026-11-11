@@ -12,6 +12,7 @@ export type AdminSectionId =
   | "deliveries"
   | "assign_delivery_partners"
   | "all_orders"
+  | "orders_list"
   | "today_delivery_status"
   | "manage_delivery_order_list"
   | "partner_report"
@@ -84,6 +85,7 @@ export const ADMIN_SECTION_DEFS: AdminSectionDef[] = [
     href: "/dashboard/admin/assign-delivery-partners"
   },
   { id: "all_orders", label: "ALL Orders", href: "/dashboard/admin/all-orders" },
+  { id: "orders_list", label: "Orders List", href: "/dashboard/admin/orders-list" },
   {
     id: "today_delivery_status",
     label: "Today Delivery Status",
@@ -211,6 +213,10 @@ export const hasAdminSection = (
   }
   if (allowed.has("deliveries")) {
     allowed.add("assign_delivery_partners");
+    allowed.add("orders_list");
+  }
+  if (allowed.has("all_orders")) {
+    allowed.add("orders_list");
   }
   return sectionIds.some((id) => allowed.has(id));
 };
@@ -237,6 +243,10 @@ export const getAdminNavLinksForUser = (user: {
   }
   if (allowed.has("deliveries")) {
     allowed.add("assign_delivery_partners");
+    allowed.add("orders_list");
+  }
+  if (allowed.has("all_orders")) {
+    allowed.add("orders_list");
   }
   return ADMIN_SECTION_DEFS.filter(
     (s) => s.always || (!s.fullOnly && allowed.has(s.id))

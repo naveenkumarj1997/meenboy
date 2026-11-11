@@ -2377,6 +2377,109 @@ const adminSetDeliveryStatus = async (req, res, next) => {
   }
 };
 
+const addDaysYmd = (ymd, delta) => {
+  const [y, m, d] = String(ymd).split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + delta);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+};
+
+const shapeDateBoardOrder = (o) => ({
+  _id: String(o._id),
+  customerName: o.customer?.name || "Customer",
+  phone: o.customer?.phone || o.address?.phone || "",
+  deliveryDate: o.deliveryDate || "",
+  deliveryTime: o.deliveryTime || "",
+  status: o.status,
+  total: Number(o.total || 0),
+  bookingSource: o.bookingSource || "website",
+  items: (o.items || []).slice(0, 4).map((item) => ({
+    productName: item.productName,
+    quantity: item.quantity,
+    unit: item.unit || "kg",
+    cutName: item.cutName || ""
+  })),
+  itemCount: (o.items || []).length
+});
+
+const listOrdersDateBoard = async (req, res, next) => {
+  try {
+    const { istYmd } = require("../utils/geoDistance");
+    const from =
+      typeof req.query.from === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.from.trim())
+        ? req.query.from.trim()
+        : istYmd();
+    const days = [0, 1, 2, 3, 4].map((i) => addDaysYmd(from, i));
+    const rows = await Order.find({
+      deliveryDate: { $in: days },
+      status: { $ne: "cancelled" }
+    })
+      .populate("customer", "name phone")
+      .sort({ deliveryTime: 1, createdAt: 1 })
+      .select("customer address deliveryDate deliveryTime status total bookingSource items.productName items.quantity items.unit items.cutName")
+      .lean();
+
+    const byDate = {};
+    for (const day of days) byDate[day] = [];
+    for (const row of rows) {
+      const key = row.deliveryDate;
+      if (byDate[key]) byDate[key].push(shapeDateBoardOrder(row));
+    }
+
+    res.json({
+      from,
+      days: days.map((date) => ({
+        date,
+        count: byDate[date].length,
+        orders: byDate[date]
+      }))
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const updateOrderDeliveryDate = async (req, res, next) => {
+  try {
+    const { orderId } = req.params;
+    const deliveryDate = String(req.body?.deliveryDate || "").trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
+      return res.status(400).json({ message: "Choose a valid delivery date." });
+    }
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.status === "cancelled") {
+      return res.status(400).json({ message: "Cancelled orders cannot be moved." });
+    }
+    if (order.status === "delivered") {
+      return res.status(400).json({ message: "Delivered orders cannot be moved to another date." });
+    }
+    if (order.deliveryDate === deliveryDate) {
+      return res.json({ order, message: "Already on that date." });
+    }
+    order.deliveryDate = deliveryDate;
+    await order.save();
+    try {
+      await regenerateOrderInvoice(order);
+    } catch (pdfErr) {
+      console.error("Invoice regenerate after date change:", pdfErr.message);
+    }
+    await createNotification({
+      user: order.customer,
+      type: "order_status_updated",
+      title: "Delivery date updated",
+      message: `Your FISHFRIENDLY delivery date is now ${deliveryDate}.`,
+      metadata: { orderId: order._id, deliveryDate }
+    });
+    res.json({ message: "Delivery date updated.", order });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
@@ -2407,6 +2510,8 @@ module.exports = {
   reorderAssignments,
   adminReorderAssignments,
   createAdminOrder,
-  adminUpdateDeliveryPayment
+  adminUpdateDeliveryPayment,
+  listOrdersDateBoard,
+  updateOrderDeliveryDate
 };
 

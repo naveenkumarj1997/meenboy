@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardShell from "./DashboardShell";
 import { ADMIN_NAV_LINKS } from "../../lib/adminNavLinks";
 import { useAuth } from "../../context/AuthContext";
@@ -7,7 +7,6 @@ import {
   deleteSourcingPhoto,
   getAdminSourcingPhotos,
   updateSourcingPhoto,
-  uploadAdminImage,
   type SourcingPhotoPayload
 } from "../../lib/api";
 import { mediaUrl } from "../../lib/mediaUrl";
@@ -18,8 +17,10 @@ const CATEGORIES: { id: SourcingPhotoPayload["category"]; label: string }[] = [
   { id: "cutting", label: "Cutting" }
 ];
 
+const MAX_PHOTOS = 6;
+const MAX_BYTES = 250 * 1024;
+
 const emptyForm = () => ({
-  imageUrl: "",
   caption: "",
   category: "sourcing" as SourcingPhotoPayload["category"],
   isPublished: true,
@@ -31,9 +32,10 @@ const AdminSourcingPhotos = () => {
   const [rows, setRows] = useState<SourcingPhotoPayload[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm());
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState("");
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const load = async () => {
@@ -54,54 +56,63 @@ const AdminSourcingPhotos = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  useEffect(() => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const atLimit = !editingId && rows.length >= MAX_PHOTOS;
+
   const startEdit = (row: SourcingPhotoPayload) => {
     setEditingId(row._id);
     setForm({
-      imageUrl: row.imageUrl,
       caption: row.caption || "",
       category: row.category,
       isPublished: row.isPublished !== false,
       sortOrder: Number(row.sortOrder) || 0
     });
+    setFile(null);
+    setPreview(mediaUrl(row.imageUrl));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const resetForm = () => {
     setEditingId(null);
     setForm(emptyForm());
+    setFile(null);
+    setPreview("");
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !token) return;
-    try {
-      setUploading(true);
-      const res = await uploadAdminImage(token, file);
-      setForm((f) => ({ ...f, imageUrl: res.url }));
-    } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Image upload failed" });
-    } finally {
-      setUploading(false);
-      e.target.value = "";
+  const handlePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const next = e.target.files?.[0];
+    e.target.value = "";
+    if (!next) return;
+    if (next.size > MAX_BYTES) {
+      setMessage({ type: "error", text: "Photo must be under 250 KB. Compress it and try again." });
+      return;
     }
+    setMessage(null);
+    setFile(next);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) return;
-    if (!form.imageUrl) {
-      setMessage({ type: "error", text: "Upload a photo first." });
+    if (!editingId && !file) {
+      setMessage({ type: "error", text: "Choose a JPG or PNG under 250 KB." });
       return;
     }
     try {
       setSaving(true);
       setMessage(null);
       if (editingId) {
-        await updateSourcingPhoto(token, editingId, form);
-        setMessage({ type: "success", text: "Photo updated." });
+        await updateSourcingPhoto(token, editingId, { ...form, file });
+        setMessage({ type: "success", text: "Photo updated in the database." });
       } else {
-        await createSourcingPhoto(token, form);
-        setMessage({ type: "success", text: "Photo added. Published photos show on the home page." });
+        await createSourcingPhoto(token, { ...form, file: file as File });
+        setMessage({ type: "success", text: "Photo saved in MongoDB. Published photos show on the home page." });
       }
       resetForm();
       await load();
@@ -133,13 +144,14 @@ const AdminSourcingPhotos = () => {
     }
   };
 
+  const previewSrc = useMemo(() => preview, [preview]);
+
   return (
     <DashboardShell
       title="Sourcing Photos"
-      description="Upload fishing, sourcing, and cutting photos. Published photos appear on the home page."
+      description="Photos are stored in MongoDB (max 6, each under 250 KB) so they stay after hosting restarts."
       navLinks={ADMIN_NAV_LINKS}
     >
-
       {message && (
         <div
           className={`mb-4 rounded-xl px-4 py-3 text-sm ${
@@ -152,19 +164,32 @@ const AdminSourcingPhotos = () => {
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200 p-5 mb-8 grid gap-4">
         <h3 className="font-bold text-slate-800">{editingId ? "Edit photo" : "Add photo"}</h3>
-        <div className="flex flex-wrap items-start gap-4">
-          {form.imageUrl ? (
-            <img src={mediaUrl(form.imageUrl)} alt="" className="w-32 h-32 object-cover rounded-xl border" />
-          ) : (
-            <div className="w-32 h-32 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400 text-center px-2">
-              No photo yet
-            </div>
-          )}
-          <label className="text-sm font-medium text-slate-700">
-            {uploading ? "Uploading…" : "Choose image"}
-            <input type="file" accept="image/*" onChange={handleUpload} className="mt-1 block text-sm" />
-          </label>
-        </div>
+        <p className="text-sm text-slate-500">
+          {rows.length} of {MAX_PHOTOS} photos used. JPG / PNG / WEBP, under 250 KB.
+        </p>
+        {atLimit ? (
+          <p className="text-sm text-amber-700">Maximum 6 photos. Delete one to add another.</p>
+        ) : (
+          <div className="flex flex-wrap items-start gap-4">
+            {previewSrc ? (
+              <img src={previewSrc} alt="" className="w-32 h-32 object-cover rounded-xl border" />
+            ) : (
+              <div className="w-32 h-32 rounded-xl border border-dashed border-slate-300 bg-slate-50 flex items-center justify-center text-xs text-slate-400 text-center px-2">
+                No photo yet
+              </div>
+            )}
+            <label className="text-sm font-medium text-slate-700">
+              Choose image
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+                onChange={handlePick}
+                className="mt-1 block text-sm"
+              />
+              <span className="block text-xs text-slate-500 mt-1">iPhone: share as JPG, not HEIC.</span>
+            </label>
+          </div>
+        )}
         <div className="grid sm:grid-cols-2 gap-4">
           <label className="text-sm font-medium text-slate-700">
             Category
@@ -214,10 +239,10 @@ const AdminSourcingPhotos = () => {
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={saving || uploading}
+            disabled={saving || atLimit}
             className="rounded-xl bg-teal-600 text-white font-semibold px-5 py-2 disabled:opacity-60"
           >
-            {saving ? "Saving…" : editingId ? "Update photo" : "Add photo"}
+            {saving ? "Saving…" : editingId ? "Update photo" : "Save to database"}
           </button>
           {editingId ? (
             <button type="button" onClick={resetForm} className="rounded-xl border px-4 py-2 text-sm">

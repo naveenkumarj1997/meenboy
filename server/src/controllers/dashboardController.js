@@ -220,6 +220,91 @@ const getAdminOverview = async (req, res, next) => {
   }
 };
 
+const OPEN_STATUSES = ["pending", "confirmed", "preparing", "out_for_delivery"];
+
+const shapeOverviewOrder = (o) => ({
+  _id: String(o._id),
+  customerName: o.customer?.name || "Customer",
+  phone: o.customer?.phone || o.address?.phone || "",
+  deliveryDate: o.deliveryDate || "",
+  deliveryTime: o.deliveryTime || "",
+  status: o.status,
+  total: Number(o.total || 0),
+  bookingSource: o.bookingSource || "website",
+  items: (o.items || []).map((item) => ({
+    productName: item.productName,
+    quantity: item.quantity,
+    unit: item.unit || "kg",
+    cutName: item.cutName || ""
+  }))
+});
+
+const listOverviewOrders = async (req, res, next) => {
+  try {
+    const kind = String(req.query.kind || "").trim();
+    const date =
+      typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date.trim())
+        ? req.query.date.trim()
+        : localYmd();
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(10, Number(req.query.limit) || 30));
+
+    let match = {};
+    let sort = { deliveryDate: -1, createdAt: -1 };
+    if (kind === "open") {
+      match = { status: { $in: OPEN_STATUSES } };
+      sort = { deliveryDate: 1, deliveryTime: 1 };
+    } else if (kind === "lifetime") {
+      match = { status: "delivered" };
+    } else if (kind === "today_revenue") {
+      match = { deliveryDate: date, status: "delivered" };
+      sort = { deliveryTime: 1 };
+    } else {
+      return res.status(400).json({ message: "kind must be open, lifetime, or today_revenue." });
+    }
+
+    const query = Order.find(match)
+      .populate("customer", "name phone")
+      .sort(sort)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .select("customer address deliveryDate deliveryTime status total bookingSource items")
+      .lean()
+      .maxTimeMS(12000);
+
+    const [totalCount, amountAgg, orders] = await Promise.all([
+      Order.countDocuments(match).maxTimeMS(12000),
+      kind === "lifetime"
+        ? Promise.resolve([])
+        : Order.aggregate([
+            { $match: match },
+            { $group: { _id: null, total: { $sum: "$total" } } }
+          ]).option({ maxTimeMS: 12000 }),
+      query
+    ]);
+
+    const pageAmount = (orders || []).reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const totalAmount =
+      kind === "lifetime"
+        ? Math.round(pageAmount * 100) / 100
+        : Math.round(Number(amountAgg[0]?.total || 0) * 100) / 100;
+
+    res.json({
+      kind,
+      date,
+      page,
+      limit,
+      totalCount,
+      totalPages: Math.max(1, Math.ceil(totalCount / limit)),
+      totalAmount,
+      orders: orders.map(shapeOverviewOrder)
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
-  getAdminOverview
+  getAdminOverview,
+  listOverviewOrders
 };
