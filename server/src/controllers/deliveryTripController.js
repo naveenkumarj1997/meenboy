@@ -1,6 +1,8 @@
 const mongoose = require("mongoose");
 const PartnerDeliveryTrip = require("../models/PartnerDeliveryTrip");
 const User = require("../models/User");
+const Order = require("../models/Order");
+const DeliveryAssignment = require("../models/DeliveryAssignment");
 const {
   computeTrailKm,
   istYmd,
@@ -376,6 +378,131 @@ const adminGetDayTrips = async (req, res, next) => {
   }
 };
 
+const trailPoints = (points) => {
+  if (!Array.isArray(points) || !points.length) return [];
+  const sliced = points.slice(-40);
+  return sliced
+    .map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) }))
+    .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
+};
+
+const pickGpsFromTrip = (trip) => {
+  if (!trip) return null;
+  if (Number.isFinite(Number(trip.lastLat)) && Number.isFinite(Number(trip.lastLng))) {
+    return {
+      lat: Number(trip.lastLat),
+      lng: Number(trip.lastLng),
+      capturedAt: trip.lastCapturedAt || null,
+      street: trip.lastStreet || "",
+      area: trip.lastArea || "",
+      label: trip.lastLocationLabel || "",
+      trail: trailPoints(trip.points)
+    };
+  }
+  return null;
+};
+
+const pickGpsFromAssignments = (list) => {
+  if (!Array.isArray(list)) return null;
+  const current = list.find((a) => a.status === "en_route" || a.status === "picked_up");
+  const loc = current?.enRouteLocation || current?.deliveredLocation;
+  if (!loc || !Number.isFinite(Number(loc.lat)) || !Number.isFinite(Number(loc.lng))) return null;
+  return {
+    lat: Number(loc.lat),
+    lng: Number(loc.lng),
+    capturedAt: loc.capturedAt || current.updatedAt || null,
+    street: "",
+    area: "",
+    label: "",
+    trail: []
+  };
+};
+
+// @route GET /api/delivery-trips/admin/live-map
+const adminGetLiveMap = async (req, res, next) => {
+  try {
+    const date = isValidYmd(req.query.date) ? String(req.query.date) : istYmd();
+    await finalizeTripsForDate(date);
+
+    const [partners, trips, orders] = await Promise.all([
+      User.find({ role: "delivery_partner" }).select("name phone status").sort({ name: 1 }).lean(),
+      PartnerDeliveryTrip.find({ date })
+        .select(
+          "deliveryPartner tripNumber status lastLat lastLng lastCapturedAt lastStreet lastArea lastLocationLabel points"
+        )
+        .sort({ tripNumber: 1, startedAt: 1 })
+        .lean(),
+      Order.find({ deliveryDate: date }).select("_id").lean()
+    ]);
+
+    const tripByPartner = {};
+    for (const trip of trips) {
+      const pId = String(trip.deliveryPartner);
+      if (tripByPartner[pId]?.status === "active") continue;
+      tripByPartner[pId] = trip;
+    }
+
+    const orderIds = orders.map((o) => o._id);
+    const assignments = orderIds.length
+      ? await DeliveryAssignment.find({ order: { $in: orderIds } })
+          .select("deliveryPartner status enRouteLocation deliveredLocation")
+          .lean()
+      : [];
+
+    const assignmentsByPartner = {};
+    for (const a of assignments) {
+      const pId = String(a.deliveryPartner);
+      if (!assignmentsByPartner[pId]) assignmentsByPartner[pId] = [];
+      assignmentsByPartner[pId].push(a);
+    }
+
+    const rows = partners
+      .filter((p) => p.status === "active" || tripByPartner[String(p._id)] || assignmentsByPartner[String(p._id)])
+      .map((p) => {
+        const pId = String(p._id);
+        const trip = tripByPartner[pId] || null;
+        const list = assignmentsByPartner[pId] || [];
+        const gps = pickGpsFromTrip(trip) || pickGpsFromAssignments(list);
+        const remaining = list.filter(
+          (a) => !["delivered", "failed", "cancelled"].includes(a.status)
+        ).length;
+        const delivered = list.filter((a) => a.status === "delivered").length;
+        const onTheWay = list.some((a) => a.status === "en_route" || a.status === "picked_up");
+        const label =
+          gps?.label ||
+          (gps ? `${gps.lat.toFixed(5)}, ${gps.lng.toFixed(5)}` : "");
+        return {
+          id: pId,
+          name: p.name,
+          phone: p.phone || "",
+          partnerStatus: p.status,
+          tripStatus: trip?.status || null,
+          tripNumber: trip?.tripNumber || null,
+          lat: gps?.lat ?? null,
+          lng: gps?.lng ?? null,
+          capturedAt: gps?.capturedAt || null,
+          street: gps?.street || "",
+          area: gps?.area || "",
+          label,
+          remaining,
+          delivered,
+          total: list.length,
+          onTheWay,
+          trail: gps?.trail || []
+        };
+      });
+
+    res.json({
+      date,
+      isToday: date === istYmd(),
+      refreshedAt: new Date().toISOString(),
+      partners: rows
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @route POST /api/delivery-trips/admin/start  { partnerId, note? }
 const adminStartTrip = async (req, res, next) => {
   try {
@@ -574,6 +701,7 @@ module.exports = {
   shapeTrip,
   maybeAutoEndTrip,
   adminGetDayTrips,
+  adminGetLiveMap,
   adminStartTrip,
   adminEndTrip,
   adminReopenTrip,

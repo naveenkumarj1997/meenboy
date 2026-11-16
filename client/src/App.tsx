@@ -12,6 +12,7 @@ import AdminAllOrders from "./pages/dashboards/AdminAllOrders";
 import AdminOrdersList from "./pages/dashboards/AdminOrdersList";
 import AdminPartnerReport from "./pages/dashboards/AdminPartnerReport";
 import AdminTodayDeliveryStatus from "./pages/dashboards/AdminTodayDeliveryStatus";
+import AdminPartnerLocations from "./pages/dashboards/AdminPartnerLocations";
 import AdminManageDeliveryOrderList from "./pages/dashboards/AdminManageDeliveryOrderList";
 import AdminOverallReports from "./pages/dashboards/AdminOverallReports";
 import AdminPendingPayments from "./pages/dashboards/AdminPendingPayments";
@@ -138,6 +139,7 @@ function App() {
           <Route path="/dashboard/admin/all-orders" element={<AdminAllOrders />} />
           <Route path="/dashboard/admin/orders-list" element={<AdminOrdersList />} />
           <Route path="/dashboard/admin/today-delivery-status" element={<AdminTodayDeliveryStatus />} />
+          <Route path="/dashboard/admin/delivery-partner-location" element={<AdminPartnerLocations />} />
           <Route path="/dashboard/admin/manage-delivery-order-list" element={<AdminManageDeliveryOrderList />} />
           <Route path="/dashboard/admin/partner-report" element={<AdminPartnerReport />} />
           <Route path="/dashboard/admin/overall-reports" element={<AdminOverallReports />} />

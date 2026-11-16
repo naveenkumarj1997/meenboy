@@ -1221,6 +1221,36 @@ export type AdminTripPartnerRow = DeliveryTripDaySummary & {
   partner: { _id: string; name: string; phone?: string; status?: string };
 };
 
+export type PartnerLiveMapRow = {
+  id: string;
+  name: string;
+  phone?: string;
+  partnerStatus?: string;
+  tripStatus?: "active" | "ended" | "auto_ended" | null;
+  tripNumber?: number | null;
+  lat: number | null;
+  lng: number | null;
+  capturedAt?: string | null;
+  street?: string;
+  area?: string;
+  label?: string;
+  remaining: number;
+  delivered: number;
+  total: number;
+  onTheWay: boolean;
+  trail: { lat: number; lng: number }[];
+};
+
+export const adminGetPartnerLiveMap = async (token: string, date?: string) =>
+  request<{
+    date: string;
+    isToday: boolean;
+    refreshedAt: string;
+    partners: PartnerLiveMapRow[];
+  }>(`/delivery-trips/admin/live-map${date ? `?date=${encodeURIComponent(date)}` : ""}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
 export const adminGetDeliveryTripsDay = async (token: string, date?: string) =>
   request<{
     date: string;

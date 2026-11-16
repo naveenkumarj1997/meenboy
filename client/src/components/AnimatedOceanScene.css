@@ -787,13 +787,343 @@
    Responsive Adjustments
    ============================================ */
 @media (max-width: 768px) {
-  .ocean-scene__sun { width: 50px; height: 50px; }
-  .ocean-scene__sun-ring { width: 100px; height: 100px; }
-  .ocean-scene__boat-group { transform: translateX(-50%) scale(0.45); }
-  .ocean-scene__boat-reflection { transform: translateX(-50%) scaleY(-1) scale(0.45); }
-  .ocean-scene__light-ray { width: 150px; height: 120px; }
-  .ocean-scene__seagull { transform: scale(0.7); }
-  .ocean-scene__dolphin { transform: scale(0.6); }
-  .ocean-scene__jellyfish { transform: scale(0.7); }
-  .ocean-scene__seaweed { transform: scale(0.8); }
+  .ocean-scene__sun { width: 42px; height: 42px; }
+  .ocean-scene__sun-ring { width: 84px; height: 84px; }
+  .ocean-scene__boat-group { transform: translateX(-50%) scale(0.38); }
+  .ocean-scene__boat-reflection { transform: translateX(-50%) scaleY(-1) scale(0.38); }
+  .ocean-scene__light-ray { width: 110px; height: 90px; }
+  .ocean-scene__seagull { transform: scale(0.6); }
+  .ocean-scene__dolphin { transform: scale(0.5); }
+  .ocean-scene__jellyfish { transform: scale(0.6); }
+  .ocean-scene__seaweed { transform: scale(0.7); }
+  .ocean-scene__cloud { transform: scale(0.7); transform-origin: top left; }
+}
+
+/* ============================================
+   LIVE RAMESWARAM WEATHER
+   Remove this block + rameswaramWeather.ts + overlay in AnimatedOceanScene.tsx
+   ============================================ */
+@keyframes ocean-rain-fall {
+  0% { transform: translateY(-12vh); opacity: 0; }
+  8% { opacity: 0.75; }
+  100% { transform: translateY(70vh); opacity: 0.15; }
+}
+
+@keyframes ocean-wind-streak {
+  0% { transform: translateX(-30%); opacity: 0; }
+  15% { opacity: 0.55; }
+  100% { transform: translateX(130vw); opacity: 0; }
+}
+
+@keyframes ocean-lightning {
+  0%, 88%, 100% { opacity: 0; }
+  89% { opacity: 0.55; }
+  91% { opacity: 0.05; }
+  93% { opacity: 0.7; }
+  95% { opacity: 0; }
+}
+
+@keyframes ocean-spout-spin {
+  0% { transform: translateX(-50%) rotate(0deg) scaleX(1); }
+  50% { transform: translateX(-50%) rotate(180deg) scaleX(1.08); }
+  100% { transform: translateX(-50%) rotate(360deg) scaleX(1); }
+}
+
+@keyframes ocean-spout-sway {
+  0%, 100% { transform: translateX(-50%) rotate(-6deg); }
+  50% { transform: translateX(-50%) rotate(7deg); }
+}
+
+.ocean-scene--day .ocean-scene__sky {
+  background: linear-gradient(
+    180deg,
+    #4db8e8 0%,
+    #6ec8e8 18%,
+    #8ed4e0 38%,
+    #b8e4d8 58%,
+    #f2d48a 82%,
+    #f4a05a 100%
+  );
+}
+.ocean-scene--day .ocean-scene__star,
+.ocean-scene--day .ocean-scene__shooting-star {
+  opacity: 0 !important;
+  animation: none !important;
+}
+.ocean-scene--day .ocean-scene__sun,
+.ocean-scene--day .ocean-scene__sun-ring {
+  opacity: 1;
+  filter: brightness(1.15);
+}
+
+.ocean-scene--night .ocean-scene__sky {
+  background: linear-gradient(
+    180deg,
+    #020617 0%,
+    #0b1a33 22%,
+    #102a46 48%,
+    #16324a 72%,
+    #0f3a48 100%
+  );
+  animation: none;
+}
+.ocean-scene--night .ocean-scene__sun,
+.ocean-scene--night .ocean-scene__sun-ring,
+.ocean-scene--night .ocean-scene__light-ray {
+  opacity: 0 !important;
+  visibility: hidden;
+}
+.ocean-scene--night .ocean-scene__star {
+  opacity: 0.85;
+}
+.ocean-scene--night .ocean-scene__water {
+  filter: brightness(0.72) saturate(0.85);
+}
+.ocean-scene--night .ocean-scene__cloud {
+  filter: brightness(0.45);
+}
+
+.ocean-scene--fair.ocean-scene--day .ocean-scene__sky {
+  filter: saturate(1.12) brightness(1.06);
+}
+
+.ocean-scene--cloudy .ocean-scene__sky {
+  filter: saturate(0.7) brightness(0.9);
+}
+.ocean-scene--cloudy.ocean-scene--day .ocean-scene__sun {
+  opacity: 0.4;
+}
+
+.ocean-scene--rain .ocean-scene__sky,
+.ocean-scene--storm .ocean-scene__sky,
+.ocean-scene--tornado .ocean-scene__sky {
+  filter: saturate(0.4) brightness(0.62);
+}
+.ocean-scene--rain.ocean-scene--night .ocean-scene__sky,
+.ocean-scene--storm.ocean-scene--night .ocean-scene__sky,
+.ocean-scene--tornado.ocean-scene--night .ocean-scene__sky {
+  filter: saturate(0.3) brightness(0.45);
+}
+.ocean-scene--rain.ocean-scene--day .ocean-scene__sun,
+.ocean-scene--storm.ocean-scene--day .ocean-scene__sun,
+.ocean-scene--tornado.ocean-scene--day .ocean-scene__sun,
+.ocean-scene--rain .ocean-scene__sun-ring,
+.ocean-scene--storm .ocean-scene__sun-ring,
+.ocean-scene--tornado .ocean-scene__sun-ring,
+.ocean-scene--rain .ocean-scene__light-ray,
+.ocean-scene--storm .ocean-scene__light-ray,
+.ocean-scene--tornado .ocean-scene__light-ray {
+  opacity: 0.12;
+}
+
+.ocean-scene--wind .ocean-scene__cloud--1,
+.ocean-scene--storm .ocean-scene__cloud--1,
+.ocean-scene--tornado .ocean-scene__cloud--1 {
+  animation-duration: 18s !important;
+}
+.ocean-scene--wind .ocean-scene__cloud--2,
+.ocean-scene--storm .ocean-scene__cloud--2,
+.ocean-scene--tornado .ocean-scene__cloud--2 {
+  animation-duration: 22s !important;
+}
+.ocean-scene--wind .ocean-scene__boat-group,
+.ocean-scene--storm .ocean-scene__boat-group,
+.ocean-scene--tornado .ocean-scene__boat-group {
+  animation-duration: 2.4s, 1.6s, 5s;
+}
+
+.ocean-weather {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.ocean-weather__sun-flare {
+  position: absolute;
+  left: 50%;
+  bottom: 36%;
+  width: min(220px, 55vw);
+  height: min(220px, 55vw);
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 220, 120, 0.35) 0%, transparent 70%);
+}
+
+.ocean-weather__moon {
+  position: absolute;
+  right: 12%;
+  top: 8%;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 32%, #f8fbff 0%, #d5deee 55%, #9aa8c4 100%);
+  box-shadow: 0 0 24px rgba(210, 230, 255, 0.45);
+  z-index: 2;
+}
+
+.ocean-weather__moon-glow {
+  position: absolute;
+  inset: -18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 220, 255, 0.28) 0%, transparent 70%);
+}
+
+.ocean-weather__drop {
+  position: absolute;
+  top: 0;
+  width: 1.5px;
+  height: 14px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, transparent, rgba(190, 230, 255, 0.85));
+  animation: ocean-rain-fall 0.9s linear infinite;
+}
+
+.ocean-weather__drop--heavy {
+  width: 2px;
+  height: 18px;
+  background: linear-gradient(180deg, transparent, rgba(210, 235, 255, 0.95));
+}
+
+.ocean-weather__wind {
+  position: absolute;
+  left: 0;
+  width: 90px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: ocean-wind-streak 2s linear infinite;
+}
+
+.ocean-weather__lightning {
+  position: absolute;
+  inset: 0;
+  background: rgba(230, 245, 255, 0.55);
+  opacity: 0;
+}
+
+.ocean-weather__lightning--a {
+  animation: ocean-lightning 7s ease-in-out infinite;
+}
+
+.ocean-weather__lightning--b {
+  animation: ocean-lightning 9.4s ease-in-out infinite;
+  animation-delay: 2.1s;
+}
+
+.ocean-weather__spout {
+  position: absolute;
+  left: 68%;
+  top: 8%;
+  width: 90px;
+  height: 48%;
+  transform: translateX(-50%);
+  animation: ocean-spout-sway 3.2s ease-in-out infinite;
+}
+
+.ocean-weather__spout-funnel {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 70px;
+  height: 100%;
+  transform: translateX(-50%);
+  background: conic-gradient(from 0deg, rgba(160, 180, 190, 0.15), rgba(80, 100, 110, 0.55), rgba(160, 180, 190, 0.15));
+  clip-path: polygon(42% 0, 58% 0, 92% 100%, 8% 100%);
+  filter: blur(0.4px);
+  animation: ocean-spout-spin 1.4s linear infinite;
+  transform-origin: 50% 0;
+}
+
+.ocean-weather__spout-spray {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 120px;
+  height: 28px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(220, 240, 255, 0.45), transparent 70%);
+}
+
+.ocean-weather-badge {
+  position: absolute;
+  left: 0.6rem;
+  top: 0.55rem;
+  bottom: auto;
+  z-index: 20;
+  max-width: calc(100vw - 1.2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 0.7rem;
+  background: rgba(4, 31, 42, 0.72);
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  color: #ecfeff;
+  text-align: left;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+
+.ocean-weather-badge__place {
+  font-size: 8px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #5eead4;
+  font-weight: 700;
+}
+
+.ocean-weather-badge__cond {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+@media (min-width: 640px) {
+  .ocean-weather-badge {
+    left: 1.25rem;
+    top: auto;
+    bottom: 1.25rem;
+    padding: 0.45rem 0.7rem;
+  }
+  .ocean-weather-badge__place { font-size: 9px; }
+  .ocean-weather-badge__cond { font-size: 12px; }
+}
+
+@media (max-width: 639px) {
+  .ocean-weather__drop--extra,
+  .ocean-weather__wind--extra {
+    display: none;
+  }
+  .ocean-weather__moon {
+    width: 36px;
+    height: 36px;
+    top: 18%;
+    right: 8%;
+  }
+  .ocean-weather__spout {
+    left: 78%;
+    width: 52px;
+    height: 36%;
+    top: 14%;
+  }
+  .ocean-weather__wind {
+    width: 52px;
+  }
+  .ocean-weather__drop {
+    height: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocean-weather__drop,
+  .ocean-weather__wind,
+  .ocean-weather__lightning,
+  .ocean-weather__spout,
+  .ocean-weather__spout-funnel {
+    animation: none !important;
+  }
+  .ocean-weather__drop { opacity: 0.35; }
 }

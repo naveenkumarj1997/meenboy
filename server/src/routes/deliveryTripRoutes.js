@@ -6,6 +6,7 @@ const {
   pingMyTrip,
   endMyTrip,
   adminGetDayTrips,
+  adminGetLiveMap,
   adminStartTrip,
   adminEndTrip,
   adminReopenTrip,
@@ -21,6 +22,15 @@ const tripsAdmin = [
   authorizeRoles("admin"),
   authorizeAdminSections("delivery_trips_control")
 ];
+const liveMapAdmin = [
+  protect,
+  authorizeRoles("admin"),
+  authorizeAdminSections(
+    "delivery_partner_location",
+    "today_delivery_status",
+    "delivery_trips_control"
+  )
+];
 
 router.get("/me/today", ...partnerOnly, getMyTodayTrip);
 router.post("/me/start", ...partnerOnly, startMyTrip);
@@ -28,6 +38,7 @@ router.post("/me/ping", ...partnerOnly, pingMyTrip);
 router.post("/me/end", ...partnerOnly, endMyTrip);
 
 router.get("/admin/day", ...tripsAdmin, adminGetDayTrips);
+router.get("/admin/live-map", ...liveMapAdmin, adminGetLiveMap);
 router.post("/admin/start", ...tripsAdmin, adminStartTrip);
 router.post("/admin/trips/:tripId/end", ...tripsAdmin, adminEndTrip);
 router.post("/admin/trips/:tripId/reopen", ...tripsAdmin, adminReopenTrip);

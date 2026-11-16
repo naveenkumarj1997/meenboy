@@ -77,7 +77,7 @@ const HomePage = () => {
   return (
     <div className="flex flex-col items-center bg-white min-h-screen">
       {/* Premium Hero Section with Animated Ocean Scene */}
-      <section className="w-full relative min-h-[90vh] flex flex-col items-center justify-start text-center px-4 sm:px-6 lg:px-8 overflow-hidden bg-cyan-950">
+      <section className="w-full relative min-h-[85dvh] sm:min-h-[90vh] flex flex-col items-center justify-start text-center px-3 sm:px-6 lg:px-8 overflow-hidden bg-cyan-950">
         {/* Animated Ocean Background */}
         <AnimatedOceanScene />
 

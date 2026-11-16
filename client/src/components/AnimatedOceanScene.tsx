@@ -1,4 +1,10 @@
-import './AnimatedOceanScene.css';
+import { useEffect, useState } from "react";
+import "./AnimatedOceanScene.css";
+import {
+  fetchRameswaramWeather,
+  guessRameswaramIsDay,
+  type RameswaramWeather
+} from "../lib/rameswaramWeather";
 
 /**
  * AnimatedOceanScene — Enhanced Version
@@ -40,6 +46,18 @@ const stars = [
   { x: '68%', y: '20%', delay: '0.9s' },
   { x: '82%', y: '19%', delay: '1.6s', lg: true },
 ];
+
+const RAIN_DROPS = Array.from({ length: 40 }, (_, i) => ({
+  left: `${(i * 13 + 5) % 97}%`,
+  delay: `${(i % 10) * 0.16}s`,
+  dur: `${0.65 + (i % 6) * 0.12}s`
+}));
+
+const WIND_STREAKS = Array.from({ length: 10 }, (_, i) => ({
+  top: `${8 + (i * 7) % 36}%`,
+  delay: `${(i % 8) * 0.35}s`,
+  dur: `${1.4 + (i % 4) * 0.25}s`
+}));
 
 // ── SVG Inline Components ──
 
@@ -316,8 +334,34 @@ const SeagullSVG = ({ size = 1 }: { size?: number }) => (
 
 
 const AnimatedOceanScene = () => {
+  const [weather, setWeather] = useState<RameswaramWeather | null>(null);
+  const [isDay, setIsDay] = useState(guessRameswaramIsDay);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchRameswaramWeather()
+      .then((data) => {
+        if (!cancelled && data) {
+          setWeather(data);
+          setIsDay(data.isDay);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mood = weather?.mood;
+  const showRain = mood === "rain" || mood === "storm" || mood === "tornado";
+  const showWind = mood === "wind" || mood === "storm" || mood === "tornado";
+  const showStorm = mood === "storm" || mood === "tornado";
+  const periodClass = isDay ? "ocean-scene--day" : "ocean-scene--night";
+  const moodClass = mood ? ` ocean-scene--${mood}` : "";
+
   return (
-    <div className="ocean-scene" aria-hidden="true">
+    <>
+    <div className={`ocean-scene ${periodClass}${moodClass}`} aria-hidden="true">
       {/* ── 1. Sky ── */}
       <div className="ocean-scene__sky" />
 
@@ -990,7 +1034,64 @@ const AnimatedOceanScene = () => {
 
       {/* ── 12. Content overlay ── */}
       <div className="ocean-scene__content-overlay" />
+
+      {/* Live Rameswaram weather layer — delete this block + rameswaramWeather.ts to remove */}
+      <div className="ocean-weather" data-mood={mood || ""} data-period={isDay ? "day" : "night"}>
+        {isDay && (mood === "fair" || mood === "wind" || !mood) ? (
+          <div className="ocean-weather__sun-flare" />
+        ) : null}
+        {!isDay ? (
+          <div className="ocean-weather__moon">
+            <span className="ocean-weather__moon-glow" />
+          </div>
+        ) : null}
+        {showWind
+          ? WIND_STREAKS.map((s, i) => (
+              <span
+                key={`wind-${i}`}
+                className={`ocean-weather__wind${i >= 5 ? " ocean-weather__wind--extra" : ""}`}
+                style={{
+                  top: s.top,
+                  animationDelay: s.delay,
+                  animationDuration: s.dur
+                }}
+              />
+            ))
+          : null}
+        {showRain
+          ? RAIN_DROPS.map((d, i) => (
+              <span
+                key={`rain-${i}`}
+                className={`ocean-weather__drop${mood === "storm" || mood === "tornado" ? " ocean-weather__drop--heavy" : ""}${i >= 16 ? " ocean-weather__drop--extra" : ""}`}
+                style={{
+                  left: d.left,
+                  animationDelay: d.delay,
+                  animationDuration: d.dur
+                }}
+              />
+            ))
+          : null}
+        {showStorm ? (
+          <>
+            <div className="ocean-weather__lightning ocean-weather__lightning--a" />
+            <div className="ocean-weather__lightning ocean-weather__lightning--b" />
+          </>
+        ) : null}
+        {mood === "tornado" ? (
+          <div className="ocean-weather__spout" aria-hidden>
+            <div className="ocean-weather__spout-funnel" />
+            <div className="ocean-weather__spout-spray" />
+          </div>
+        ) : null}
+      </div>
     </div>
+    {weather ? (
+      <div className="ocean-weather-badge">
+        <span className="ocean-weather-badge__place">Rameswaram now</span>
+        <span className="ocean-weather-badge__cond">{weather.label}</span>
+      </div>
+    ) : null}
+    </>
   );
 };
 

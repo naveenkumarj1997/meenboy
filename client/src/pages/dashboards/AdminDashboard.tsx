@@ -42,6 +42,11 @@ const SHORTCUTS: Shortcut[] = [
     href: "/dashboard/admin/today-delivery-status",
     section: "today_delivery_status"
   },
+  {
+    label: "Delivery Partner Location",
+    href: "/dashboard/admin/delivery-partner-location",
+    section: "delivery_partner_location"
+  },
   { label: "Today's Catch", href: "/dashboard/admin/todays-catch", section: "todays_catch" },
   { label: "Order Management", href: "/dashboard/admin/deliveries", section: "deliveries" },
   { label: "Orders List", href: "/dashboard/admin/orders-list", section: "orders_list" },
